@@ -1,0 +1,18 @@
+{
+  "id": "carousel",
+  "name": "LinkedIn Carousel",
+  "tagline": "Editorial swipe slides — PNGs, an upload-ready PDF, an optional animated MP4, and the caption.",
+  "category": "design",
+  "order": 8,
+  "estimate": "6–12 min",
+  "accent": "#0a66c2",
+  "options": [
+    { "key": "angle", "label": "Angle", "type": "select", "choices": ["problem-solution", "how-it-works", "listicle", "before-after", "myth-buster", "launch"], "default": "problem-solution" },
+    { "key": "slides", "label": "Slides", "type": "number", "default": "8", "min": 4, "max": 12 },
+    { "key": "platform", "label": "Size", "type": "select", "choices": ["linkedin", "instagram", "square"], "default": "linkedin" },
+    { "key": "motion", "label": "Animated MP4", "type": "select", "choices": ["yes", "no"], "default": "yes" }
+  ],
+  "outputs": ["slides/*.png", "*.pdf", "*.mp4", "caption.md", "*.md"],
+  "skills": [],
+  "tools": ["chrome", "ffmpeg"]
+}

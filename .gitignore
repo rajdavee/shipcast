@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.shipcast/
+*.log
+.DS_Store
+.env
+.env.*

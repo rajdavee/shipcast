@@ -1,0 +1,138 @@
+import { test, before, after } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import type { AddressInfo } from 'node:net';
+
+// Isolate the data dir and swap the claude CLI for a scripted fake.
+const home = mkdtempSync(join(tmpdir(), 'shipcast-test-'));
+const log = join(home, 'claude-calls.ndjson');
+process.env.SHIPCAST_HOME = home;
+process.env.SHIPCAST_CLAUDE_BIN = join(import.meta.dirname, 'fake-claude.mjs');
+process.env.FAKE_CLAUDE_LOG = log;
+
+const { createApp } = await import('@shipcast/api');
+const { startWorker } = await import('@shipcast/worker');
+
+let base = '';
+const app = createApp({ serveWeb: false });
+const worker = startWorker({ intervalMs: 50, log: () => {} });
+
+before(async () => {
+  await new Promise<void>((r) => app.listen(0, '127.0.0.1', r));
+  base = `http://localhost:${(app.address() as AddressInfo).port}`;
+});
+after(async () => {
+  await worker.stop();
+  app.close();
+  rmSync(home, { recursive: true, force: true });
+});
+
+const api = async (path: string, init: RequestInit & { json?: unknown } = {}) => {
+  const res = await fetch(base + path, {
+    ...init,
+    headers: { 'content-type': 'application/json', ...(init.headers ?? {}) },
+    body: init.json !== undefined ? JSON.stringify(init.json) : init.body,
+  });
+  const text = await res.text();
+  return { status: res.status, body: text ? JSON.parse(text) : null };
+};
+
+async function waitFor(id: string, pred: (c: any) => boolean, ms = 10_000) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < ms) {
+    const { body } = await api(`/api/campaigns/${id}`);
+    if (pred(body)) return body;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  throw new Error('timed out');
+}
+
+test('rejects bad input', async () => {
+  assert.equal((await api('/api/campaigns', { method: 'POST', json: {} })).status, 400);
+  assert.equal((await api('/api/campaigns', { method: 'POST', json: { source: { type: 'url', value: 'x.dev' }, deliverables: [] } })).status, 400);
+  assert.equal((await api('/api/campaigns', { method: 'POST', json: { source: { type: 'url', value: 'x.dev' }, deliverables: [{ pack: 'nope' }] } })).status, 400);
+  const bad = await api('/api/campaigns', { method: 'POST', json: { source: { type: 'url', value: 'x.dev' }, deliverables: [{ pack: 'carousel', options: { platform: 'myspace' } }] } });
+  assert.equal(bad.status, 400);
+});
+
+test('blocks cross-site writes and foreign hosts', async () => {
+  const r = await fetch(base + '/api/campaigns', { method: 'POST', headers: { origin: 'https://evil.example' }, body: '{}' });
+  assert.equal(r.status, 403);
+});
+
+test('lists packs with install status', async () => {
+  const { body } = await api('/api/packs');
+  const carousel = body.find((p: any) => p.id === 'carousel');
+  assert.ok(carousel);
+  assert.equal(carousel.prompt, undefined);
+  assert.ok(Array.isArray(carousel.skills));
+});
+
+test('campaign runs brief then deliverable, then revises with --resume', async () => {
+  const created = await api('/api/campaigns', {
+    method: 'POST',
+    json: { name: 'Demo', source: { type: 'url', value: 'example.com' }, goal: 'launch', deliverables: [{ pack: 'carousel', options: { slides: '6' } }] },
+  });
+  assert.equal(created.status, 200);
+  const id = created.body.id;
+  assert.equal(created.body.source.value, 'https://example.com');
+  assert.equal(created.body.steps[1].options.slides, '6');
+  assert.equal(created.body.steps[1].options.angle, 'problem-solution');
+
+  const done = await waitFor(id, (c) => c.steps.every((s: any) => s.status === 'done'));
+  const step = done.steps[1];
+  assert.deepEqual(step.outputs, ['out/NOTES.md', 'out/carousel.pdf', 'out/copy.md', 'out/slides/slide-01.png']);
+  assert.ok(step.sessionId);
+
+  // Brief must run first, in the brief folder, with sub-agents blocked for this pack.
+  const calls = readFileSync(log, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+  assert.ok(calls[0].cwd.endsWith('/brief'));
+  assert.ok(calls[1].args.includes('--disallowedTools'));
+  assert.ok(calls[1].args.includes('--plugin-dir'));
+
+  // Files are served with a sandbox CSP and range support.
+  const f = await fetch(`${base}/api/campaigns/${id}/files/deliverables/${step.id}/out/carousel.pdf`, { headers: { range: 'bytes=0-1' } });
+  assert.equal(f.status, 206);
+  assert.equal(await f.text(), 'pd');
+  assert.match(f.headers.get('content-security-policy') ?? '', /sandbox/);
+  assert.equal((await fetch(`${base}/api/campaigns/${id}/files/../../settings.json`)).status, 404);
+  assert.equal((await fetch(`${base}/api/campaigns/${id}/files/%2e%2e%2f%2e%2e%2fx`)).status, 403);
+
+  const rev = await api(`/api/campaigns/${id}/steps/${step.id}/revise`, { method: 'POST', json: { note: 'bigger headline' } });
+  assert.equal(rev.status, 200);
+  const revised = await waitFor(id, (c) => c.steps[1].status === 'done' && c.steps[1].revisions.length === 1);
+  assert.equal(revised.steps[1].revisions[0].note, 'bigger headline');
+  const last = readFileSync(log, 'utf8').trim().split('\n').map((l) => JSON.parse(l)).at(-1);
+  assert.equal(last.args[last.args.indexOf('--resume') + 1], step.sessionId);
+  const notes = await fetch(`${base}/api/campaigns/${id}/files/deliverables/${step.id}/out/NOTES.md`);
+  assert.equal(await notes.text(), 'revised');
+
+  // Event log captured the stream.
+  const sse = await fetch(`${base}/api/campaigns/${id}/events`);
+  const reader = sse.body!.getReader();
+  const { value } = await reader.read();
+  await reader.cancel();
+  assert.match(new TextDecoder().decode(value), /event: log/);
+});
+
+test('failed brief blocks deliverables; retry unblocks', async () => {
+  process.env.FAKE_CLAUDE_MODE = 'fail';
+  const { body } = await api('/api/campaigns', { method: 'POST', json: { source: { type: 'text', value: 'A todo app for cats' }, deliverables: [{ pack: 'copy-kit' }] } });
+  const failed = await waitFor(body.id, (c) => c.steps[0].status === 'failed' && c.steps[1].status === 'blocked');
+  assert.match(failed.steps[0].error, /boom/);
+  delete process.env.FAKE_CLAUDE_MODE;
+  await api(`/api/campaigns/${body.id}/steps/brief/retry`, { method: 'POST' });
+  await waitFor(body.id, (c) => c.steps.every((s: any) => s.status === 'done'));
+});
+
+test('cancel stops a running step', async () => {
+  process.env.FAKE_CLAUDE_MODE = 'hang';
+  const { body } = await api('/api/campaigns', { method: 'POST', json: { source: { type: 'url', value: 'example.org' }, deliverables: [{ pack: 'thumbnails' }] } });
+  await waitFor(body.id, (c) => c.steps[0].status === 'running');
+  await api(`/api/campaigns/${body.id}/steps/brief/cancel`, { method: 'POST' });
+  const c = await waitFor(body.id, (x) => x.steps[0].status === 'canceled', 8000);
+  assert.equal(c.steps[1].status, 'blocked');
+  delete process.env.FAKE_CLAUDE_MODE;
+});

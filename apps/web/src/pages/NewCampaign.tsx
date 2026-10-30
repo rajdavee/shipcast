@@ -1,0 +1,249 @@
+import { useMemo, useState, type CSSProperties } from 'react';
+import { api, detectSource, type Pack, type SourceType, type Status } from '../api.ts';
+import { go, toast, useLoad } from '../hooks.ts';
+import { PackFrame } from '../components/PackFrame.tsx';
+import { OptionInput } from '../components/OptionInput.tsx';
+import { Icon } from '../components/icons.tsx';
+
+const KIND_LABEL: Record<SourceType, string> = {
+  url: 'Website',
+  github: 'GitHub repo',
+  local: 'Local folder',
+  text: 'Written brief',
+};
+
+const BUNDLES: { name: string; packs: string[] }[] = [
+  { name: 'Launch kit', packs: ['launch-video', 'carousel', 'thumbnails', 'copy-kit'] },
+  { name: 'Social week', packs: ['social-short', 'discovery-journey', 'carousel', 'copy-kit'] },
+  { name: 'Video only', packs: ['launch-video', 'product-promo', 'social-short'] },
+];
+
+export function NewCampaign({ status }: { status: Status | null }) {
+  const packs = useLoad(() => api.packs());
+  const [input, setInput] = useState('');
+  const [selected, setSelected] = useState<string[]>(['launch-video', 'carousel', 'copy-kit']);
+  const [options, setOptions] = useState<Record<string, Record<string, string>>>({});
+  const [details, setDetails] = useState({ name: '', goal: '', audience: '', tone: '', notes: '' });
+  const [repos, setRepos] = useState<{ nameWithOwner: string; isPrivate: boolean }[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [installing, setInstalling] = useState<string | null>(null);
+
+  const source = detectSource(input);
+  const all = packs.data ?? [];
+  const byId = useMemo(() => new Map(all.map((p) => [p.id, p])), [all]);
+  const chosen = selected.map((id) => byId.get(id)).filter((p): p is Pack => !!p);
+  const usable = (p: Pack) => !source || p.sources.length === 0 || p.sources.includes(source.type);
+
+  const toggle = (p: Pack) => {
+    if (!usable(p)) return;
+    setSelected((s) => (s.includes(p.id) ? s.filter((x) => x !== p.id) : [...s, p.id]));
+  };
+  const setOpt = (pack: string, key: string, value: string) => setOptions((o) => ({ ...o, [pack]: { ...o[pack], [key]: value } }));
+
+  async function loadRepos() {
+    try {
+      setRepos(await api.repos());
+    } catch (e) {
+      setError(String((e as Error).message));
+    }
+  }
+
+  async function install(p: Pack) {
+    setInstalling(p.id);
+    try {
+      const r = await api.installPack(p.id);
+      const failed = r.results.filter((x) => !x.ok);
+      toast(failed.length ? `Couldn't install ${failed.map((f) => f.skill).join(', ')}` : `${p.name} is ready`);
+      packs.reload();
+    } catch (e) {
+      toast(String((e as Error).message));
+    } finally {
+      setInstalling(null);
+    }
+  }
+
+  async function start() {
+    if (!source) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const c = await api.createCampaign({
+        ...details,
+        source,
+        deliverables: chosen.filter(usable).map((p) => ({ pack: p.id, options: options[p.id] ?? {} })),
+      });
+      go(`/c/${c.id}`);
+    } catch (e) {
+      setError(String((e as Error).message));
+      setBusy(false);
+    }
+  }
+
+  const missingSkills = chosen.some((p) => p.skills.some((s) => !s.installed));
+  const claudeReady = status?.claude.loggedIn;
+  const runnable = chosen.filter(usable);
+
+  return (
+    <div className="slate">
+      <h1 className="slate-title">Paste a link. Get a launch.</h1>
+      <p className="slate-sub">
+        Shipcast reads your site or repo once, then makes the videos, motion graphics, carousels, thumbnails and posts — on your machine, with your own Claude login.
+      </p>
+
+      {status && !claudeReady && (
+        <div className="banner" style={{ marginBottom: 18 }}>
+          Claude Code isn't connected yet. <a href="#/connect">Connect it</a> — it's the only account Shipcast needs.
+        </div>
+      )}
+
+      <label className="source-bar">
+        <input
+          autoFocus
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="yourproduct.com, owner/repo, or a folder path"
+          aria-label="What should we promote?"
+          onKeyDown={(e) => e.key === 'Enter' && source && runnable.length && claudeReady && start()}
+        />
+        <span className="source-kind">{source ? <b>{KIND_LABEL[source.type]}</b> : input.trim() ? 'Keep typing…' : ''}</span>
+      </label>
+      <div className="source-help">
+        <span>Try</span>
+        <button onClick={() => setInput('https://latent-spaces.github.io/brag/')}>a website</button>
+        <button onClick={() => setInput('rajdavee/shipcast')}>a GitHub repo</button>
+        <button onClick={() => setInput('A habit tracker for remote teams that turns daily standups into a 30-second voice note, transcribed and summarised for everyone.')}>a written brief</button>
+        {status?.github.loggedIn && !repos && <button onClick={loadRepos}>pick from your GitHub</button>}
+      </div>
+      {repos && (
+        <div className="field" style={{ marginTop: 14, maxWidth: 520 }}>
+          <span>Your repositories</span>
+          <select className="select" value="" onChange={(e) => e.target.value && setInput(e.target.value)}>
+            <option value="">Choose a repository…</option>
+            {repos.map((r) => (
+              <option key={r.nameWithOwner} value={r.nameWithOwner}>
+                {r.nameWithOwner}
+                {r.isPrivate ? ' (private)' : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      <section className="section" aria-labelledby="formats">
+        <div className="section-head">
+          <h2 className="section-title" id="formats">What should we make?</h2>
+          <div className="bundle-row">
+            {BUNDLES.map((b) => (
+              <button key={b.name} className="btn small" onClick={() => setSelected(b.packs.filter((id) => byId.has(id)))}>
+                {b.name}
+              </button>
+            ))}
+            <button className="btn small ghost" onClick={() => setSelected([])}>
+              Clear
+            </button>
+          </div>
+        </div>
+        {packs.error && <p className="error-text">{packs.error}</p>}
+        <div className="reel">
+          {all.map((p) => {
+            const on = selected.includes(p.id);
+            const ok = usable(p);
+            return (
+              <button
+                key={p.id}
+                className="tile"
+                aria-pressed={on}
+                aria-disabled={!ok}
+                title={ok ? p.tagline : `Needs a ${p.sources.map((s) => KIND_LABEL[s]).join(' or ')} source`}
+                onClick={() => toggle(p)}
+              >
+                <PackFrame pack={p} options={options[p.id]} />
+                <span className="tile-check">
+                  <Icon.check />
+                </span>
+                <span className="tile-name">{p.name}</span>
+                <span className="tile-line">{p.tagline}</span>
+                <span className="tile-meta">
+                  <span className="tnum">{p.estimate}</span>
+                  {p.skills.some((s) => !s.installed) && <span>needs install</span>}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {chosen.length > 0 && (
+          <div className="inspector">
+            {chosen.map((p) => (
+              <div key={p.id} className="inspect-card" style={{ '--accent': p.accent } as CSSProperties}>
+                <div className="inspect-head">
+                  <i className="swatch" />
+                  <h3>{p.name}</h3>
+                </div>
+                {p.options.length > 0 && (
+                  <div className="opts">
+                    {p.options.map((o) => (
+                      <OptionInput key={o.key} field={o} value={options[p.id]?.[o.key] ?? o.default} onChange={(v) => setOpt(p.id, o.key, v)} />
+                    ))}
+                  </div>
+                )}
+                {p.skills.some((s) => !s.installed) && (
+                  <div className="missing">
+                    Uses the {p.skills.map((s) => s.name).join(', ')} skill from {p.skills[0].source}. It installs automatically when this runs, or now:
+                    <button className="btn small" disabled={installing === p.id} onClick={() => install(p)}>
+                      {installing === p.id ? 'Installing…' : 'Install skill'}
+                    </button>
+                  </div>
+                )}
+                {!usable(p) && <div className="missing">Works from a GitHub repo — this one will be skipped.</div>}
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="section" aria-labelledby="details">
+        <div className="section-head">
+          <h2 className="section-title" id="details">Point it in a direction</h2>
+          <span className="hint">All optional — the brief fills the gaps.</span>
+        </div>
+        <div className="details-grid">
+          <label className="field">
+            <span>Campaign name</span>
+            <input className="input" value={details.name} onChange={(e) => setDetails({ ...details, name: e.target.value })} placeholder="v2 launch" />
+          </label>
+          <label className="field">
+            <span>Goal</span>
+            <input className="input" value={details.goal} onChange={(e) => setDetails({ ...details, goal: e.target.value })} placeholder="Launch day, new feature, hiring, fundraising…" />
+          </label>
+          <label className="field">
+            <span>Audience</span>
+            <input className="input" value={details.audience} onChange={(e) => setDetails({ ...details, audience: e.target.value })} placeholder="Indie hackers, CFOs at 50-person startups…" />
+          </label>
+          <label className="field">
+            <span>Tone</span>
+            <input className="input" value={details.tone} onChange={(e) => setDetails({ ...details, tone: e.target.value })} placeholder="Confident and dry, like a Stripe changelog" />
+          </label>
+        </div>
+        <label className="field" style={{ marginTop: 14 }}>
+          <span>Anything else Claude should know</span>
+          <textarea className="textarea" value={details.notes} onChange={(e) => setDetails({ ...details, notes: e.target.value })} placeholder="Feature the new dashboard. Don't mention pricing. Our handle is @acme." />
+        </label>
+      </section>
+
+      {error && <p className="error-text" style={{ marginTop: 16 }}>{error}</p>}
+
+      <div className="launch-bar">
+        <span className="launch-summary">
+          {source ? <b>{KIND_LABEL[source.type]}</b> : 'Add a source'} ·{' '}
+          {runnable.length ? `${runnable.length} deliverable${runnable.length > 1 ? 's' : ''}` : 'pick at least one format'}
+          {missingSkills ? ' · installs missing skills first' : ''}
+        </span>
+        <button className="btn primary" disabled={!source || !runnable.length || busy || !claudeReady} onClick={start}>
+          {busy ? 'Starting…' : 'Start campaign'}
+        </button>
+      </div>
+    </div>
+  );
+}

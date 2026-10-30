@@ -1,0 +1,13 @@
+{
+  "name": "@shipcast/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@shipcast/engine": "0.1.0",
+    "@shipcast/worker": "0.1.0"
+  }
+}

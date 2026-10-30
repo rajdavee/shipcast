@@ -1,0 +1,20 @@
+{
+  "id": "product-promo",
+  "name": "Product Promo",
+  "tagline": "Narrated 30–60s promo: hook, demo of the real flow, proof, CTA — with local AI voiceover.",
+  "category": "video",
+  "order": 2,
+  "estimate": "20–40 min",
+  "accent": "#7c5cff",
+  "subagents": true,
+  "options": [
+    { "key": "length", "label": "Length", "type": "select", "choices": ["15s", "30s", "45s", "60s"], "default": "30s" },
+    { "key": "aspect", "label": "Aspect", "type": "select", "choices": ["1920x1080", "1080x1920", "1080x1080"], "default": "1920x1080" },
+    { "key": "voiceover", "label": "Voiceover", "type": "select", "choices": ["yes", "no"], "default": "yes" },
+    { "key": "voice", "label": "Voice", "type": "select", "choices": ["af_heart", "af_nova", "af_sky", "am_adam", "am_michael", "bf_emma", "bm_george"], "default": "af_heart" },
+    { "key": "angle", "label": "Angle", "type": "text", "default": "", "placeholder": "e.g. feature reveal of the new editor" }
+  ],
+  "outputs": ["*.mp4", "*.jpg", "*.srt", "*.vtt", "*.md"],
+  "skills": [{ "name": "product-launch-video", "source": "heygen-com/hyperframes" }],
+  "tools": ["ffmpeg", "chrome"]
+}
