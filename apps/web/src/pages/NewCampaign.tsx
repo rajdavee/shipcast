@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { api, detectSource, type Pack, type SourceType, type Status } from '../api.ts';
 import { go, toast, useLoad } from '../hooks.ts';
 import { PackFrame } from '../components/PackFrame.tsx';
@@ -30,6 +30,20 @@ export function NewCampaign({ status }: { status: Status | null }) {
   const [installing, setInstalling] = useState<string | null>(null);
 
   const source = detectSource(input);
+  const [pulls, setPulls] = useState<{ repo: string; items: { value: string; label: string }[] } | null>(null);
+  const repo = source?.type === 'github' ? source.value.replace(/^(https?:\/\/)?(www\.)?github\.com\//i, '').replace(/\.git$|\/$/g, '') : null;
+  const wantsPr = selected.includes('pr-video');
+  // Suggest recent pull requests for the PR video format (needs the GitHub CLI).
+  useEffect(() => {
+    if (!repo || !wantsPr || !status?.github.loggedIn || pulls?.repo === repo) return;
+    const t = setTimeout(() => {
+      api
+        .pulls(repo)
+        .then((ps) => setPulls({ repo, items: ps.map((p) => ({ value: String(p.number), label: `#${p.number} ${p.title} (${p.state.toLowerCase()})` })) }))
+        .catch(() => setPulls({ repo, items: [] }));
+    }, 400);
+    return () => clearTimeout(t);
+  }, [repo, wantsPr, status?.github.loggedIn]);
   const all = packs.data ?? [];
   const byId = useMemo(() => new Map(all.map((p) => [p.id, p])), [all]);
   const chosen = selected.map((id) => byId.get(id)).filter((p): p is Pack => !!p);
@@ -184,7 +198,13 @@ export function NewCampaign({ status }: { status: Status | null }) {
                 {p.options.length > 0 && (
                   <div className="opts">
                     {p.options.map((o) => (
-                      <OptionInput key={o.key} field={o} value={options[p.id]?.[o.key] ?? o.default} onChange={(v) => setOpt(p.id, o.key, v)} />
+                      <OptionInput
+                        key={o.key}
+                        field={o}
+                        value={options[p.id]?.[o.key] ?? o.default}
+                        onChange={(v) => setOpt(p.id, o.key, v)}
+                        suggestions={o.key === 'pr' && pulls?.repo === repo ? pulls.items : undefined}
+                      />
                     ))}
                   </div>
                 )}
