@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { run } from './exec.ts';
+import { engineEnv } from './setup.ts';
 
 export interface ClaudeAuth {
   installed: boolean;
@@ -146,7 +147,7 @@ export function runClaude(o: RunOptions): ClaudeRun {
   const bin = process.env.SHIPCAST_CLAUDE_BIN ?? 'claude';
   const child = spawn(bin, buildArgs(o), {
     cwd: o.cwd,
-    env: { ...process.env, CLAUDE_CODE_ENTRYPOINT: 'shipcast' },
+    env: { ...process.env, ...engineEnv() },
     stdio: ['ignore', 'pipe', 'pipe'],
     // Own process group, so stopping a run also stops the renders it started.
     detached: process.platform !== 'win32',

@@ -26,6 +26,7 @@ import {
   readCampaign,
   readEvents,
   readSettings,
+  SETUPS,
   updateCampaign,
   walk,
   writeSettings,
@@ -114,6 +115,17 @@ router.get('/api/status', async () => {
   return { claude, github, logins: { claude: loginState('claude'), github: loginState('github') } };
 });
 router.get('/api/doctor', () => doctor());
+const setupRuns = new Map<string, Promise<{ ok: boolean; log: string }>>();
+router.post('/api/setup/:id', async (_q, _r, p) => {
+  if (!Object.hasOwn(SETUPS, p.id)) throw new HttpError(404, 'unknown setup');
+  // One install at a time per engine; a second click waits for the first.
+  let job = setupRuns.get(p.id);
+  if (!job) {
+    job = SETUPS[p.id as keyof typeof SETUPS].run().finally(() => setupRuns.delete(p.id));
+    setupRuns.set(p.id, job);
+  }
+  return job;
+});
 router.post('/api/connect/claude', () => startClaudeLogin());
 router.post('/api/connect/github', () => startGithubLogin());
 router.get('/api/github/repos', () => listRepos());

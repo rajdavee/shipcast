@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { run, which } from './exec.ts';
 import { claudeAuth } from './claude.ts';
 import { githubStatus } from './github.ts';
+import { voiceReady } from './setup.ts';
 
 export interface Check {
   id: string;
@@ -12,6 +13,8 @@ export interface Check {
   required: boolean;
   detail: string;
   hint?: string;
+  /** Id of a one-click setup in SETUPS that fixes this check. */
+  fix?: string;
 }
 
 /** Find a Chrome the renderers can drive: HyperFrames' cached shell, then system browsers. */
@@ -51,7 +54,7 @@ export async function doctor(): Promise<Check[]> {
     bin('git', 'git', true, 'Install git', ['--version']),
     bin('ffmpeg', 'FFmpeg', true, 'brew install ffmpeg  ·  apt install ffmpeg  ·  winget install ffmpeg'),
     bin('whisper-cli', 'whisper.cpp (captions)', false, 'brew install whisper-cpp — word-timed captions offline', ['--help']),
-    run('python3', ['-c', 'import kokoro_onnx'], { timeoutMs: 15_000 }),
+    voiceReady(),
   ]);
   const [major, minor] = process.versions.node.split('.').map(Number);
   const chrome = findChrome();
@@ -89,15 +92,17 @@ export async function doctor(): Promise<Check[]> {
       required: true,
       detail: chrome ? chrome.split('/').slice(-1)[0] : 'not found',
       hint: 'npx hyperframes browser ensure  (or install Google Chrome)',
+      fix: 'chrome',
     },
     whisper,
     {
       id: 'kokoro',
       label: 'Kokoro TTS (voiceover)',
-      ok: kokoro.code === 0,
+      ok: kokoro,
       required: false,
-      detail: kokoro.code === 0 ? 'local voices ready' : 'not installed',
-      hint: 'pip install kokoro-onnx soundfile — free local voiceover',
+      detail: kokoro ? 'local voices ready' : 'not installed — videos fall back to the system voice',
+      hint: 'Free, natural local voiceover. Installs into ~/.shipcast/voice.',
+      fix: 'voice',
     },
   ];
 }

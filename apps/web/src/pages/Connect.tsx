@@ -1,12 +1,29 @@
 import { useEffect, useState } from 'react';
 import { api, type LoginState, type Status } from '../api.ts';
-import { useLoad } from '../hooks.ts';
+import { toast, useLoad } from '../hooks.ts';
 import { Icon } from '../components/icons.tsx';
 
 export function Connect({ status, onChange }: { status: Status | null; onChange: () => void }) {
   const checks = useLoad(() => api.doctor());
   const [claudeLogin, setClaudeLogin] = useState<LoginState | null>(null);
   const [ghLogin, setGhLogin] = useState<LoginState | null>(null);
+  const [fixing, setFixing] = useState<string | null>(null);
+  const [fixLog, setFixLog] = useState<string | null>(null);
+
+  async function fix(id: string, label: string) {
+    setFixing(id);
+    setFixLog(null);
+    try {
+      const r = await api.setup(id);
+      toast(r.ok ? `${label} is ready` : `${label} setup failed`);
+      if (!r.ok) setFixLog(r.log);
+      checks.reload();
+    } catch (e) {
+      toast(String((e as Error).message));
+    } finally {
+      setFixing(null);
+    }
+  }
 
   // While a login is in flight, poll status so the lamp flips the moment the browser step finishes.
   useEffect(() => {
@@ -104,11 +121,25 @@ export function Connect({ status, onChange }: { status: Status | null; onChange:
                 {!k.required && <span className="hint">optional</span>}
               </div>
               <div className="check-detail">{k.detail}</div>
-              {!k.ok && k.hint && <div className="check-hint"><code>{k.hint}</code></div>}
+              {!k.ok && k.fix ? (
+                <>
+                  <div className="check-hint">{k.hint}</div>
+                  <button className="btn small" style={{ justifySelf: 'start', marginTop: 6 }} disabled={!!fixing} onClick={() => fix(k.fix!, k.label)}>
+                    {fixing === k.fix ? 'Setting up — this can take a few minutes…' : 'Set up'}
+                  </button>
+                </>
+              ) : (
+                !k.ok && k.hint && <div className="check-hint"><code>{k.hint}</code></div>
+              )}
             </div>
           ))}
           {!checks.data && <p className="hint">Checking tools…</p>}
         </div>
+        {fixLog && (
+          <div className="doc" style={{ marginTop: 12, maxWidth: 860 }}>
+            <pre>{fixLog}</pre>
+          </div>
+        )}
       </section>
     </div>
   );

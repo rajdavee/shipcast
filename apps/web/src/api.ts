@@ -66,6 +66,7 @@ export interface Check {
   required: boolean;
   detail: string;
   hint?: string;
+  fix?: string;
 }
 
 export interface LoginState {
@@ -103,6 +104,7 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 export const api = {
   status: () => call<Status>('GET', '/api/status'),
   doctor: () => call<Check[]>('GET', '/api/doctor'),
+  setup: (id: string) => call<{ ok: boolean; log: string }>('POST', `/api/setup/${id}`),
   connectClaude: () => call<LoginState>('POST', '/api/connect/claude'),
   connectGithub: () => call<LoginState>('POST', '/api/connect/github'),
   repos: () => call<{ nameWithOwner: string; description: string; isPrivate: boolean; updatedAt: string }[]>('GET', '/api/github/repos'),

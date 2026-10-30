@@ -8,4 +8,5 @@ export * from './skills.ts';
 export * from './doctor.ts';
 export * from './files.ts';
 export * from './runner.ts';
+export * from './setup.ts';
 export { run, which } from './exec.ts';
