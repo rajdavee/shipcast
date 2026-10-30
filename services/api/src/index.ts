@@ -1,5 +1,5 @@
 import { createServer, type Server } from 'node:http';
-import { existsSync, createWriteStream } from 'node:fs';
+import { existsSync, createWriteStream, realpathSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import { join, resolve, sep, basename } from 'node:path';
 import { spawn } from 'node:child_process';
@@ -277,7 +277,19 @@ function safePath(id: string, rel: string): string {
   const abs = resolve(root, rel);
   if (abs !== root && !abs.startsWith(root + sep)) throw new HttpError(403, 'outside campaign');
   if (/(^|\/)(source|\.lock)(\/|$)/.test(rel)) throw new HttpError(403, 'not served');
+  if (!insideReal(root, abs)) throw new HttpError(403, 'outside campaign');
   return abs;
+}
+
+/** True if `file` exists and, with symlinks resolved, still lives under `root`. */
+function insideReal(root: string, file: string): boolean {
+  try {
+    const realRoot = realpathSync(root);
+    const real = realpathSync(file);
+    return real === realRoot || real.startsWith(realRoot + sep);
+  } catch {
+    return false;
+  }
 }
 
 router.get('/api/campaigns/:id/files/*', (req, res, p) => {
@@ -318,7 +330,7 @@ router.post('/api/campaigns/:id/uploads', async (req, _r, p) => {
 router.get('/api/campaigns/:id/export', async (req, res, p) => {
   const c = await mustCampaign(p.id);
   const root = campaignDir(p.id);
-  const paths = ['brief/brief.md', 'brief/brand.json', ...c.steps.flatMap((s) => (s.kind === 'pack' ? s.outputs.map((o) => `deliverables/${s.id}/${o}`) : []))].filter((f) => existsSync(join(root, f)));
+  const paths = ['brief/brief.md', 'brief/brand.json', ...c.steps.flatMap((s) => (s.kind === 'pack' ? s.outputs.map((o) => `deliverables/${s.id}/${o}`) : []))].filter((f) => insideReal(root, join(root, f)));
   const useZip = process.platform !== 'win32';
   const child = useZip ? spawn('zip', ['-q', '-', ...paths], { cwd: root }) : spawn('tar', ['-czf', '-', ...paths], { cwd: root });
   res.writeHead(200, {

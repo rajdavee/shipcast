@@ -166,7 +166,10 @@ export function runClaude(o: RunOptions): ClaudeRun {
   });
   const done = new Promise<Awaited<ClaudeRun['done']>>((resolve) => {
     child.on('error', (err) => resolve({ code: -1, stderr: String(err) }));
-    child.on('close', (code) => resolve({ code, result, sessionId: result?.sessionId ?? sessionId, stderr }));
+    child.on('close', (code) => {
+      rl.close();
+      resolve({ code, result, sessionId: result?.sessionId ?? sessionId, stderr });
+    });
   });
   const kill = () => {
     try {

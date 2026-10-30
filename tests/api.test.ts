@@ -145,3 +145,15 @@ test('settings accept known fields only', async () => {
   assert.equal(r.body.bogus, undefined);
   assert.equal((await api('/api/settings', { method: 'PUT', json: { subagents: 'always' } })).body.subagents, 'never');
 });
+
+test('files route refuses symlinks that point outside the campaign', async () => {
+  const { symlinkSync, mkdirSync, writeFileSync } = await import('node:fs');
+  const { body } = await api('/api/campaigns', { method: 'POST', json: { source: { type: 'text', value: 'A tool that does something useful for people' }, deliverables: [{ pack: 'copy-kit' }] } });
+  const secret = join(home, 'secret.txt');
+  writeFileSync(secret, 'top secret');
+  const dir = join(home, 'campaigns', body.id, 'uploads');
+  mkdirSync(dir, { recursive: true });
+  symlinkSync(secret, join(dir, 'link.txt'));
+  assert.equal((await fetch(`${base}/api/campaigns/${body.id}/files/uploads/link.txt`)).status, 403);
+  await waitFor(body.id, (c) => c.steps.every((s: any) => s.status === 'done'));
+});

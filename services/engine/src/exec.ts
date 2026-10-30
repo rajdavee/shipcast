@@ -18,8 +18,10 @@ export function run(cmd: string, args: string[], opts: { cwd?: string; timeoutMs
       return resolve({ code: 127, stdout: '', stderr: String(e) });
     }
     const timer = setTimeout(() => child.kill('SIGTERM'), opts.timeoutMs ?? 60_000);
-    child.stdout.on('data', (d) => (stdout += d));
-    child.stderr.on('data', (d) => (stderr += d));
+    // Keep the tail only: installers can be very chatty.
+    const cap = (s: string) => (s.length > 1_000_000 ? s.slice(-500_000) : s);
+    child.stdout.on('data', (d) => (stdout = cap(stdout + d)));
+    child.stderr.on('data', (d) => (stderr = cap(stderr + d)));
     child.on('error', (e) => {
       clearTimeout(timer);
       resolve({ code: 127, stdout, stderr: stderr + String(e) });
