@@ -66,6 +66,12 @@ Then:
 
 `npm run doctor` checks your machine from the terminal.
 
+**Better voiceover (optional):** on the Connections page, click **Set up** next
+to *Kokoro TTS*. Shipcast installs the free Kokoro voice model into its own
+Python environment under `~/.shipcast/voice` — nothing is added to your system
+Python — and narrated formats use it automatically. Without it, videos fall
+back to your OS voice.
+
 <p align="center"><img src="docs/assets/studio-new.png" alt="New campaign: paste a URL, pick formats" width="900" /></p>
 
 ## Formats
