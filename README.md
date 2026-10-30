@@ -17,6 +17,8 @@
   <a href="docs/WRITING-PACKS.md">Write a format</a>
 </p>
 
+<p align="center"><img src="docs/assets/studio-run.png" alt="A Shipcast campaign: research brief, carousel, copy kit, thumbnails, launch video and motion graphic, with the 20-second vertical launch video playing" width="900" /></p>
+
 ---
 
 You built something. Now it needs a launch video, a vertical cut for Shorts, a
@@ -63,6 +65,8 @@ Then:
    of what Claude is doing. Play, preview, copy, download, or ask for changes.
 
 `npm run doctor` checks your machine from the terminal.
+
+<p align="center"><img src="docs/assets/studio-new.png" alt="New campaign: paste a URL, pick formats" width="900" /></p>
 
 ## Formats
 

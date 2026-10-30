@@ -136,3 +136,12 @@ test('cancel stops a running step', async () => {
   assert.equal(c.steps[1].status, 'blocked');
   delete process.env.FAKE_CLAUDE_MODE;
 });
+
+test('settings accept known fields only', async () => {
+  const r = await api('/api/settings', { method: 'PUT', json: { subagents: 'never', model: 'sonnet', stepTimeoutMinutes: 2, bogus: 1 } });
+  assert.equal(r.body.subagents, 'never');
+  assert.equal(r.body.model, 'sonnet');
+  assert.equal(r.body.stepTimeoutMinutes, 5);
+  assert.equal(r.body.bogus, undefined);
+  assert.equal((await api('/api/settings', { method: 'PUT', json: { subagents: 'always' } })).body.subagents, 'never');
+});

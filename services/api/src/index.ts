@@ -138,6 +138,7 @@ router.put('/api/settings', async (req) => {
   const patch: Record<string, unknown> = {};
   if (typeof body.model === 'string') patch.model = body.model.trim();
   if (Array.isArray(body.allowedTools)) patch.allowedTools = body.allowedTools.map(String).filter((t: string) => /^[\w():*, .-]+$/.test(t));
+  if (body.subagents === 'pack' || body.subagents === 'never') patch.subagents = body.subagents;
   if (Number.isFinite(body.stepTimeoutMinutes)) patch.stepTimeoutMinutes = Math.min(240, Math.max(5, Number(body.stepTimeoutMinutes)));
   return writeSettings(patch);
 });
