@@ -221,6 +221,8 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
     }
     await mkdir(join(cwd, 'out'), { recursive: true });
     await mkdir(join(cwd, 'work'), { recursive: true });
+    // Keep the live feed readable: show paths relative to the campaign.
+    const short = (t: string) => t.replaceAll(cwd + '/', '').replaceAll(dir + '/', '');
     await log({ step: step.id, type: 'status', status: 'running', text: note ? `Revising: ${note}` : 'Started' });
 
     const handle = runClaude({
@@ -237,8 +239,8 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
       onEvent: (e: StreamEvent) => {
         if (e.kind === 'init') updateStep(id, step.id, { sessionId: e.sessionId }).catch(() => {});
         else if (e.kind === 'text') log({ step: step.id, type: 'text', text: e.text });
-        else if (e.kind === 'tool') log({ step: step.id, type: 'tool', tool: e.tool, text: e.summary });
-        else if (e.kind === 'tool_result' && e.isError) log({ step: step.id, type: 'tool_result', text: e.summary });
+        else if (e.kind === 'tool') log({ step: step.id, type: 'tool', tool: e.tool, text: short(e.summary) });
+        else if (e.kind === 'tool_result' && e.isError) log({ step: step.id, type: 'tool_result', text: short(e.summary) });
       },
     });
     const kill = handle.kill;

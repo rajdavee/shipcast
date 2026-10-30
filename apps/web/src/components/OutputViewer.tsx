@@ -55,7 +55,7 @@ export function OutputViewer({ campaign, step, events }: { campaign: Campaign; s
           </a>
         )}
       </div>
-      {copyJson && docs.length > 0 && <Docs files={docs} url={url} />}
+      {copyJson && docs.some((f) => f.endsWith('NOTES.md')) && <Docs files={docs.filter((f) => f.endsWith('NOTES.md'))} url={url} />}
     </>
   );
 }
@@ -91,7 +91,7 @@ function MediaStage({ files, url }: { files: string[]; url: (f: string) => strin
   return (
     <>
       <div className="monitor">
-        {isVideo(active) ? <video key={active} src={url(active)} controls playsInline preload="metadata" /> : <img src={url(active)} alt={base(active)} />}
+        {isVideo(active) ? <video key={active} src={url(active) + '#t=0.1'} controls playsInline preload="metadata" /> : <img src={url(active)} alt={base(active)} />}
       </div>
       {ordered.length > 1 && (
         <div className="thumbs" role="list">

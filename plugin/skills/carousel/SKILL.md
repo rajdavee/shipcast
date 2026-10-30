@@ -77,15 +77,20 @@ postable on its own.
 
 ## 4. Motion version (when `motion` is `yes`)
 
-Make `out/carousel.mp4` (same size, ~2.5s per slide, 30fps) with ffmpeg:
-a gentle push-in on each slide plus a quick slide/wipe between them, and a
-soft music bed only if one is available locally (otherwise silent). Example
-building block:
+Make `out/carousel.mp4` with the bundled script — a gentle push-in on each
+slide and a transition between them (~2.6s per slide, 30fps):
 
 ```bash
-ffmpeg -loop 1 -t 2.6 -i out/slides/slide-01.png -vf "zoompan=z='min(zoom+0.0006,1.04)':d=78:s=1080x1350:fps=30" -pix_fmt yuv420p work/s01.mp4
-# … then xfade=transition=slideleft:duration=0.35 between clips
+node "<this skill's base dir>/../../scripts/slides-to-video.mjs" --out out/carousel.mp4 \
+  --size 1080x1350 --hold 2.6 --transition slideleft out/slides/*.png
 ```
+
+Pick the transition to match the design (`slideleft` for a swipe feel,
+`fade` for calm, `wipeleft`/`circleopen` for punch). Add `--music <file>` only
+if a music file is already available locally (the user's uploads or a track
+another format rendered); otherwise leave it silent and say so in NOTES.md.
+Confirm the length with `ffprobe -v error -show_entries format=duration -of csv=p=0 out/carousel.mp4`
+— it should be about slides × 2.6s.
 
 ## 5. Caption
 

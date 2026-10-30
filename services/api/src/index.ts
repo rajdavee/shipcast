@@ -352,7 +352,10 @@ export function createApp({ serveWeb = true } = {}): Server {
       }
       const file = resolve(WEB_DIST, '.' + url.pathname);
       const inside = file.startsWith(WEB_DIST + sep);
-      sendFile(req, res, inside && existsSync(file) && !url.pathname.endsWith('/') ? file : join(WEB_DIST, 'index.html'));
+      const asset = inside && existsSync(file) && !url.pathname.endsWith('/');
+      // Hashed build assets are immutable; the HTML shell must always revalidate.
+      const cache = asset && url.pathname.startsWith('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache';
+      sendFile(req, res, asset ? file : join(WEB_DIST, 'index.html'), { 'cache-control': cache });
     } catch (e) {
       const status = e instanceof HttpError ? e.status : 500;
       if (status === 500) console.error(e);
