@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/mark.svg" width="64" height="64" alt="" />
+  <img src="docs/assets/banner.png" alt="Shipcast — Paste a link. Get a launch." width="900" />
 </p>
 
 <h1 align="center">Shipcast</h1>
@@ -15,6 +15,11 @@
   <a href="#formats">Formats</a> ·
   <a href="docs/ARCHITECTURE.md">Architecture</a> ·
   <a href="docs/WRITING-PACKS.md">Write a format</a>
+</p>
+
+<p align="center">
+  <a href="docs/assets/shipcast-launch.mp4"><img src="docs/assets/shipcast-launch.jpg" alt="Play the Shipcast launch video" width="900" /></a><br />
+  <sub>▶ The launch video above (and the banner, and <a href="docs/assets/shipcast-promo.mp4">this narrated promo</a>) were made by Shipcast, from this repo, in one campaign.</sub>
 </p>
 
 <p align="center"><img src="docs/assets/studio-run.png" alt="A Shipcast campaign: research brief, carousel, copy kit, thumbnails, launch video and motion graphic, with the 20-second vertical launch video playing" width="900" /></p>
