@@ -1,4 +1,4 @@
-import { onColor, type BrandKit, type SafeZone } from '@shipcast/engine';
+import { luminance, onColor, type BrandKit, type SafeZone } from '@shipcast/engine';
 import { esc } from './scenes.ts';
 
 export interface Word {
@@ -85,7 +85,7 @@ export function buildCaptions(words: Word[], style: CaptionStyle, opts: { id: st
   // colour), so word highlights use the short-form standard yellow unless the
   // brand's secondary colour is itself bright and distinct from the primary.
   const sec = brand.colors.secondary;
-  const accent = sec && sec !== brand.colors.primary && onColor(sec) === '#000000' ? sec : '#FFD84D';
+  const accent = sec && sec !== brand.colors.primary && luminance(sec) > 0.55 ? sec : '#FFD84D';
   const onAccent = onColor(accent);
   // Caption band: above the platform UI on vertical, lower third on landscape.
   const bottom = vertical ? Math.max(safe.bottom, 560 * u) : Math.round(height * 0.1);

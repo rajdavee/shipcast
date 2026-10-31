@@ -1,5 +1,5 @@
 import { pathToFileURL } from 'node:url';
-import { contrastRatio, onColor, type BrandKit, type SafeZone } from '@shipcast/engine';
+import { contrastRatio, ensureContrast, luminance, onColor, type BrandKit, type SafeZone } from '@shipcast/engine';
 
 /** Mix a colour toward white until it reads (≥ 3:1, WCAG large text) on a dark ground. */
 function readableOnDark(hex: string, ground = '#121317'): string {
@@ -93,8 +93,13 @@ function frame(c: SceneCtx) {
 /** Shared background: brand ground with two slowly drifting glows. */
 function bg(c: SceneCtx, mode: 'dark' | 'brand' | 'light' = 'dark') {
   const { S } = frame(c);
-  const base = mode === 'brand' ? 'var(--brand-primary)' : mode === 'light' ? 'var(--brand-bg)' : 'color-mix(in srgb,var(--brand-bg) 12%,#08090d)';
-  const ink = mode === 'brand' ? 'var(--brand-on-primary)' : mode === 'light' ? 'var(--brand-text)' : '#f4f5f8';
+  // "Light" scenes stay light even when the brand's own ground is dark, so long videos alternate
+  // dark and light instead of sitting on one tone for minutes.
+  const darkBrand = luminance(c.brand.colors.background) < 0.35;
+  const paper = '#f3f4f6';
+  const base = mode === 'brand' ? 'var(--brand-primary)' : mode === 'light' ? (darkBrand ? paper : 'var(--brand-bg)') : 'color-mix(in srgb,var(--brand-bg) 12%,#08090d)';
+  const ink = mode === 'brand' ? 'var(--brand-on-primary)' : mode === 'light' ? (darkBrand ? '#14161c' : 'var(--brand-text)') : '#f4f5f8';
+  const lightAccent = ensureContrast(c.brand.colors.primary, darkBrand ? paper : c.brand.colors.background, 3);
   return {
     markup: `<div class="bg"><i class="g1"></i><i class="g2"></i><i class="grain"></i></div>`,
     css: `${S}{position:absolute;left:0;top:0;width:${c.width}px;height:${c.height}px;overflow:hidden;background:${base};color:${ink};font-family:var(--font-body)}
@@ -102,7 +107,7 @@ ${S} .bg,${S} .bg i{position:absolute;inset:0}
 ${S} .bg .g1{inset:-20%;background:radial-gradient(40% 40% at 75% 25%,color-mix(in srgb,var(--brand-primary) ${mode === 'brand' ? 0 : mode === 'dark' ? 26 : 45}%,transparent),transparent 70%)}
 ${S} .bg .g2{inset:-20%;background:radial-gradient(45% 45% at 20% 85%,color-mix(in srgb,var(--brand-secondary) ${mode === 'brand' ? 25 : 30}%,transparent),transparent 70%)}
 ${S} .bg .grain{opacity:.08;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>")}
-${S} .acc{color:${mode === 'brand' ? ink : mode === 'dark' ? readableOnDark(c.brand.colors.primary) : 'var(--brand-primary)'}}
+${S} .acc{color:${mode === 'brand' ? ink : mode === 'dark' ? readableOnDark(c.brand.colors.primary) : lightAccent}}
 ${S} .stage{position:absolute;display:flex;flex-direction:column;justify-content:center}`,
     js: `tl.fromTo("${S} .g1",{xPercent:-4,yPercent:3,scale:1},{xPercent:5,yPercent:-4,scale:1.08,duration:${c.duration},ease:"none"},0);
 tl.fromTo("${S} .g2",{xPercent:4,yPercent:-2},{xPercent:-5,yPercent:4,duration:${c.duration},ease:"none"},0);`,
@@ -408,7 +413,7 @@ ${S} .dev img{display:block;width:100%;height:auto}`,
       const b = bg(c, 'dark');
       const lines = list(f.output).slice(0, 6);
       const titleH = f.title ? Math.round((vertical ? 170 : 140) * u) : 0;
-      const fs = Math.round((vertical ? 32 : 38) * u);
+      const fs = Math.round((vertical ? 36 : 46) * u);
       const cmd = String(f.command ?? '');
       const typeDur = Math.min(1.4, 0.035 * cmd.length + 0.3);
       return {
