@@ -42,6 +42,7 @@ Shipcast makes all of it from one URL, on your own machine.
   on LinkedIn: stages, what people think, where they go (with real platform
   logos), what they do. Claude researches the journey; you get a looping GIF,
   an MP4 and the post text.
+- **Skill Hub — the best community skills, mixed per job.** Shipcast pulls specialist Claude skills from their own repos (pinned commits, licence-checked, installed into Shipcast only): HyperFrames and GSAP for motion, taste-skill and Anthropic's creative skills for design, diagram-design for diagrams, marketingskills and humanizer for copy, ffmpeg-skill for post-production and more. Each format asks for roles (motion, design taste, copy…) and the hub assigns the strongest enabled skill — browse and override them on the Skills page. The list lives in `skills/registry.json`.
 - **Real UI, not stock filler.** Formats reuse your product's actual screens,
   components, copy and brand.
 - **Revise like you'd brief a designer.** "Make the hook punchier, slow down
