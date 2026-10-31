@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs';
+import { writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { home } from './paths.ts';
 import { run } from './exec.ts';
@@ -11,8 +12,11 @@ export const voiceVenv = () => join(home(), 'voice');
 export const voicePython = () => join(voiceVenv(), process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
 
 /** Env for Claude runs so HyperFrames finds Shipcast-managed engines. */
+const voiceMarker = () => join(voiceVenv(), '.shipcast-ready');
+
+/** Env for Claude runs and services so HyperFrames finds Shipcast-managed engines (only once setup succeeded). */
 export function engineEnv(): Record<string, string> {
-  return existsSync(voicePython()) ? { HYPERFRAMES_PYTHON: voicePython() } : {};
+  return existsSync(voiceMarker()) ? { HYPERFRAMES_PYTHON: voicePython() } : {};
 }
 
 export async function voiceReady(): Promise<boolean> {
@@ -27,7 +31,8 @@ export const SETUPS = {
     async run(): Promise<{ ok: boolean; log: string }> {
       let log = '';
       if (!existsSync(voicePython())) {
-        const v = await run('python3', ['-m', 'venv', voiceVenv()], { timeoutMs: 120_000 });
+        await rm(voiceMarker(), { force: true });
+      const v = await run('python3', ['-m', 'venv', voiceVenv()], { timeoutMs: 120_000 });
         log += v.stdout + v.stderr;
         if (v.code !== 0) return { ok: false, log: log + '\nPython 3 with the venv module is required.' };
       }
@@ -40,7 +45,9 @@ export const SETUPS = {
       if (dataPath.length >= 159) {
         return { ok: false, log: `${log}\nThe voice data path is too long for espeak-ng (${dataPath.length} chars, limit 159):\n${dataPath}\nSet SHIPCAST_HOME to a shorter folder and run setup again.` };
       }
-      return { ok: p.code === 0 && (await voiceReady()), log };
+      const ok = p.code === 0 && (await voiceReady());
+      if (ok) await writeFile(voiceMarker(), new Date().toISOString());
+      return { ok, log };
     },
   },
   chrome: {
