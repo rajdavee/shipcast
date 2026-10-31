@@ -6,7 +6,7 @@ export function Library({ campaigns }: { campaigns: Campaign[] | null }) {
     <main className="page">
       <div className="camp-head">
         <div>
-          <h1>Library</h1>
+          <h1>Projects</h1>
           <p>Everything you've made. Files live in ~/.shipcast on this computer.</p>
         </div>
         <a className="btn primary" href="#/new">New launch</a>

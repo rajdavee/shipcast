@@ -3,12 +3,12 @@ import { fileUrl, type Campaign, type CampaignEvent, type Step } from '../api.ts
 import { toast } from '../hooks.ts';
 
 const ext = (f: string) => f.split('.').pop()!.toLowerCase();
-const isVideo = (f: string) => ['mp4', 'webm', 'mov'].includes(ext(f));
-const isImage = (f: string) => ['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(ext(f)) && !f.includes('.sheet.');
-const isText = (f: string) => ['md', 'txt', 'srt'].includes(ext(f));
+export const isVideo = (f: string) => ['mp4', 'webm', 'mov'].includes(ext(f));
+export const isImage = (f: string) => ['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(ext(f)) && !f.includes('.sheet.');
+export const isText = (f: string) => ['md', 'txt', 'srt'].includes(ext(f));
 const base = (f: string) => f.split('/').pop()!;
 
-function useText(url: string | null, version: string) {
+export function useText(url: string | null, version: string) {
   const [text, setText] = useState<string | null>(null);
   useEffect(() => {
     if (!url) return setText(null);
@@ -67,7 +67,7 @@ export function OutputViewer({ campaign, step, events }: { campaign: Campaign; s
   );
 }
 
-function MediaStage({ files, url }: { files: string[]; url: (f: string) => string }) {
+export function MediaStage({ files, url }: { files: string[]; url: (f: string) => string }) {
   const ordered = useMemo(() => [...files.filter((f) => f.endsWith('.gif')), ...files.filter(isVideo), ...files.filter(isImage).filter((f) => !f.endsWith('.gif')).filter((f) => !/(video|captioned)\.jpg$/.test(f))], [files]);
   const [cur, setCur] = useState(ordered[0]);
   const active = ordered.includes(cur) ? cur : ordered[0];
@@ -89,7 +89,7 @@ function MediaStage({ files, url }: { files: string[]; url: (f: string) => strin
   );
 }
 
-function Docs({ files, url }: { files: string[]; url: (f: string) => string }) {
+export function Docs({ files, url }: { files: string[]; url: (f: string) => string }) {
   const ordered = [...files].sort((a, b) => Number(a.endsWith('NOTES.md')) - Number(b.endsWith('NOTES.md')));
   const [cur, setCur] = useState(ordered[0]);
   const active = ordered.includes(cur) ? cur : ordered[0];
@@ -114,7 +114,7 @@ function Docs({ files, url }: { files: string[]; url: (f: string) => string }) {
   );
 }
 
-function CopyKit({ url, version }: { url: string; version: string }) {
+export function CopyKit({ url, version }: { url: string; version: string }) {
   const raw = useText(url, version);
   const data = useMemo(() => {
     try {

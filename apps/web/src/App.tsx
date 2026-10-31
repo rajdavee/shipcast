@@ -24,9 +24,8 @@ export function App() {
           <span className="wordmark-text">Shipcast</span>
         </a>
         <nav className="tabs-top" aria-label="Main">
-          <a href="#/new" aria-current={page === 'new' ? 'page' : undefined}>Create</a>
-          <a href="#/library" aria-current={page === 'library' ? 'page' : undefined}>Library</a>
-          <a href="#/setup" aria-current={page === 'setup' ? 'page' : undefined}>Setup</a>
+          <a href="#/new" aria-current={page === 'new' || !page ? 'page' : undefined}>New</a>
+          <a href="#/library" aria-current={page === 'library' ? 'page' : undefined}>Projects</a>
         </nav>
         <div className="top-right">
           {live && (
@@ -37,7 +36,7 @@ export function App() {
           )}
           <a className="pill-status" href="#/setup" title={ready ? 'Everything is connected' : 'Finish setup'}>
             <i className={`dot ${status.data && services.data ? (ready ? 'ok' : 'bad') : ''}`} />
-            <span className="lbl">{!status.data || !services.data ? 'Checking…' : ready ? 'Ready' : 'Finish setup'}</span>
+            <span className="lbl">{!status.data || !services.data ? 'Checking…' : ready ? 'Connected' : 'Finish setup'}</span>
           </a>
         </div>
       </header>

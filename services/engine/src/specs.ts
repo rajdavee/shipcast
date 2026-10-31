@@ -27,9 +27,21 @@ export async function catalogMarkdown(kind: SpecKind): Promise<string> {
     return [
       '# Infographic catalog',
       '',
-      'Column kinds: `stage` (dark numbered pill, 1–3 words), `note` (sticky note, ≤ 70 chars; tones yellow|green|blue|pink), `chips` (list of platform/tool names rendered with their real logos), `text` (plain line).',
-      'Sizes: `1080x1350` (default, LinkedIn/Instagram portrait) or `1080x1080`. Themes: `board` (light dotted canvas, default) or `night`.',
-      `Chip names with known logos: ${KNOWN_ICONS.join(', ')}. Any other well-known product name usually resolves too (e.g. "Notion", "Figma", "Stripe"); unknown names get a tidy monogram.`,
+      '## Layouts — pick the one that matches the shape of the idea',
+      '- `table` — a journey/matrix: `columns` (2–4; kinds `stage` | `note` | `chips` | `text`) and `rows` (3–9). The classic "stage · what they think · where they go · what they do".',
+      '- `timeline` — an ordered plan or story: `steps` (3–8) of `{title, text?, note?, chips?}`. Cards alternate around a spine; `note` is the sticky thought on the other side.',
+      '- `funnel` — drop-off or narrowing: `steps` (3–6) with `metric` ("41%", "2.4k") on each level plus `note`, `text`, `chips`.',
+      '- `compare` — A vs B: `compare: {left:{name,icon?}, right:{name,icon?}, rows:[{label,left,right,winner:"left"|"right"|"both"|"none"}]}` (3–9 rows). Use `icon: "brand"` for the product itself.',
+      '',
+      '## Looks',
+      '- `board` light dotted canvas, sticky notes (default) · `night` the same on near-black · `sketch` hand-drawn boxes on graph paper, marker notes · `paper` editorial serif, quiet and premium · `glass` frosted cards on a brand-colour gradient.',
+      '',
+      '## Chips (platforms)',
+      'A chip is a platform name, or a group: `{"label":"AI assistants","icons":["ChatGPT","Claude","Gemini","Perplexity"]}` (1–4 logos, stacked). Up to 8 chips per table cell, 6 per timeline step, 5 per funnel level. Fill the box — 4–7 chips per row reads best.',
+      `Names with known logos: ${KNOWN_ICONS.join(', ')}. Most well-known products resolve too ("Notion", "Figma", "Stripe"); unknown names get a monogram. Iconify ids work as well ("mdi:rocket-launch-outline").`,
+      '',
+      '## Everything else',
+      '`kicker` (short, uppercase-styled), `title` with one `*accent phrase*`, `badge` ("Save this"), `cursor` (first name shown on the moving cursor), `footer: {name, handle, brand, avatar}` where avatar is `github:<user>` or a file in the brief. Sizes `1080x1350` (default) or `1080x1080`.',
     ].join('\n');
   }
   if (kind === 'storyboard') {

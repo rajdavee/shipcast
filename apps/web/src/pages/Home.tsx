@@ -1,63 +1,73 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { api, detectSource, type Campaign, type Pack, type SourceType, type Status } from '../api.ts';
+import { useEffect, useRef, useState } from 'react';
+import { api, detectSource, type Campaign, type SourceType, type Status } from '../api.ts';
 import { go, useLoad } from '../hooks.ts';
-import { GOALS, isStudio, PLAIN } from '../formats.ts';
-import { OptionInput } from '../components/OptionInput.tsx';
+import { DEFAULT_FORMATS, FORMATS } from '../formats.ts';
 import { CampaignCover } from '../components/CampaignCover.tsx';
 
 const KIND: Record<SourceType, string> = { url: 'Website', github: 'GitHub repo', local: 'Folder on this computer', text: 'Description' };
+const PICK_KEY = 'shipcast.formats';
 
-const Check = () => (
-  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
-);
-const Chevron = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M9 6l6 6-6 6" /></svg>
+function loadPicks(): string[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(PICK_KEY) ?? 'null');
+    if (Array.isArray(v) && v.length) return v.filter((id) => FORMATS.some((f) => f.id === id));
+  } catch {}
+  return DEFAULT_FORMATS;
+}
+
+function savePicks(ids: string[]) {
+  try {
+    localStorage.setItem(PICK_KEY, JSON.stringify(ids));
+  } catch {}
+}
+
+/** A miniature post for the text-only format, so every tile shows a real artefact. */
+const PostMock = () => (
+  <div className="post-mock" aria-hidden="true">
+    <div className="pm-head"><i /><span><b /><small /></span></div>
+    <p>Most launches die quietly. Not because the product is weak —</p>
+    <p>because nobody can tell what it does in five seconds.</p>
+    <p className="pm-dim">Here's the checklist we use now ↓</p>
+  </div>
 );
 
 export function Home({ status, services, campaigns }: { status: Status | null; services: { name: string; ok: boolean }[] | null; campaigns: Campaign[] | null }) {
-  const packs = useLoad(() => api.packs());
   const [text, setText] = useState('');
-  const [goal, setGoal] = useState<string>('launch');
-  const [custom, setCustom] = useState(false);
-  const [picked, setPicked] = useState<string[] | null>(null);
-  const [opts, setOpts] = useState<Record<string, Record<string, string>>>({});
-  const [openOpts, setOpenOpts] = useState<string | null>(null);
-  const [showExp, setShowExp] = useState(false);
+  const [picks, setPicks] = useState<string[]>(loadPicks);
+  const [noteOpen, setNoteOpen] = useState(false);
   const [notes, setNotes] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const ta = useRef<HTMLTextAreaElement>(null);
+  const packs = useLoad(() => api.packs());
 
   const source = detectSource(text);
-  const all = packs.data ?? [];
-  const byId = useMemo(() => new Map(all.map((p) => [p.id, p])), [all]);
-  const goalPacks = GOALS.find((g) => g.id === goal)?.packs ?? [];
-  const selected = (picked ?? [...goalPacks]).filter((id) => byId.has(id));
-  const usable = (p: Pack) => !source || !p.sources.length || p.sources.includes(source.type);
-  const runnable = selected.filter((id) => usable(byId.get(id)!));
-  // Unknown (still checking) counts as ready; the server reports a missing login anyway.
+  const available = new Set((packs.data ?? []).map((p) => p.id));
+  const formats = FORMATS.filter((f) => !packs.data || available.has(f.id));
+  const chosen = picks.filter((id) => formats.some((f) => f.id === id));
   const claudeReady = status ? status.claude.loggedIn : true;
   const servicesDown = services?.filter((s) => !s.ok).map((s) => s.name) ?? [];
+  const canGo = !!source && chosen.length > 0 && !busy && claudeReady;
 
-  // Grow the composer with its content.
   useEffect(() => {
     const el = ta.current;
     if (!el) return;
     el.style.height = 'auto';
-    el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+    el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
   }, [text]);
 
-  const toggle = (id: string) => setPicked((cur) => {
-    const base = cur ?? [...goalPacks];
-    return base.includes(id) ? base.filter((x) => x !== id) : [...base, id];
-  });
+  const toggle = (id: string) => {
+    const next = chosen.includes(id) ? chosen.filter((x) => x !== id) : [...chosen, id];
+    setPicks(next);
+    savePicks(next);
+  };
 
   async function make() {
-    if (!source || !runnable.length) return;
+    if (!canGo || !source) return;
     setBusy(true);
     setError(null);
     try {
-      const c = await api.createCampaign({ source, notes, deliverables: runnable.map((id) => ({ pack: id, options: opts[id] ?? {} })) });
+      const c = await api.createCampaign({ source, notes, deliverables: chosen.map((id) => ({ pack: id, options: {} })) });
       go(`/c/${c.id}`);
     } catch (e) {
       setError(String((e as Error).message));
@@ -65,169 +75,91 @@ export function Home({ status, services, campaigns }: { status: Status | null; s
     }
   }
 
-  const groups = [
-    { label: 'Video', items: all.filter((p) => isStudio(p) && (p.category === 'video' || p.category === 'motion')) },
-    { label: 'Design', items: all.filter((p) => isStudio(p) && p.category === 'design') },
-    { label: 'Writing', items: all.filter((p) => p.category === 'copy') },
-  ].filter((g) => g.items.length);
-  const experimental = all.filter((p) => !isStudio(p) && p.category !== 'copy');
+  const minutes = Math.max(5, chosen.length * 3);
 
   return (
-    <main className="page">
+    <main className="page home">
       <section className="hero">
-        <h1>What are you launching?</h1>
-        <p>Paste a website or a GitHub repo. Shipcast studies it, then makes your videos, carousels, thumbnails and posts — on your computer.</p>
+        <h1>Paste a link. Get the launch content.</h1>
+        <p>Shipcast studies your product, then designs the posts, videos and carousels — on your own computer, with your Claude account.</p>
       </section>
 
       {status && !claudeReady ? (
-        <div className="banner" style={{ maxWidth: 820, margin: '0 auto 14px' }}>
-          Connect your Claude account to start — it's the only account Shipcast needs. <a href="#/setup">Open setup</a>
-        </div>
+        <div className="banner center">Connect your Claude account to start — it's the only account Shipcast needs. <a href="#/setup">Connect Claude</a></div>
       ) : servicesDown.length ? (
-        <div className="banner" style={{ maxWidth: 820, margin: '0 auto 14px' }}>
-          Shipcast's renderers aren't running ({servicesDown.join(', ')}). Start them with <code>npm start</code>.
-        </div>
+        <div className="banner center">The renderers aren't running ({servicesDown.join(', ')}). Start them with <code>npm start</code>.</div>
       ) : null}
 
       <div className="composer">
-        <div className="composer-row">
-          <textarea
-            ref={ta}
-            rows={1}
-            autoFocus
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                if (source && claudeReady) make();
-              }
-            }}
-            placeholder="yourproduct.com, owner/repo, or describe what you built…"
-            aria-label="What are you launching?"
-          />
-          <button className="btn primary lg" disabled={!source || !runnable.length || busy || !claudeReady} onClick={make}>
-            {busy ? 'Starting…' : 'Make it'}
-          </button>
-        </div>
+        <textarea
+          ref={ta}
+          rows={1}
+          autoFocus
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              make();
+            }
+          }}
+          placeholder="yourproduct.com, owner/repo, or a few sentences about what you built"
+          aria-label="Your product: a link, a GitHub repo or a description"
+        />
+        <button className="btn primary lg" disabled={!canGo} onClick={make}>
+          {busy ? 'Starting…' : 'Make it'}
+        </button>
         <div className="composer-meta">
-          <span className="kind">{source ? <>Detected: <b>{KIND[source.type]}</b></> : text.trim() ? 'Keep typing — a link, a repo, or a few sentences' : 'Press Enter to start'}</span>
-          <span className="kind">{runnable.length} {runnable.length === 1 ? 'thing' : 'things'} to make · about {Math.max(6, runnable.length * 3)} min</span>
+          <span>{source ? <>Reading a <b>{KIND[source.type].toLowerCase()}</b></> : text.trim() ? 'Keep typing — a link, a repo, or a few sentences' : 'Enter to start'}</span>
+          <span className="tnum">{chosen.length ? `${chosen.length} ${chosen.length === 1 ? 'piece' : 'pieces'} · about ${minutes} min` : 'Pick at least one format'}</span>
         </div>
       </div>
 
       {!text && (
         <div className="examples">
-          <button onClick={() => setText('https://bun.sh')}>Try a website</button>
-          <button onClick={() => setText('rajdavee/shipcast')}>Try a GitHub repo</button>
-          <button onClick={() => setText('A habit tracker for remote teams that turns daily standups into 30-second voice notes, transcribed and summarised for everyone.')}>Try a description</button>
+          <span>Try</span>
+          <button onClick={() => setText('https://bun.sh')}>bun.sh</button>
+          <button onClick={() => setText('rajdavee/shipcast')}>rajdavee/shipcast</button>
+          <button onClick={() => setText('A habit tracker for remote teams that turns daily standups into 30-second voice notes, summarised for everyone.')}>a description</button>
         </div>
       )}
 
-      <div className="goals" role="radiogroup" aria-label="What should we make?">
-        {GOALS.map((g) => (
-          <button
-            key={g.id}
-            className="goal"
-            role="radio"
-            aria-checked={goal === g.id && !picked}
-            aria-pressed={goal === g.id && !picked}
-            onClick={() => {
-              setGoal(g.id);
-              setPicked(null);
-            }}
-          >
-            <span className="check"><Check /></span>
-            <span className="shapes" aria-hidden="true">
-              {g.shapes.map(([w, h], i) => <i key={i} style={{ width: w, height: h }} />)}
-            </span>
-            <h3>{g.title}</h3>
-            <p>{g.blurb}</p>
+      <section className="pick" aria-labelledby="pick-h">
+        <div className="pick-head">
+          <h2 id="pick-h">What should we make?</h2>
+          <button className="linkish" onClick={() => setNoteOpen(!noteOpen)} aria-expanded={noteOpen}>
+            {noteOpen ? 'Hide note' : notes ? 'Edit your note' : 'Add a note for Claude'}
           </button>
-        ))}
-      </div>
-
-      <div className="customize">
-        <button className="disclosure" aria-expanded={custom} onClick={() => setCustom(!custom)}>
-          <Chevron /> {picked ? `Custom selection · ${runnable.length}` : 'Customize what we make'}
-        </button>
-        {custom && (
-          <div className="format-groups">
-            {groups.map((g) => (
-              <div key={g.label}>
-                <p className="group-label">{g.label}</p>
-                <div className="format-list">
-                  {g.items.map((p) => {
-                    const on = selected.includes(p.id);
-                    const ok = usable(p);
-                    return (
-                      <div key={p.id}>
-                        <button className="fmt" aria-pressed={on} disabled={!ok} style={{ width: '100%', opacity: ok ? 1 : 0.45 }} onClick={() => toggle(p.id)}>
-                          <span className="box"><Check /></span>
-                          <span>
-                            <b>{p.name.replace(/ · (freeform|brag)$/, '')}</b>
-                            <small>{ok ? (PLAIN[p.id] ?? p.tagline) : 'Needs a GitHub repo'}</small>
-                          </span>
-                        </button>
-                        {on && p.options.length > 0 && (
-                          <>
-                            <button className="disclosure" style={{ fontSize: 12.5, padding: '6px 2px' }} aria-expanded={openOpts === p.id} onClick={() => setOpenOpts(openOpts === p.id ? null : p.id)}>
-                              <Chevron /> Options
-                            </button>
-                            {openOpts === p.id && (
-                              <div className="fmt-opts">
-                                {p.options.map((o) => (
-                                  <OptionInput key={o.key} field={o} value={opts[p.id]?.[o.key] ?? o.default} onChange={(v) => setOpts((x) => ({ ...x, [p.id]: { ...x[p.id], [o.key]: v } }))} />
-                                ))}
-                              </div>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-            {experimental.length > 0 && (
-              <div>
-                <button className="disclosure" style={{ fontSize: 13 }} aria-expanded={showExp} onClick={() => setShowExp(!showExp)}>
-                  <Chevron /> Experimental formats ({experimental.length}) — Claude builds these freely; slower and less predictable
-                </button>
-                {showExp && (
-                  <div className="format-list" style={{ marginTop: 8 }}>
-                    {experimental.map((p) => {
-                      const on = selected.includes(p.id);
-                      const ok = usable(p);
-                      return (
-                        <button key={p.id} className="fmt" aria-pressed={on} disabled={!ok} style={{ opacity: ok ? 1 : 0.45 }} onClick={() => toggle(p.id)}>
-                          <span className="box"><Check /></span>
-                          <span>
-                            <b>{p.name.replace(' · freeform', '').replace(' · brag', '')} <span className="muted" style={{ fontWeight: 500 }}>· experimental</span></b>
-                            <small>{ok ? p.tagline : 'Needs a GitHub repo'}</small>
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-            <label className="field">
-              <span>Anything Claude should know?</span>
-              <textarea className="textarea" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Who it's for, what to highlight, what to avoid. E.g. “Aimed at CTOs. Show the new dashboard. Don't mention pricing.”" />
-            </label>
-          </div>
+        </div>
+        {noteOpen && (
+          <textarea className="textarea note-box" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Who it's for, what to highlight, what to avoid. E.g. “For CTOs. Show the new dashboard. Don't mention pricing.”" />
         )}
-      </div>
+        <div className="tiles" role="group" aria-label="Formats">
+          {formats.map((f) => {
+            const on = chosen.includes(f.id);
+            return (
+              <button key={f.id} className="tile" aria-pressed={on} onClick={() => toggle(f.id)}>
+                <span className="tape" aria-hidden="true" />
+                <span className="tile-art">
+                  {f.img ? <img src={f.img} alt="" style={{ aspectRatio: String(f.ratio) }} loading="lazy" /> : <PostMock />}
+                </span>
+                <span className="tile-text">
+                  <b>{f.title}</b>
+                  <small>{f.line}</small>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
 
-      {error && <p className="error-text" style={{ textAlign: 'center', marginTop: 16 }}>{error}</p>}
+      {error && <p className="error-text center">{error}</p>}
 
       {campaigns && campaigns.length > 0 && (
         <section className="section">
           <div className="section-head">
-            <h2>Recent</h2>
-            <a className="btn ghost sm" href="#/library">See all</a>
+            <h2>Your projects</h2>
+            <a className="linkish" href="#/library">See all</a>
           </div>
           <div className="covers">
             {campaigns.slice(0, 4).map((c) => <CampaignCover key={c.id} campaign={c} />)}

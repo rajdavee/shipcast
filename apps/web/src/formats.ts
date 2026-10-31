@@ -1,42 +1,21 @@
 import type { Pack, Step } from './api.ts';
 
-/** Three starting points instead of a catalogue of formats. */
-export const GOALS = [
-  {
-    id: 'launch',
-    title: 'Launch kit',
-    blurb: 'Launch film, a reel, a carousel, YouTube thumbnails and ready-to-post copy.',
-    packs: ['launch-film', 'reel', 'carousel', 'thumbnails', 'copy-kit'],
-    shapes: [[30, 18], [12, 22], [18, 22], [28, 16], [14, 20]],
-  },
-  {
-    id: 'social',
-    title: 'Social pack',
-    blurb: 'A reel, a silent feature clip, an animated carousel and posts for the week.',
-    packs: ['infographic', 'reel', 'carousel', 'copy-kit'],
-    shapes: [[12, 22], [18, 22], [18, 22], [14, 20]],
-  },
-  {
-    id: 'video',
-    title: 'Video only',
-    blurb: 'A narrated launch film, a vertical reel and a 60-second explainer.',
-    packs: ['launch-film', 'reel', 'explainer-video'],
-    shapes: [[30, 18], [12, 22], [30, 18]],
-  },
-] as const;
+/** The formats people pick on Home, in the order they appear. Preview images live in /public/formats. */
+export const FORMATS: { id: string; title: string; line: string; img?: string; ratio: number }[] = [
+  { id: 'infographic', title: 'Infographic post', line: 'Animated framework post with real logos', img: '/formats/infographic.jpg', ratio: 4 / 5 },
+  { id: 'carousel', title: 'Carousel', line: 'Swipe slides for LinkedIn and Instagram', img: '/formats/carousel.jpg', ratio: 4 / 5 },
+  { id: 'reel', title: 'Reel', line: 'Vertical video with captions', img: '/formats/reel.jpg', ratio: 9 / 16 },
+  { id: 'launch-film', title: 'Launch film', line: '30-second video for launch day', img: '/formats/launch-film.jpg', ratio: 16 / 9 },
+  { id: 'explainer-video', title: 'Explainer', line: 'Narrated 60-second walkthrough', img: '/formats/explainer-video.jpg', ratio: 16 / 9 },
+  { id: 'thumbnails', title: 'Thumbnails', line: 'YouTube, link cards and banners', img: '/formats/thumbnails.jpg', ratio: 16 / 9 },
+  { id: 'copy-kit', title: 'Posts', line: 'Ready-to-paste posts for every channel', ratio: 4 / 5 },
+];
+export const DEFAULT_FORMATS = ['infographic', 'carousel', 'copy-kit'];
 
-/** Friendly one-liners shown in Customize (falls back to the pack's tagline). */
-export const PLAIN: Record<string, string> = {
-  infographic: 'A save-worthy animated framework post with real platform logos — GIF, video and post text',
-  'launch-film': 'A 20–40 s film for YouTube, LinkedIn or your site',
-  reel: 'Vertical 9:16 for Reels, Shorts and TikTok, with captions',
-  'feature-spotlight': 'A short silent clip that loops in the feed',
-  'explainer-video': 'A narrated 60 s explainer of the problem you solve',
-  'caption-video': 'Add styled captions to a clip you upload',
-  carousel: 'LinkedIn / Instagram swipe slides, PDF and MP4',
-  thumbnails: 'YouTube thumbnails, link previews, banners, stories',
-  'copy-kit': 'Posts for LinkedIn, X, YouTube, Product Hunt and more',
-};
+/** Friendly one-liners (falls back to the pack's tagline). */
+export const PLAIN: Record<string, string> = Object.fromEntries(FORMATS.map((f) => [f.id, f.line]));
+PLAIN['feature-spotlight'] = 'A short silent clip that loops in the feed';
+PLAIN['caption-video'] = 'Styled captions on a clip you upload';
 
 export const isStudio = (p: Pack) => !!p.spec || !!p.pipeline;
 
@@ -48,6 +27,7 @@ export function shape(pack: Pack | undefined, step?: Step): number {
   if (pack?.id === 'reel' || preset === 'vertical') return 9 / 16;
   if (preset === 'linkedin-video') return 4 / 5;
   if (preset === 'square-video') return 1;
+  if (pack?.id === 'infographic') return pick('size') === '1080x1080' ? 1 : 4 / 5;
   if (pack?.id === 'carousel') return pick('platform') === '1080x1080' ? 1 : 4 / 5;
   if (pack?.category === 'copy') return 4 / 5;
   return 16 / 9;
