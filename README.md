@@ -69,7 +69,7 @@ Then:
 4. Watch the run sheet: research first, then each deliverable, with a live feed
    of what Claude is doing. Play, preview, copy, download, or ask for changes.
 
-`npm run doctor` checks your machine from the terminal.
+`npm run doctor` checks your machine; `npm run status` shows the services.
 
 **Better voiceover (optional):** on the Connections page, click **Set up** next
 to *Kokoro TTS*. Shipcast installs the free Kokoro voice model into its own
@@ -81,38 +81,50 @@ back to your OS voice.
 
 ## Formats
 
-| Format | What you get | Built on |
-|---|---|---|
-| **Launch Video** | 20s music-driven launch film from your real UI, poster, share copy | [`brag-slim`](https://github.com/latent-spaces/brag) |
-| **Product Promo** | Narrated 15–60s promo with local AI voiceover and captions | [HyperFrames](https://github.com/heygen-com/hyperframes) `product-launch-video` |
-| **Explainer** | Faceless explainer of the problem you solve — kinetic type, diagrams | HyperFrames `faceless-explainer` |
-| **Motion Graphics** | Logo sting, stat count-up, kinetic type, animated testimonial, UI callout | HyperFrames `motion-graphics` |
-| **Discovery Journey** | The "where customers actually find you" story — feed, review, thread, search, AI answer — ending on your product | HyperFrames `general-video` |
-| **Reel / Short** | 9:16 with a 1-second hook, fast cuts, word-by-word captions | HyperFrames `faceless-explainer` |
-| **Changelog / PR Video** | A merged pull request turned into a feature-reveal video | HyperFrames `pr-to-video` |
-| **LinkedIn Carousel** | Editorial slides as PNGs + upload-ready PDF + animated MP4 + caption | Shipcast `carousel` |
-| **Thumbnails & Cards** | YouTube A/B thumbnails, OG card, X/LinkedIn images, story, GitHub banner | Shipcast `thumbnails` |
-| **Launch Copy Kit** | LinkedIn posts, X thread, YouTube metadata, Product Hunt, Show HN, newsletter, ads | Shipcast `social-copy` |
-| **Talking-Head Captions** | Styled, word-timed captions burned into your own clip | HyperFrames `embedded-captions` |
+**Studio formats** — Claude writes a spec, Shipcast's services render it,
+quality gates measure it, and you can edit any slide or scene afterwards and
+re-render without another Claude run.
 
-Third-party skills are **not bundled**. The first time a format needs one,
-Shipcast installs it from its own repository with the
-[`skills`](https://github.com/vercel-labs/skills) CLI, under that project's own
-license. Shipcast's own skills live in [`plugin/`](plugin/) and load per run.
+| Format | What you get |
+|---|---|
+| **Reel / Short** | 9:16 master safe for Reels, Shorts and TikTok: 1-second hook, voiceover, word-timed captions (bold, pop, karaoke, boxed, clean, typewriter) |
+| **Launch Film** | 20–40s film for YouTube, LinkedIn, X or your site: hook, the real product in motion, proof, CTA |
+| **Feature Spotlight** | 8–15s silent motion graphic for the feed |
+| **Explainer** | 45–75s narrated explainer — teach first, sell last |
+| **LinkedIn Carousel** | 6–10 slides in 4 themes × 9 layouts, upload-ready PDF, post caption |
+| **Thumbnails & Cards** | 3 YouTube thumbnails for Test & Compare, OG / GitHub cards, X & LinkedIn images, stories, banners |
+| **Launch Copy Kit** | LinkedIn posts, X thread, YouTube metadata, Product Hunt, Show HN, newsletter, ads |
+
+**Freeform formats** — Claude builds directly with the open-source
+[HyperFrames](https://github.com/heygen-com/hyperframes) and
+[brag](https://github.com/latent-spaces/brag) skills, for ideas outside the
+scene library: brag launch video, product promo, explainer, motion graphics,
+Discovery Journey, changelog video from a pull request, talking-head captions.
+
+Third-party skills are **not bundled**; Shipcast installs them from their own
+repositories on first use, under their own licenses.
+
+### What "quality" means here
+
+Every video is checked before you see it ([research](docs/research/landscape-2026.md)):
+platform canvas and codec, **-14 LUFS / -1 dBTP** loudness, no black or frozen
+stretches, captions inside the platform safe zone at a readable pace, no text
+overlapping or clipping, WCAG contrast, a real first frame for the feed
+thumbnail. Stills are audited for overflow, safe margins and minimum type size.
+Problems go back to Claude with the fix hint; you see what passed.
 
 ## How it works
 
 ```
- web (React)  ──HTTP/SSE──►  api (node:http)  ──►  ~/.shipcast/campaigns/<id>/  ◄──  worker
-                                                    campaign.json, events.ndjson       │
-                                                    brief/  deliverables/  uploads/    ▼
-                                                                                claude -p … (your login)
+web ─► api :4317 ──► ~/.shipcast ◄── worker (Claude, your login)
+                                        │ specs
+            render :4320 · stills :4321 · media :4322 · qa :4323
 ```
 
-Three small services share one folder — no database, no queue server, no
-framework on the backend. Kill any of them and nothing is lost. Run the worker
-separately with `npm start -- --no-worker` + `npm run worker`, or point several
-workers at the same data dir. Details in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Six small services, one shared data folder, no database. `shipcast start`
+supervises them all; `docker compose up` puts each in its own container; any
+service can move to another machine with `SHIPCAST_<NAME>_URL`. Details in
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Usage limits
 

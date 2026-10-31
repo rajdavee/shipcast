@@ -48,6 +48,39 @@ async function hf(args: string[], cwd: string, timeoutMs = 1_800_000) {
 }
 
 /**
+ * HyperFrames' in-browser checks on the compiled project: text overlaps,
+ * clipping, contrast and craft rules (empty first frame, unreadable last line).
+ * Layout errors block; the rest are warnings with the engine's own fix hints.
+ */
+async function compositionFindings(project: string) {
+  const r = await hf(['check', '.', '--json', '--samples', '12'], project, 600_000);
+  let j: any;
+  try {
+    j = JSON.parse(r.stdout.slice(r.stdout.indexOf('{')));
+  } catch {
+    return [];
+  }
+  const out: { rule: string; severity: string; message: string; at?: number; fix?: string }[] = [];
+  for (const area of ['layout', 'contrast', 'craft', 'lint'] as const) {
+    for (const f of j[area]?.findings ?? []) {
+      if (f.severity === 'info') continue;
+      // Frame 0 is replaced by the poster frame after rendering.
+      if (f.code === 'first_frame_empty') continue;
+      // Captions are allowed to sit over product footage.
+      if (f.code === 'content_overlap' && /host-captions/.test(`${f.containerSelector ?? ''}${f.selector ?? ''}`) && /\.cam|img/.test(f.selector ?? '')) continue;
+      out.push({
+        rule: `${area}.${f.code}`,
+        severity: area === 'layout' && f.severity === 'error' ? 'error' : 'warn',
+        message: `${f.message}${f.text ? ` ("${String(f.text).slice(0, 40)}")` : ''}`,
+        at: typeof f.time === 'number' ? f.time : undefined,
+        fix: f.fixHint,
+      });
+    }
+  }
+  return out.slice(0, 30);
+}
+
+/**
  * render — storyboards → HyperFrames projects → MP4. Draft renders are
  * quick previews; final renders are mastered (loudness, codec) and gated
  * by the qa service before they're returned.
@@ -102,10 +135,19 @@ export function createRenderService() {
         await run('rm', ['-f', raw]);
         const poster = join(dir, `${name}.jpg`);
         const mid = compiled.scenes[0] ? compiled.scenes[0].start + Math.min(compiled.scenes[0].duration * 0.8, compiled.scenes[0].duration - 0.1) : 1;
-        await run('ffmpeg', ['-y', '-v', 'error', '-ss', mid.toFixed(2), '-i', final, '-frames:v', '1', '-q:v', '3', poster]);
+        await run('ffmpeg', ['-y', '-v', 'error', '-ss', mid.toFixed(2), '-i', final, '-frames:v', '1', '-q:v', '2', poster]);
+        // Frame 0 is the thumbnail on most social players: make it the settled hook frame.
+        const withPoster = join(dir, `${name}.p.mp4`);
+        const pr = await run('ffmpeg', ['-y', '-v', 'error', '-i', final, '-i', poster, '-filter_complex', "[1:v]scale=iw:ih[p];[0:v][p]overlay=enable='eq(n\\,0)'", '-c:v', 'libx264', '-profile:v', 'high', '-crf', '18', '-pix_fmt', 'yuv420p', '-c:a', 'copy', '-movflags', '+faststart', withPoster]);
+        if (pr.code === 0) await run('mv', [withPoster, final]);
         const sheet = await contactSheet(final, join(dir, `${name}.sheet.jpg`));
-        ctx.progress(0.92, 'quality checks');
-        const qa = await callService('qa', 'video', { file: final, preset: compiled.preset.id }).catch((e: Error) => ({ pass: false, issues: [{ rule: 'qa.unavailable', severity: 'warn', message: e.message }] }));
+        ctx.progress(0.9, 'quality checks');
+        const [qa, layout] = await Promise.all([
+          callService('qa', 'video', { file: final, preset: compiled.preset.id }).catch((e: Error) => ({ pass: false, issues: [{ rule: 'qa.unavailable', severity: 'warn', message: e.message }], facts: {} })),
+          compositionFindings(project),
+        ]);
+        qa.issues.push(...layout);
+        qa.pass = !qa.issues.some((i: any) => i.severity === 'error');
         return { file: final, poster, sheet, duration: compiled.duration, scenes: compiled.scenes, project, lint: lintJson?.summary ?? lintJson ?? undefined, qa };
       },
     },

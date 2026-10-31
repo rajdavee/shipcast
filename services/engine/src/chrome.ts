@@ -18,6 +18,7 @@ class Session {
   private id = 0;
   private pending = new Map<number, Pending>();
   private ready: Promise<void>;
+  closed = false;
   constructor(url: string) {
     this.ws = new WebSocket(url);
     this.ready = new Promise((res, rej) => {
@@ -33,6 +34,7 @@ class Session {
       else p.resolve(msg.result);
     };
     this.ws.onclose = () => {
+      this.closed = true;
       for (const p of this.pending.values()) p.reject(new Error('DevTools connection closed'));
       this.pending.clear();
     };
@@ -45,7 +47,7 @@ class Session {
       this.pending.set(id, { resolve, reject });
       setTimeout(() => {
         if (this.pending.delete(id)) reject(new Error(`${method} timed out`));
-      }, 120_000);
+      }, method === 'Page.printToPDF' || method === 'Page.captureScreenshot' ? 90_000 : 30_000);
     });
   }
   close() {
@@ -101,6 +103,7 @@ export class Browser {
   }
 
   private async ensure(): Promise<Session> {
+    if (this.session?.closed) await this.restart();
     if (!this.session) {
       this.starting ??= this.start();
       await this.starting;
@@ -108,8 +111,28 @@ export class Browser {
     return this.session!;
   }
 
-  /** Open a page at an exact viewport and wait until it's fully painted. */
+  /** Kill a wedged browser so the next call starts a fresh one. */
+  async restart() {
+    this.session?.close();
+    this.proc?.kill('SIGKILL');
+    this.session = undefined;
+    this.proc = undefined;
+    this.starting = undefined;
+    if (this.profile) await rm(this.profile, { recursive: true, force: true }).catch(() => {});
+  }
+
+  /** Open a page at an exact viewport; on a dead or hung browser, relaunch once and retry. */
   async open(url: string, opts: CaptureOptions): Promise<PageHandle> {
+    try {
+      return await this.openOnce(url, opts);
+    } catch (e) {
+      if (!/DevTools|timed out|Target|closed|exited/i.test(String((e as Error).message))) throw e;
+      await this.restart();
+      return this.openOnce(url, opts);
+    }
+  }
+
+  private async openOnce(url: string, opts: CaptureOptions): Promise<PageHandle> {
     const s = await this.ensure();
     const { targetId } = await s.send('Target.createTarget', { url: 'about:blank' });
     const { sessionId } = await s.send('Target.attachToTarget', { targetId, flatten: true });
@@ -176,7 +199,8 @@ export function layoutAuditScript(safe: { top: number; right: number; bottom: nu
       const r = el.getBoundingClientRect();
       if (r.width === 0 || r.height === 0) continue;
       out.minFont = Math.min(out.minFont, parseFloat(cs.fontSize));
-      if (el.scrollWidth > el.clientWidth + 2 && cs.overflow !== 'visible' || el.scrollHeight > el.clientHeight + 2 && /hidden|clip/.test(cs.overflowY)) out.overflow.push(label(el));
+      const block = cs.display !== 'inline';
+      if (block && el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 3 || el.scrollHeight > el.clientHeight + 2 && /hidden|clip/.test(cs.overflowY)) out.overflow.push(label(el));
       if (r.left < -1 || r.top < -1 || r.right > W + 1 || r.bottom > H + 1) out.offCanvas.push(label(el));
       else if (!el.closest('[data-safe-ignore]') && (r.left < S.left || r.top < S.top || r.right > W - S.right || r.bottom > H - S.bottom)) out.unsafe.push(label(el));
     }
@@ -193,3 +217,32 @@ export interface LayoutAudit {
   minFont: number;
   textCount: number;
 }
+
+/**
+ * Shrink headlines until they fit their box: no word may stick out sideways
+ * and (with data-fit-lines) the block may not exceed N lines. Runs in-page
+ * after fonts load, so it measures the real typeface.
+ */
+export const FIT_SCRIPT = `(() => {
+  const els = document.querySelectorAll('[data-fit], h1, h2, .title, .hl, .big, .num, .quote');
+  let changed = 0;
+  for (const el of els) {
+    const cs = getComputedStyle(el);
+    if (cs.display === 'inline' || !el.clientWidth) continue;
+    let size = parseFloat(cs.fontSize);
+    const min = Math.max(size * 0.45, 28);
+    // Shrink-wrapped boxes (absolute, flex items) are measured against the room their parent leaves.
+    const room = () => { const p = el.parentElement.getBoundingClientRect(); const r = el.getBoundingClientRect(); return Math.min(el.clientWidth, p.right - r.left, window.innerWidth - r.left); };
+    const maxLines = Number(el.dataset.fitLines || 0);
+    const lh = () => parseFloat(getComputedStyle(el).lineHeight) || size * 1.1;
+    for (let i = 0; i < 30 && size > min; i++) {
+      const tooWide = el.scrollWidth > room() + 1;
+      const tooTall = maxLines && el.scrollHeight > lh() * maxLines + 2;
+      if (!tooWide && !tooTall) break;
+      size *= 0.94;
+      el.style.fontSize = size + 'px';
+      changed++;
+    }
+  }
+  return changed;
+})()`;

@@ -77,7 +77,10 @@ function subcomp(id: string, width: number, height: number, part: { markup: stri
   return `<!doctype html><html><head><meta charset="UTF-8"></head><body><template>
 <style>${part.css}</style>
 <div id="${id}" data-composition-id="${id}" data-width="${width}" data-height="${height}">${part.markup}</div>
-<script>(()=>{const tl=gsap.timeline({paused:true});
+<script>(()=>{const root=document.getElementById("${id}");
+const fit=()=>{for(const el of root.querySelectorAll("h1,h2,.num,p")){const cs=getComputedStyle(el);if(cs.display==="inline"||!el.clientWidth)continue;let s=parseFloat(cs.fontSize);const min=Math.max(s*.45,28);const room=()=>{const p=el.parentElement.getBoundingClientRect(),r=el.getBoundingClientRect(),c=root.getBoundingClientRect();return Math.min(el.clientWidth,p.right-r.left,c.right-r.left);};for(let i=0;i<30&&s>min&&el.scrollWidth>room()+1;i++){s*=.94;el.style.fontSize=s+"px";}}};
+fit();if(document.fonts&&document.fonts.ready)document.fonts.ready.then(fit);
+const tl=gsap.timeline({paused:true});
 ${part.js}
 window.__timelines["${id}"]=tl;})();</script>
 </template></body></html>`;
@@ -121,7 +124,9 @@ export async function compileStoryboard(story: Storyboard, opts: { dir: string; 
   const timeline = story.scenes.map((sc, i) => {
     const min = sc.scene ? getScene(sc.scene).minSeconds : 3;
     const vo = voiced[i] ? voiced[i].duration + VO_LEAD + VO_TAIL : 0;
-    const duration = Math.round(Math.max(sc.duration ?? 0, min, vo) * 100) / 100;
+    // The last scene holds an extra beat so the closing line is read, not flashed.
+    const tail = i === story.scenes.length - 1 ? 1.2 : 0;
+    const duration = Math.round(Math.max(sc.duration ?? 0, min, vo + tail) * 100) / 100;
     const entry = { sc, i, id: `s${i + 1}-${sc.scene ?? sc.block}`.replace(/[^\w-]/g, ''), start: Math.round(t * 100) / 100, duration };
     t += duration;
     return entry;
@@ -162,11 +167,15 @@ export async function compileStoryboard(story: Storyboard, opts: { dir: string; 
     },
   };
 
-  // 5. Scenes.
+  // 5. Scenes. With captions on, scenes keep their text above the caption band.
   progress(0.6, 'scenes');
+  const style0 = story.captions ?? (words.length ? 'karaoke' : 'none');
+  const vertical = height > width * 1.2;
+  const u = Math.min(width, height) / 1080;
+  const captionBand = words.length && style0 !== 'none' ? (vertical ? Math.max(preset.safe.bottom, 560 * u) + 250 * u : Math.round(height * 0.1) + 150 * u) : 0;
   const hosts: string[] = [];
   for (const e of timeline) {
-    const sctx: SceneCtx = { id: e.id, width, height, duration: e.duration, safe: preset.safe, brand: fallbackBrand, assetsDir: opts.brandDir, asset };
+    const sctx: SceneCtx = { id: e.id, width, height, duration: e.duration, safe: preset.safe, brand: fallbackBrand, assetsDir: opts.brandDir, asset, captionBand: e.sc.scene === 'product' || e.sc.scene === 'scroll' ? 0 : captionBand };
     if (e.sc.scene) {
       const part = getScene(e.sc.scene).build((e.sc.fields ?? {}) as Record<string, any>, sctx);
       await writeFile(join(dir, 'compositions', `${e.id}.html`), subcomp(e.id, width, height, part));

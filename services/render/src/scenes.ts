@@ -1,5 +1,16 @@
 import { pathToFileURL } from 'node:url';
-import { onColor, type BrandKit, type SafeZone } from '@shipcast/engine';
+import { contrastRatio, onColor, type BrandKit, type SafeZone } from '@shipcast/engine';
+
+/** Mix a colour toward white until it reads (≥ 3:1, WCAG large text) on a dark ground. */
+function readableOnDark(hex: string, ground = '#121317'): string {
+  const mix = (t: number) => {
+    const n = parseInt(hex.slice(1).length === 3 ? [...hex.slice(1)].map((c) => c + c).join('') : hex.slice(1), 16);
+    const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => Math.round(v + (255 - v) * t));
+    return '#' + ch.map((v) => v.toString(16).padStart(2, '0')).join('');
+  };
+  for (let t = 0; t <= 0.85; t += 0.05) if (contrastRatio(mix(t), ground) >= 4.6) return mix(t);
+  return '#ffffff';
+}
 
 /**
  * Shipcast motion scenes. Each scene compiles to a HyperFrames
@@ -20,6 +31,8 @@ export interface SceneCtx {
   assetsDir?: string;
   /** Project folder: assets are copied here and referenced relatively. */
   asset: (src: string) => string;
+  /** Pixels at the bottom reserved for captions (0 when there are none). */
+  captionBand?: number;
 }
 
 export interface SceneDef {
@@ -42,7 +55,7 @@ export const esc = (s: unknown) =>
 
 /** `*word*` → accent span. Words become individually animatable spans. */
 function words(text: unknown, cls = 'w'): string {
-  return esc(text)
+  const tokens = esc(text)
     .split(/(\*[^*]+\*)/g)
     .flatMap((part) => {
       const accent = /^\*.*\*$/.test(part);
@@ -50,9 +63,12 @@ function words(text: unknown, cls = 'w'): string {
         .replace(/^\*|\*$/g, '')
         .split(/\s+/)
         .filter(Boolean)
-        .map((w) => `<span class="${cls}-m"><span class="${cls}${accent ? ' acc' : ''}">${w}</span></span>`);
-    })
-    .join(' ');
+        .map((w) => ({ w, accent }));
+    });
+  // Punctuation that followed an accented phrase ("*finished*.") hugs the previous word.
+  return tokens
+    .map(({ w, accent }, i) => `${i && !/^[.,!?;:…)%]+$/.test(w) ? ' ' : ''}<span class="${cls}-m"><span class="${cls}${accent ? ' acc' : ''}">${w}</span></span>`)
+    .join('');
 }
 
 const list = (v: unknown): string[] => (Array.isArray(v) ? v.map(String) : String(v ?? '').split('\n')).map((x) => x.trim()).filter(Boolean);
@@ -68,7 +84,7 @@ function frame(c: SceneCtx) {
   const vertical = c.height > c.width * 1.2;
   // Phones show vertical video small and close: type runs larger there.
   const u = (Math.min(c.width, c.height) / 1080) * (vertical ? 1.18 : 1);
-  const pad = { t: Math.max(c.safe.top, 60 * u), r: Math.max(c.safe.right, 72 * u), b: Math.max(c.safe.bottom, 60 * u), l: Math.max(c.safe.left, 72 * u) };
+  const pad = { t: Math.max(c.safe.top, 60 * u), r: Math.max(c.safe.right, 72 * u), b: Math.max(c.safe.bottom, 60 * u, c.captionBand ?? 0), l: Math.max(c.safe.left, 72 * u) };
   return { u, vertical, pad, S: `#${c.id}` };
 }
 
@@ -84,7 +100,7 @@ ${S} .bg,${S} .bg i{position:absolute;inset:0}
 ${S} .bg .g1{inset:-20%;background:radial-gradient(40% 40% at 75% 25%,color-mix(in srgb,var(--brand-primary) ${mode === 'brand' ? 0 : 45}%,transparent),transparent 70%)}
 ${S} .bg .g2{inset:-20%;background:radial-gradient(45% 45% at 20% 85%,color-mix(in srgb,var(--brand-secondary) ${mode === 'brand' ? 25 : 30}%,transparent),transparent 70%)}
 ${S} .bg .grain{opacity:.08;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>")}
-${S} .acc{color:${mode === 'brand' ? ink : 'var(--brand-primary)'}}
+${S} .acc{color:${mode === 'brand' ? ink : mode === 'dark' ? readableOnDark(c.brand.colors.primary) : 'var(--brand-primary)'}}
 ${S} .stage{position:absolute;display:flex;flex-direction:column;justify-content:center}`,
     js: `tl.fromTo("${S} .g1",{xPercent:-4,yPercent:3,scale:1},{xPercent:5,yPercent:-4,scale:1.08,duration:${c.duration},ease:"none"},0);
 tl.fromTo("${S} .g2",{xPercent:4,yPercent:-2},{xPercent:-5,yPercent:4,duration:${c.duration},ease:"none"},0);`,
@@ -96,14 +112,17 @@ const stage = (c: SceneCtx, inner: string, align: 'left' | 'center' = 'left') =>
   return `<div class="stage" style="left:${pad.l}px;right:${pad.r}px;top:${pad.t}px;bottom:${pad.b}px;align-items:${align === 'center' ? 'center' : 'flex-start'};text-align:${align}">${inner}</div>`;
 };
 
+/** Only animate what exists: optional fields leave no GSAP "target not found" noise. */
+const has = (sel: string, code: string) => `if(document.querySelector(${JSON.stringify(sel)})){${code}}`;
+
 const wordIn = (S: string, sel: string, at: number, cls = 'w') =>
-  `tl.fromTo("${S} ${sel} .${cls}",{yPercent:115,opacity:0},{yPercent:0,opacity:1,duration:.85,ease:"expo.out",stagger:.06},${at});`;
+  has(`${S} ${sel} .${cls}`, `tl.fromTo("${S} ${sel} .${cls}",{yPercent:115,opacity:0},{yPercent:0,opacity:1,duration:.85,ease:"expo.out",stagger:.06},${at});`);
 
 const headCss = (S: string) => `${S} .w-m,${S} .x-m{display:inline-block;overflow:hidden;vertical-align:top;padding:.04em .02em .1em;margin:-.04em -.02em -.1em}
 ${S} .w,${S} .x{display:inline-block}
 ${S} h1,${S} h2{font-family:var(--font-display);font-weight:800;letter-spacing:-.035em;line-height:1.02;margin:0;text-wrap:balance}
-${S} .kicker{font-weight:700;letter-spacing:-.005em;color:var(--brand-primary);display:block}
-${S} .sub{opacity:.72;font-weight:500;line-height:1.35;max-width:28ch;text-wrap:pretty}`;
+${S} .kicker{font-weight:700;letter-spacing:-.005em;display:block}
+${S} .sub{opacity:.72;font-weight:500;line-height:1.35;max-width:28ch;text-wrap:pretty;overflow-wrap:anywhere}`;
 
 function img(src: unknown, c: SceneCtx): string {
   const s = String(src ?? '').trim();
@@ -131,9 +150,9 @@ export const SCENES: SceneDef[] = [
       const b = bg(c, 'dark');
       const size = fit(f.title, u, vertical ? [[14, 150], [26, 124], [44, 104], [80, 86]] : [[14, 168], [26, 140], [44, 116], [80, 92]], 76);
       return {
-        markup: b.markup + stage(c, `${f.kicker ? `<span class="kicker" style="font-size:${Math.round(36 * u)}px;margin-bottom:${Math.round(28 * u)}px"><span class="x-m"><span class="x">${esc(f.kicker)}</span></span></span>` : ''}<h1 style="font-size:${size}px">${words(f.title)}</h1>${f.subtitle ? `<p class="sub" style="font-size:${Math.round(40 * u)}px;margin-top:${Math.round(32 * u)}px">${esc(f.subtitle)}</p>` : ''}`),
+        markup: b.markup + stage(c, `${f.kicker ? `<span class="kicker acc" style="font-size:${Math.round(36 * u)}px;margin-bottom:${Math.round(28 * u)}px"><span class="x-m"><span class="x">${esc(f.kicker)}</span></span></span>` : ''}<h1 style="font-size:${size}px">${words(f.title)}</h1>${f.subtitle ? `<p class="sub" style="font-size:${Math.round(40 * u)}px;margin-top:${Math.round(32 * u)}px">${esc(f.subtitle)}</p>` : ''}`),
         css: b.css + headCss(S),
-        js: b.js + `tl.fromTo("${S} .x",{yPercent:110},{yPercent:0,duration:.6,ease:"expo.out"},.05);` + wordIn(S, 'h1', 0.15) + `tl.fromTo("${S} .sub",{y:${24 * u},opacity:0},{y:0,opacity:.72,duration:.7,ease:"expo.out"},.55);tl.fromTo("${S} h1",{scale:1},{scale:1.03,duration:${c.duration},ease:"none",transformOrigin:"0% 50%"},0);`,
+        js: b.js + has(`${S} .x`, `tl.fromTo("${S} .x",{yPercent:110},{yPercent:0,duration:.6,ease:"expo.out"},.05);`) + wordIn(S, 'h1', 0.15) + has(`${S} .sub`, `tl.fromTo("${S} .sub",{y:${24 * u},opacity:0},{y:0,opacity:.72,duration:.7,ease:"expo.out"},.55);`) + `tl.fromTo("${S} h1",{scale:1},{scale:1.03,duration:${c.duration},ease:"none",transformOrigin:"0% 50%"},0);`,
       };
     },
   },
@@ -147,13 +166,13 @@ export const SCENES: SceneDef[] = [
       const { u, vertical, S } = frame(c);
       const b = bg(c, 'light');
       const size = fit(f.text, u, vertical ? [[30, 120], [60, 96], [110, 78]] : [[30, 128], [60, 104], [110, 84]], 70);
-      const html = esc(f.text).replace(/\*([^*]+)\*/g, '<mark><span class="hl"></span><span class="t">$1</span></mark>');
+      const html = esc(f.text).replace(/\*([^*]+)\*/g, '<mark><span class="t">$1</span><span class="hl" aria-hidden="true">$1</span></mark>');
       return {
         markup: b.markup + stage(c, `<h2 style="font-size:${size}px">${html}</h2>`),
-        css: b.css + headCss(S) + `${S} mark{position:relative;background:none;color:var(--brand-on-primary);padding:0 .08em;white-space:nowrap}
-${S} mark .hl{position:absolute;inset:.06em -.02em -.02em;background:var(--brand-primary);border-radius:.08em;transform-origin:0 50%}
-${S} mark .t{position:relative}`,
-        js: b.js + `tl.fromTo("${S} h2",{y:${40 * u},opacity:0},{y:0,opacity:1,duration:.8,ease:"expo.out"},.1);tl.fromTo("${S} mark .hl",{scaleX:0},{scaleX:1,duration:.55,ease:"power3.inOut"},.75);tl.fromTo("${S} mark .t",{color:"${c.brand.colors.text}"},{color:"${onColor(c.brand.colors.primary)}",duration:.2},.95);tl.fromTo("${S} h2",{scale:1},{scale:1.025,duration:${c.duration},ease:"none",transformOrigin:"0% 50%"},0);`,
+        css: b.css + headCss(S) + `${S} mark{position:relative;display:inline-block;background:none;color:inherit;padding:0 .08em}
+${S} mark .t{color:inherit}
+${S} mark .hl{position:absolute;left:0;top:0;right:0;bottom:0;padding:0 .08em;background:var(--brand-primary);color:${onColor(c.brand.colors.primary)};border-radius:.08em;white-space:nowrap}`,
+        js: b.js + `tl.fromTo("${S} h2",{y:${40 * u},opacity:0},{y:0,opacity:1,duration:.8,ease:"expo.out"},.1);tl.fromTo("${S} mark .hl",{clipPath:"inset(0 100% 0 0)"},{clipPath:"inset(0 0% 0 0)",duration:.55,ease:"power3.inOut"},.75);tl.fromTo("${S} h2",{scale:1},{scale:1.025,duration:${c.duration},ease:"none",transformOrigin:"0% 50%"},0);`,
       };
     },
   },
@@ -182,7 +201,7 @@ ${S} mark .t{position:relative}`,
           `tl.fromTo("${S} .num",{scale:.86,opacity:0},{scale:1,opacity:1,duration:.7,ease:"back.out(1.5)",transformOrigin:"0% 80%"},.05);` +
           (num ? `const cnt={v:0};const nEl=document.querySelector("${S} .n");tl.fromTo(cnt,{v:0},{v:${target},duration:1.3,ease:"expo.out",onUpdate:()=>{nEl.textContent=cnt.v.toLocaleString("en-US",{minimumFractionDigits:${decimals},maximumFractionDigits:${decimals}})}},.1);` : '') +
           wordIn(S, 'h2', 0.6) +
-          `tl.fromTo("${S} .sub",{opacity:0},{opacity:.72,duration:.6},1.1);`,
+          has(`${S} .sub`, `tl.fromTo("${S} .sub",{opacity:0},{opacity:.72,duration:.6},1.1);`),
       };
     },
   },
@@ -378,7 +397,7 @@ ${S} .dev img{display:block;width:100%;height:auto}`,
       return {
         markup: b.markup + stage(c, `<div class="lg">${logoMarkup(c, Math.round(96 * u))}</div><h2 style="font-size:${fit(f.title, u, [[20, 120], [40, 96], [60, 80]], 70)}px;margin-top:${Math.round(44 * u)}px">${words(f.title)}</h2>${f.cta ? `<span class="btn" style="font-size:${Math.round(38 * u)}px;margin-top:${Math.round(48 * u)}px;padding:${Math.round(24 * u)}px ${Math.round(44 * u)}px">${esc(f.cta)}</span>` : ''}${f.url ? `<span class="url" style="font-size:${Math.round(32 * u)}px;margin-top:${Math.round(26 * u)}px">${esc(f.url)}</span>` : ''}`, 'center'),
         css: b.css + headCss(S) + `${S} .lg img.logo{background:var(--brand-on-primary);border-radius:20%;padding:8%}${S} .btn{display:inline-block;border-radius:999px;background:var(--brand-on-primary);color:var(--brand-primary);font-weight:800;letter-spacing:-.01em}${S} .url{display:block;font-family:var(--font-mono);opacity:.8}`,
-        js: b.js + `tl.fromTo("${S} .lg",{scale:.5,opacity:0,rotate:-8},{scale:1,opacity:1,rotate:0,duration:.8,ease:"back.out(1.6)"},.05);` + wordIn(S, 'h2', 0.4) + `tl.fromTo("${S} .btn",{y:${30 * u},opacity:0,scale:.92},{y:0,opacity:1,scale:1,duration:.6,ease:"back.out(1.6)"},.95);tl.fromTo("${S} .url",{opacity:0},{opacity:.8,duration:.5},1.25);`,
+        js: b.js + `tl.fromTo("${S} .lg",{scale:.5,opacity:0,rotate:-8},{scale:1,opacity:1,rotate:0,duration:.8,ease:"back.out(1.6)"},.05);` + wordIn(S, 'h2', 0.4) + has(`${S} .btn`, `tl.fromTo("${S} .btn",{y:${30 * u},opacity:0,scale:.92},{y:0,opacity:1,scale:1,duration:.6,ease:"back.out(1.6)"},.95);`) + has(`${S} .url`, `tl.fromTo("${S} .url",{opacity:0},{opacity:.8,duration:.5},1.25);`),
       };
     },
   },

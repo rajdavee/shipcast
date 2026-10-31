@@ -1,7 +1,7 @@
 import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { assertInHome, browser, createService, getPreset, layoutAuditScript, loadBrand, normalizeBrand, presetForSize, SERVICE_PORTS, type BrandKit, type LayoutAudit } from '@shipcast/engine';
+import { assertInHome, browser, createService, FIT_SCRIPT, getPreset, layoutAuditScript, loadBrand, normalizeBrand, presetForSize, SERVICE_PORTS, type BrandKit, type LayoutAudit } from '@shipcast/engine';
 import { CAROUSEL_LAYOUTS, renderCarouselSlide, THEMES } from './templates/carousel.ts';
 import type { RenderCtx } from './templates/common.ts';
 import { CARD_LAYOUTS, renderCard, renderThumbnail, THUMBNAIL_LAYOUTS } from './templates/graphics.ts';
@@ -58,6 +58,7 @@ async function capture(html: string, file: string, width: number, height: number
   await writeFile(htmlFile, html);
   const page = await browser().open(pathToFileURL(htmlFile).href, { width, height, settleMs: 80 });
   try {
+    await page.eval(FIT_SCRIPT);
     const audit = await page.eval<LayoutAudit>(layoutAuditScript(safe, width, height));
     const jpg = /\.jpe?g$/.test(file);
     await writeFile(file, await page.screenshot(jpg ? 'jpeg' : 'png', 90));
