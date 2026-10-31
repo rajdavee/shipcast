@@ -51,23 +51,6 @@ export function Skills() {
         </div>
       </div>
 
-      <section className="setup-section">
-        <h2>Who does what</h2>
-        <p>For each part of the work, Shipcast uses the strongest enabled skill. Pick a different one any time.</p>
-        <div className="roles-grid">
-          {Object.entries(view.roles)
-            .sort(([a], [b]) => a.localeCompare(b))
-            .map(([role, r]) => (
-              <label key={role} className="field role-pick">
-                <span>{ROLE_LABEL(role)}</span>
-                <select className="select" value={r.chosen ?? ''} onChange={(e) => act(role, () => api.setSkillRole(role, e.target.value || null), `${ROLE_LABEL(role)}: updated`)}>
-                  <option value="">Best available</option>
-                  {r.candidates.map((c) => <option key={c.id} value={c.id}>{c.name} · {c.skill}</option>)}
-                </select>
-              </label>
-            ))}
-        </div>
-      </section>
 
       {byArea.map((g) => (
         <section key={g.a} className="setup-section">
@@ -77,6 +60,24 @@ export function Skills() {
           </div>
         </section>
       ))}
+      <details className="setup-section roles-adv">
+        <summary>Advanced — choose who plays each role</summary>
+        <p className="muted">Shipcast picks the strongest enabled skill for each part of the work. Override it where more than one can do the job.</p>
+        <div className="roles-grid">
+          {Object.entries(view.roles)
+            .filter(([, r]) => r.candidates.length > 1)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([role, r]) => (
+              <label key={role} className="field role-pick">
+                <span>{ROLE_LABEL(role)}</span>
+                <select className="select" value={r.chosen ?? ''} onChange={(e) => act(role, () => api.setSkillRole(role, e.target.value || null), `${ROLE_LABEL(role)}: updated`)}>
+                  <option value="">Best available{r.effective && !r.chosen ? ` (${r.effective})` : ''}</option>
+                  {r.candidates.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </label>
+            ))}
+        </div>
+      </details>
     </main>
   );
 }

@@ -2,7 +2,7 @@
 export type SourceType = 'url' | 'github' | 'local' | 'text';
 export type Source = { type: SourceType; value: string };
 export interface HubPackage { id: string; name: string; repo: string; ref: string; paths: string[]; licence: string; area: string; roles: Record<string, string>; summary: string; verdict: number; needs?: string[]; stars?: number }
-export interface SkillsView { packages: (HubPackage & { installed: boolean; enabled: boolean; permissive: boolean; accepted: boolean })[]; roles: Record<string, { candidates: { id: string; skill: string; name: string }[]; chosen?: string }> }
+export interface SkillsView { packages: (HubPackage & { installed: boolean; enabled: boolean; permissive: boolean; accepted: boolean })[]; roles: Record<string, { candidates: { id: string; skill: string; name: string }[]; chosen?: string; effective?: string }> }
 export interface BrainQuestion { id: string; question: string; why?: string; options: string[] }
 export interface BrainDirection { id: string; title: string; hook: string; angle: string; tone: string }
 export interface BrainTurn { understood: string; questions: BrainQuestion[]; directions: BrainDirection[] }

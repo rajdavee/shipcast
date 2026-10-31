@@ -285,9 +285,13 @@ router.post('/api/brainstorm', async (req) => {
 // ── Skill Hub: upstream skills, installed pinned and isolated, mixed per role ─
 async function skillsView() {
   const [reg, s] = await Promise.all([loadRegistry(), hubState()]);
-  const roles: Record<string, { candidates: { id: string; skill: string; name: string }[]; chosen?: string }> = {};
+  const roles: Record<string, { candidates: { id: string; skill: string; name: string }[]; chosen?: string; effective?: string }> = {};
   for (const p of reg) for (const [role, skill] of Object.entries(p.roles)) (roles[role] ??= { candidates: [] }).candidates.push({ id: p.id, skill, name: p.name });
-  for (const r of Object.keys(roles)) roles[r].chosen = s.roles[r];
+  for (const r of Object.keys(roles)) {
+    roles[r].chosen = s.roles[r];
+    const live = reg.filter((p) => p.roles[r] && isEnabled(p, s) && (isPermissive(p.licence) || s.accepted[p.id]));
+    roles[r].effective = (live.find((p) => p.id === s.roles[r]) ?? live.sort((a, b) => b.verdict - a.verdict)[0])?.name;
+  }
   return {
     packages: reg.map((p) => ({ ...p, installed: isInstalled(p, s), enabled: isEnabled(p, s), permissive: isPermissive(p.licence), accepted: !!s.accepted[p.id] })),
     roles,
