@@ -48,7 +48,9 @@ back to you to fix.
 5. **Land the CTA.** End on `outro` with the brief's CTA and URL; hold ≥ 2.5 s.
 6. **Voiceover = spoken, not written.** ~2.4 words/sec, 4–14 words per scene, contractions, short sentences, the same claim as the on-screen text (not a repeat of every word). Spell brand names exactly as `brand.json`.
 7. **On-screen text is short.** Titles ≤ 8 words; wrap the single most important word in `*stars*` for the accent.
-8. **Vary the rhythm.** Alternate dark/light/brand scenes (title → statement → product → stat …) and vary transitions: `wipe` for momentum, `flash` for a beat drop, `fade` before the outro, `zoom` into a reveal, `cut` for punch.
+8. **Use the high-energy scenes.** Every video needs at least one moment of pure motion, not just text and screenshots:
+   `kinetic` (2–4 huge lines slam in on the beat — great hook or punchline), `logos` (the real tools your audience juggles burst in and collapse into your product — great for "replaces", "works with", integrations), `stack3d` (features or steps as a 3D card stack). Pick the one that fits the story; don't use all three in a short video.
+9. **Vary the rhythm.** Alternate dark/light/brand scenes (title → statement → product → stat …) and vary transitions: `wipe` for momentum, `flash` for a beat drop, `fade` before the outro, `zoom` into a reveal, `cut` for punch.
 
 ## Formats
 

@@ -2,7 +2,7 @@ import { copyFile, mkdir, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { basename, extname, join } from 'node:path';
 import { createHash } from 'node:crypto';
-import { brandCss, getPreset, loadBrand, localizeFonts, normalizeBrand, run, type BrandKit, type PlatformPreset } from '@shipcast/engine';
+import { brandCss, getPreset, loadBrand, localizeFonts, normalizeBrand, resolveIcons, run, type BrandKit, type PlatformPreset } from '@shipcast/engine';
 import { getScene, type SceneCtx } from './scenes.ts';
 import { MOODS, type Mood } from '@shipcast/media';
 import { buildCaptions, CAPTION_STYLES, type CaptionStyle, type Word } from './captions.ts';
@@ -199,8 +199,11 @@ export async function compileStoryboard(story: Storyboard, opts: { dir: string; 
   const u = Math.min(width, height) / 1080;
   const captionBand = words.length && style0 !== 'none' ? (vertical ? Math.max(preset.safe.bottom, 560 * u) + 250 * u : Math.round(height * 0.1) + 150 * u) : 0;
   const hosts: string[] = [];
+  // Logos for scenes that show real tools (same resolver and cache as the infographics).
+  const iconNames = timeline.flatMap((e) => (e.sc.scene === 'logos' ? String(Array.isArray(e.sc.fields?.items) ? (e.sc.fields!.items as string[]).join('\n') : (e.sc.fields?.items ?? '')).split('\n').map((x) => x.trim()).filter(Boolean) : []));
+  const icons = iconNames.length ? await resolveIcons(iconNames) : {};
   for (const e of timeline) {
-    const sctx: SceneCtx = { id: e.id, width, height, duration: e.duration, safe: preset.safe, brand: fallbackBrand, assetsDir: opts.brandDir, asset, captionBand: e.sc.scene === 'product' || e.sc.scene === 'scroll' ? 0 : captionBand };
+    const sctx: SceneCtx = { id: e.id, width, height, duration: e.duration, safe: preset.safe, brand: fallbackBrand, assetsDir: opts.brandDir, asset, icons, captionBand: e.sc.scene === 'product' || e.sc.scene === 'scroll' ? 0 : captionBand };
     if (e.sc.scene) {
       const part = getScene(e.sc.scene).build((e.sc.fields ?? {}) as Record<string, any>, sctx);
       await writeFile(join(dir, 'compositions', `${e.id}.html`), subcomp(e.id, width, height, part));

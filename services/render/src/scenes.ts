@@ -33,6 +33,8 @@ export interface SceneCtx {
   asset: (src: string) => string;
   /** Pixels at the bottom reserved for captions (0 when there are none). */
   captionBand?: number;
+  /** Platform/tool logos resolved before build (name → data URI, null = monogram). */
+  icons?: Record<string, string | null>;
 }
 
 export interface SceneDef {
@@ -489,6 +491,161 @@ ${S} .val{font-variant-numeric:tabular-nums;text-align:right;opacity:.85}`,
 tl.fromTo("${S} .bar",{scaleX:0},{scaleX:1,duration:1.1,ease:"expo.out",stagger:.12},.55);
 tl.fromTo("${S} .row.hi .track",{boxShadow:"0 0 0 0 rgba(255,255,255,0)"},{boxShadow:"0 0 0 ${Math.max(2, Math.round(3 * u))}px ${accent}",duration:.4,ease:"power2.out"},1.7);` +
           has(`${S} .sub`, `tl.fromTo("${S} .sub",{opacity:0},{opacity:.72,duration:.5},1.6);`),
+      };
+    },
+  },
+  {
+    id: 'logos',
+    label: 'Logo storm',
+    use: 'The tools/platforms your audience juggles today burst in around the frame, then collapse into your product. Best for "replaces N tools", "works with everything you use", integrations. 5–10 real names.',
+    minSeconds: 4,
+    fields: [
+      { id: 'title', type: 'text', label: 'Title', optional: true, max: 50 },
+      { id: 'items', type: 'list', label: 'Tools / platforms', help: 'One per line, real names (Slack, Notion, pip, Docker...)' },
+      { id: 'punchline', type: 'text', label: 'Punchline under the logo', optional: true, max: 40 },
+    ],
+    build: (f, c) => {
+      const { u, vertical, pad, S } = frame(c);
+      const b = bg(c, 'dark');
+      const items = list(f.items).slice(0, 12);
+      const titleH = f.title ? Math.round((vertical ? 170 : 140) * u) : 0;
+      const top = pad.t + titleH, bottom = c.height - pad.b;
+      const cx = c.width / 2, cy = (top + bottom) / 2;
+      const rx = (c.width - pad.l - pad.r) * (vertical ? 0.36 : 0.33), ry = (bottom - top) * 0.36;
+      const tile = Math.round((vertical ? 200 : 178) * u);
+      const tiles = items
+        .map((name, i) => {
+          const a = (i / items.length) * Math.PI * 2 - Math.PI / 2 + (i % 2 ? 0.18 : -0.12);
+          const jx = ((i * 37) % 23) - 11, jy = ((i * 53) % 19) - 9;
+          const x = cx + Math.cos(a) * rx + jx * u - tile / 2, y = cy + Math.sin(a) * ry + jy * u - tile / 2;
+          const icon = c.icons?.[name];
+          return `<div class="lt" data-dx="${Math.round(cx - tile / 2 - x)}" data-dy="${Math.round(cy - tile / 2 - y)}" style="left:${Math.round(x)}px;top:${Math.round(y)}px;width:${tile}px;height:${tile}px;--r:${((i * 7) % 11) - 5}deg">${icon ? `<i class="ic" style="background-image:url('${icon}')"></i>` : `<b class="mg">${esc(name[0] ?? '•')}</b>`}<span>${esc(name)}</span></div>`;
+        })
+        .join('');
+      const hub = Math.round((vertical ? 300 : 260) * u);
+      return {
+        markup:
+          b.markup +
+          `${f.title ? `<h2 class="cap" style="position:absolute;left:${pad.l}px;right:${pad.r}px;top:${pad.t}px;font-size:${Math.round((vertical ? 80 : 76) * u)}px;text-align:center">${words(f.title)}</h2>` : ''}${tiles}
+<div class="hub" style="left:${cx - hub / 2}px;top:${cy - hub / 2}px;width:${hub}px;height:${hub}px">${logoMarkup(c, Math.round(hub * 0.5))}</div>
+${f.punchline ? `<p class="pl" style="top:${cy + hub / 2 + 34 * u}px;font-size:${Math.round((vertical ? 64 : 58) * u)}px">${words(f.punchline, 'x')}</p>` : ''}`,
+        css:
+          b.css +
+          headCss(S) +
+          `${S} .lt{position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:${Math.round(10 * u)}px;border-radius:${Math.round(28 * u)}px;background:rgba(255,255,255,.96);color:#14161c;box-shadow:0 ${Math.round(18 * u)}px ${Math.round(40 * u)}px -${Math.round(16 * u)}px rgba(0,0,0,.6);transform:rotate(var(--r))}
+${S} .lt .ic{width:46%;height:46%;background:center/contain no-repeat}
+${S} .lt .mg{width:46%;height:46%;display:grid;place-items:center;border-radius:50%;background:var(--brand-primary);color:var(--brand-on-primary);font:800 ${Math.round(40 * u)}px/1 var(--font-display)}
+${S} .lt span{font:700 ${Math.round(24 * u)}px/1 var(--font-body);max-width:90%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+${S} .hub{position:absolute;display:grid;place-items:center;border-radius:${Math.round(44 * u)}px;background:#fff;box-shadow:0 0 0 ${Math.round(10 * u)}px color-mix(in srgb,var(--brand-primary) 35%,transparent),0 ${Math.round(30 * u)}px ${Math.round(70 * u)}px -${Math.round(20 * u)}px rgba(0,0,0,.7)}
+${S} .hub .logo{max-width:70%;object-fit:contain;color:#14161c}
+${S} .pl{position:absolute;left:${pad.l}px;right:${pad.r}px;text-align:center;margin:0;font-family:var(--font-display);font-weight:800;letter-spacing:-.03em}`,
+        js:
+          b.js +
+          wordIn(S, '.cap', 0.05) +
+          `tl.fromTo("${S} .lt",{scale:0,opacity:0},{scale:1,opacity:1,duration:.55,ease:"back.out(1.8)",stagger:{each:.07,from:"random"}},.25);
+tl.to("${S} .lt",{y:"-=${Math.round(14 * u)}",duration:${(c.duration * 0.3).toFixed(2)},ease:"sine.inOut",stagger:.05},.9);
+tl.set("${S} .hub",{scale:0,opacity:0},0);
+const tc=${Math.max(1.9, c.duration * 0.5).toFixed(2)};
+tl.to("${S} .lt",{x:(i,el)=>+el.dataset.dx,y:(i,el)=>+el.dataset.dy-${Math.round(14 * u)},scale:.25,rotation:0,opacity:0,duration:.6,ease:"power3.in",stagger:{each:.025,from:"edges"}},tc);
+tl.to("${S} .hub",{scale:1,opacity:1,duration:.7,ease:"back.out(1.6)"},tc+.45);` +
+          has(`${S} .pl .x`, `tl.fromTo("${S} .pl .x",{yPercent:110},{yPercent:0,duration:.6,ease:"expo.out",stagger:.06},tc+.75);`),
+      };
+    },
+  },
+  {
+    id: 'kinetic',
+    label: 'Kinetic type slam',
+    use: 'Two to four very short lines slam onto the screen one per beat, huge, with a colour hit on each. For a hook, a manifesto or a punchline. Lines of 1–3 words land hardest.',
+    minSeconds: 2.4,
+    fields: [{ id: 'lines', type: 'list', label: 'Lines', help: '2–4 lines, each ≤ 16 characters. *wrap* a line to make it the accent line.' }],
+    build: (f, c) => {
+      const { u, vertical, pad, S } = frame(c);
+      const b = bg(c, 'dark');
+      const lines = list(f.lines).slice(0, 4);
+      const longest = Math.max(...lines.map((l) => l.replace(/\*/g, '').length), 4);
+      const avail = c.width - pad.l - pad.r;
+      const areaH = c.height - pad.t - pad.b;
+      const size = Math.round(Math.min((avail / (longest * 0.56)), (areaH / lines.length) * 0.92, (vertical ? 230 : 250) * u));
+      const beat = Math.min(0.55, Math.max(0.3, (c.duration - 1) / Math.max(1, lines.length)));
+      return {
+        markup:
+          b.markup +
+          `<div class="hit"></div>` +
+          stage(
+            c,
+            lines
+              .map((l, i) => {
+                const acc = /^\*.*\*$/.test(l.trim());
+                return `<div class="kl-m"><div class="kl${acc ? ' acc-line' : ''}${i % 2 && !acc ? ' dim' : ''}" style="font-size:${size}px">${esc(l.replace(/\*/g, ''))}</div></div>`;
+              })
+              .join(''),
+          ),
+        css:
+          b.css +
+          `${S} .hit{position:absolute;inset:0;background:var(--brand-primary);opacity:0;z-index:0}
+${S} .stage{z-index:1;gap:${Math.round(4 * u)}px}
+${S} .kl-m{overflow:hidden;padding:.02em 0 .06em}
+${S} .kl{font-family:var(--font-display);font-weight:900;letter-spacing:-.05em;line-height:.92;text-transform:none;white-space:nowrap;will-change:transform}
+${S} .kl.dim{opacity:.55}
+${S} .kl.acc-line{color:${onColor(readableOnDark(c.brand.colors.primary))};background:${readableOnDark(c.brand.colors.primary)};padding:0 .12em;display:inline-block}`,
+        js:
+          b.js +
+          `const ls=document.querySelectorAll("${S} .kl");ls.forEach((el,i)=>{const t=.15+i*${beat.toFixed(2)};
+tl.fromTo(el,{yPercent:105,skewY:6},{yPercent:0,skewY:0,duration:.42,ease:"expo.out"},t);
+tl.fromTo("${S} .hit",{opacity:.0},{opacity:.22,duration:.06,yoyo:true,repeat:1,ease:"none"},t);});
+tl.fromTo("${S} .stage",{scale:1},{scale:1.05,duration:${c.duration},ease:"none",transformOrigin:"0% 50%"},0);`,
+      };
+    },
+  },
+  {
+    id: 'stack3d',
+    label: '3D card stack',
+    use: 'Three to five features as cards in a 3D stack; each comes to the front in turn. For "how it works" steps or key features. Each card: "Title — one short line".',
+    minSeconds: 4,
+    fields: [
+      { id: 'title', type: 'text', label: 'Title', optional: true, max: 50 },
+      { id: 'cards', type: 'list', label: 'Cards', help: 'One per line: "Title — one short line" (3–5)' },
+    ],
+    build: (f, c) => {
+      const { u, vertical, pad, S } = frame(c);
+      const b = bg(c, 'dark');
+      const cards = list(f.cards).slice(0, 5).map((l) => {
+        const [t, ...rest] = l.split(/\s+[—–-]\s+|:\s+/);
+        return { t: t.trim(), d: rest.join(' — ').trim() };
+      });
+      const titleH = f.title ? Math.round((vertical ? 170 : 140) * u) : 0;
+      const top = pad.t + titleH, bottom = c.height - pad.b;
+      const cw = Math.round(Math.min(c.width - pad.l - pad.r, (vertical ? 900 : 1040) * u));
+      const ch = Math.round(Math.min((bottom - top) * 0.72, (vertical ? 560 : 420) * u));
+      const cx = c.width / 2 - cw / 2, cy = top + (bottom - top) / 2 - ch / 2 + 40 * u;
+      const n = cards.length;
+      const slot = Math.max(0.9, (c.duration - 0.9) / n);
+      return {
+        markup:
+          b.markup +
+          `${f.title ? `<h2 class="cap" style="position:absolute;left:${pad.l}px;right:${pad.r}px;top:${pad.t}px;font-size:${Math.round((vertical ? 80 : 76) * u)}px;text-align:center">${words(f.title)}</h2>` : ''}<div class="persp">${cards
+            .map((k, i) => `<div class="cd" data-i="${i}" style="left:${cx}px;top:${cy}px;width:${cw}px;height:${ch}px"><span class="no">${String(i + 1).padStart(2, '0')}</span><b>${esc(k.t)}</b>${k.d ? `<p>${esc(k.d)}</p>` : ''}</div>`)
+            .join('')}</div>`,
+        css:
+          b.css +
+          headCss(S) +
+          `${S} .persp{position:absolute;inset:0;perspective:${Math.round(1800 * u)}px}
+${S} .cd{position:absolute;border-radius:${Math.round(34 * u)}px;padding:${Math.round(48 * u)}px ${Math.round(56 * u)}px;display:flex;flex-direction:column;justify-content:center;gap:${Math.round(16 * u)}px;
+  background:#f6f7f9;color:#121317;border:1px solid rgba(255,255,255,.5);box-shadow:0 ${Math.round(40 * u)}px ${Math.round(80 * u)}px -${Math.round(30 * u)}px rgba(0,0,0,.8);transform-style:preserve-3d}
+${S} .cd .no{align-self:flex-start;font:800 ${Math.round(30 * u)}px/1 var(--font-display);padding:${Math.round(10 * u)}px ${Math.round(16 * u)}px;border-radius:999px;background:var(--brand-primary);color:var(--brand-on-primary)}
+${S} .cd.back{background:#2a2d36;color:#cfd3dc}
+${S} .cd b{font:800 ${Math.round((vertical ? 96 : 92) * u)}px/1.02 var(--font-display);letter-spacing:-.035em}
+${S} .cd p{margin:0;font:500 ${Math.round((vertical ? 46 : 42) * u)}px/1.3 var(--font-body);opacity:.78;max-width:30ch}`,
+        js:
+          b.js +
+          wordIn(S, '.cap', 0.05) +
+          `const cds=[...document.querySelectorAll("${S} .cd")];const n=${n},D=${Math.round(170 * u)},Y=${Math.round(-78 * u)};
+const place=(k)=>({z:-k*D,y:k*Y,rotationX:k?6:0,opacity:k>2?0:1,scale:1});
+cds.forEach((el,i)=>{tl.set(el,{...place(i),zIndex:n-i,transformPerspective:${Math.round(1800 * u)},className:i?'cd back':'cd'},0);});
+tl.fromTo(cds,{y:"+=${Math.round(120 * u)}",opacity:0},{y:(i)=>i*Y,opacity:(i)=>i>2?0:1,duration:.7,ease:"expo.out",stagger:.08},.1);
+for(let s=1;s<n;s++){const t=.4+s*${slot.toFixed(2)};
+  tl.to(cds[s-1],{y:${Math.round(-c.height * 0.55)},rotationX:-28,opacity:0,duration:.55,ease:"power3.in"},t-.35);
+  cds.slice(s).forEach((el,j)=>{const p=place(j);tl.to(el,{z:p.z,y:p.y,rotationX:p.rotationX,opacity:p.opacity,duration:.6,ease:"power3.out"},t-.15);if(!j)tl.set(el,{className:'cd'},t-.15);});}`,
       };
     },
   },
