@@ -51,7 +51,8 @@ export function shortsFromStoryboard(sb: Board, count = 3, opts: { maxSeconds?: 
       scenes.push({ ...s, transition: scenes.length ? s.transition : 'cut' });
       t += d;
     }
-    if (outro) scenes.push(outro);
+    // The long video's sign-off often points at "the description" — a Short closes on the visual alone.
+    if (outro) scenes.push({ ...outro, vo: '', duration: Math.max(outro.duration ?? 0, 3) });
     return { title: `${sb.title ?? 'Short'} — ${ch.title}`, preset: 'vertical', voice: sb.voice, music: sb.music, captions: opts.captions ?? 'highlight', scenes };
   });
 }
