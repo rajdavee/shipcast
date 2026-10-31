@@ -129,12 +129,16 @@ test('failed brief blocks deliverables; retry unblocks', async () => {
 
 test('cancel stops a running step', async () => {
   process.env.FAKE_CLAUDE_MODE = 'hang';
-  const { body } = await api('/api/campaigns', { method: 'POST', json: { source: { type: 'url', value: 'example.org' }, deliverables: [{ pack: 'thumbnails' }] } });
-  await waitFor(body.id, (c) => c.steps[0].status === 'running');
-  await api(`/api/campaigns/${body.id}/steps/brief/cancel`, { method: 'POST' });
-  const c = await waitFor(body.id, (x) => x.steps[0].status === 'canceled', 8000);
-  assert.equal(c.steps[1].status, 'blocked');
-  delete process.env.FAKE_CLAUDE_MODE;
+  try {
+    const { body } = await api('/api/campaigns', { method: 'POST', json: { source: { type: 'url', value: 'example.org' }, deliverables: [{ pack: 'thumbnails' }] } });
+    await waitFor(body.id, (c) => c.steps[0].status === 'running');
+    await api(`/api/campaigns/${body.id}/steps/brief/cancel`, { method: 'POST' });
+    // Downstream steps are blocked just after the brief is marked canceled.
+    const c = await waitFor(body.id, (x) => x.steps[0].status === 'canceled' && x.steps[1].status !== 'queued', 8000);
+    assert.equal(c.steps[1].status, 'blocked');
+  } finally {
+    delete process.env.FAKE_CLAUDE_MODE;
+  }
 });
 
 test('settings accept known fields only', async () => {
