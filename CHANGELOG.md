@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.0 — 2026-11-01
+
+Save-worthy posts, videos with real energy, and a studio with fewer decisions.
+
+- **Animated infographic posts** — the framework format that gets saved on LinkedIn. Four layouts (journey table, timeline, funnel, A-vs-B compare) and five looks (dotted board, night, hand-drawn sketch, editorial paper, glass). Dense cells with real platform logos and grouped chips, a cursor that tours and clicks each step, real author avatar and brand wordmark. Claude finds the idea and chooses the layout and look. GIF + MP4 + PNG + post text.
+- **Video type fixed** — headlines were rendering at roughly half size (the fit pass measured scenes before they were mounted). Titles, statements, lists and charts now land at full size; stat numbers size to the frame.
+- **New motion scenes** — `kinetic` (huge lines slam in on the beat), `logos` (the tools your audience juggles burst in and collapse into your product), `stack3d` (features as a 3D card stack). The storyboard skill asks for at least one per video.
+- **Visual carousel layouts** — `platforms` (grouped real logos), `journey` (stage pills with logos), `note` (a hand-written sticky thought).
+- **Studio** — Home is one input plus format tiles with real previews; projects are a live gallery; results open in a lightbox with Download, Copy post text and "Ask for changes" up front. Navigation is New, Projects and a status pill.
+- **Logos** — one Iconify request per icon set with backoff; rate limits never poison the cache; dozens of dev-tool aliases.
+
 ## 0.4.0 — 2026-10-31
 
 The studio, redesigned around one question.
