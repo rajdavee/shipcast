@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.8.0 — 2026-11-01
+
+Sketch it before you make it, and a hub of the best community skills.
+
+- **Drawing board** — after picking a direction, Shipcast sketches the video Excalidraw-style: a hand-drawn frame per beat (kinetic type, product shot, big number, logo storm, 3D cards, presenter, cinematic shot…), the line in handwriting, the director's note, arrows between. Rewrite, swap scenes, reorder, add or drop beats; the approved board becomes the plan every step follows.
+- **Brainstorm, continued** — reply to the directions in your own words ("mix 1 and 3", "more playful") and get reworked ones; Claude suggests the formats that fit and applies them in one click.
+- **Skill Hub** — 19 curated packages from 14 repos (HyperFrames, GSAP, taste-skill, Anthropic's creative skills, diagram-design, marketingskills, humanizer, ffmpeg-skill, Emil Kowalski's motion skills and more), each pinned to a commit, licence-checked and installed into Shipcast only. Formats ask for roles; the hub assigns the strongest skill. Add any skill repo by GitHub URL.
+- **Scriptwriting skill** — Shipcast's own: hooks, structures from 15-second shorts to 10-minute videos, story spines, open loops, writing for the ear.
+- **Music that follows the story** — the score thins out under quiet scenes and comes in full on the big moments.
+- **Mascot looks** — blob, bot, orb and sticky note for the animated presenter.
+- HyperFrames workflow skills are pinned to the last release that shipped them, so formats keep working on fresh machines.
+
 ## 0.7.0 — 2026-11-01
 
 Shipcast talks with you first, and videos get a voice and a face.

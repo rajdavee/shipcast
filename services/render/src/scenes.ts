@@ -690,6 +690,7 @@ ${S} .w-m{display:inline-block;overflow:hidden;vertical-align:top}${S} .w{displa
       { id: 'line', type: 'text', label: 'Speech bubble', max: 90 },
       { id: 'pose', type: 'text', label: 'Pose', optional: true, help: 'explain | wave | point | think | celebrate' },
       { id: 'side', type: 'text', label: 'Side', optional: true, help: 'left | right' },
+      { id: 'look', type: 'text', label: 'Mascot', optional: true, help: 'blob | bot | orb | note — keep one look per video' },
     ],
     build: (f, c) => {
       const { u, vertical, pad, S } = frame(c);
@@ -706,18 +707,27 @@ ${S} .w-m{display:inline-block;overflow:hidden;vertical-align:top}${S} .w{displa
       const bx = vertical ? pad.l : right ? pad.l : pad.l + cw + 80 * u;
       const by = vertical ? pad.t + 40 * u : c.height * 0.2;
       const size = fit(f.line, u, vertical ? [[40, 84], [70, 72], [90, 64]] : [[40, 80], [70, 68], [90, 60]], 54);
-      const eye = dark ? '#fff' : '#14161c';
+      const look = ['bot', 'orb', 'note'].includes(String(f.look)) ? String(f.look) : 'blob';
+      const eye = look === 'note' ? '#23252b' : look === 'bot' ? '#7CF0C0' : dark ? '#fff' : '#14161c';
+      // Face height per look (eyes, mouth); arms and gestures are shared.
+      const fy = look === 'bot' ? -14 : look === 'orb' ? 10 : look === 'note' ? 4 : 0;
+      const armC = look === 'note' ? '#23252b' : body;
+      const shape: Record<string, string> = {
+        blob: `<rect x="22" y="40" width="96" height="148" rx="48" fill="${body}"/><ellipse cx="70" cy="58" rx="30" ry="12" fill="#fff" opacity=".18"/>`,
+        bot: `<line x1="70" y1="40" x2="70" y2="20" stroke="${body}" stroke-width="5"/><circle cx="70" cy="16" r="7" fill="#FFD84D"/><rect x="34" y="122" width="72" height="66" rx="16" fill="${body}"/><rect x="20" y="38" width="100" height="84" rx="20" fill="${body}"/><rect x="32" y="52" width="76" height="56" rx="12" fill="#14161c"/>`,
+        orb: `<ellipse cx="70" cy="34" rx="30" ry="8" fill="none" stroke="#FFD84D" stroke-width="5"/><circle cx="70" cy="122" r="62" fill="${body}"/><ellipse cx="54" cy="88" rx="18" ry="10" fill="#fff" opacity=".2"/>`,
+        note: `<rect x="24" y="48" width="92" height="132" fill="#FFE680"/><path d="M116 156 L92 180 L116 180 Z" fill="#E8C94A"/><rect x="52" y="40" width="38" height="14" fill="rgba(255,255,255,.7)" transform="rotate(-4 71 47)"/>`,
+      };
       // Mascot: rounded body in the brand colour, face, two arms; drawn on a 140×200 grid.
       const svg = `<svg class="mascot" viewBox="0 0 140 200" width="${cw}" height="${ch}" style="left:${cx}px;top:${cy}px">
 <ellipse cx="70" cy="194" rx="46" ry="6" fill="rgba(0,0,0,.14)"/>
 <g class="bodyg">
-<g class="armL"><path d="M30 108 Q14 124 20 144" stroke="${body}" stroke-width="13" stroke-linecap="round" fill="none"/></g>
-<g class="armR"><path d="M110 108 Q126 124 120 144" stroke="${body}" stroke-width="13" stroke-linecap="round" fill="none"/></g>
-<rect x="22" y="40" width="96" height="148" rx="48" fill="${body}"/>
-<ellipse cx="70" cy="58" rx="30" ry="12" fill="#fff" opacity=".18"/>
-<g class="face"><g class="eyes"><ellipse class="eye" cx="54" cy="92" rx="6.5" ry="8" fill="${eye}"/><ellipse class="eye" cx="86" cy="92" rx="6.5" ry="8" fill="${eye}"/></g>
-<ellipse class="mouth" cx="70" cy="118" rx="10" ry="3" fill="${eye}"/>
-<circle cx="45" cy="110" r="6" fill="#ff7a9a" opacity=".35"/><circle cx="95" cy="110" r="6" fill="#ff7a9a" opacity=".35"/></g>
+<g class="armL"><path d="M30 108 Q14 124 20 144" stroke="${armC}" stroke-width="${look === 'note' ? 5 : 13}" stroke-linecap="round" fill="none"/></g>
+<g class="armR"><path d="M110 108 Q126 124 120 144" stroke="${armC}" stroke-width="${look === 'note' ? 5 : 13}" stroke-linecap="round" fill="none"/></g>
+${shape[look]}
+<g class="face" transform="translate(0 ${fy})"><g class="eyes"><ellipse class="eye" cx="54" cy="92" rx="6.5" ry="8" fill="${eye}"/><ellipse class="eye" cx="86" cy="92" rx="6.5" ry="8" fill="${eye}"/></g>
+<ellipse class="mouth" cx="70" cy="${look === 'bot' ? 112 : 118}" rx="10" ry="3" fill="${eye}"/>
+${look === 'bot' ? '' : '<circle cx="45" cy="110" r="6" fill="#ff7a9a" opacity=".35"/><circle cx="95" cy="110" r="6" fill="#ff7a9a" opacity=".35"/>'}</g>
 ${pose === 'think' ? '<g class="prop"><circle cx="122" cy="30" r="5" fill="#bbb"/><circle cx="132" cy="14" r="8" fill="#ccc"/></g>' : ''}
 ${pose === 'celebrate' ? '<g class="prop"><path d="M14 30 l6 -12 l6 12 z" fill="#FFD84D"/><path d="M118 22 l6 -12 l6 12 z" fill="#5BD6A0"/><circle cx="30" cy="16" r="4" fill="#ff7a9a"/><circle cx="110" cy="40" r="4" fill="#7aa7ff"/></g>' : ''}
 </g></svg>`;
