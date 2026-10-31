@@ -37,6 +37,13 @@ const deps = {
   mix: (voice: string | null, music: string | null, out: string, seconds: number, gainDb?: number) => callService('media', 'mix', { voice, music, out, seconds, ...(gainDb !== undefined ? { musicGainDb: gainDb } : {}) }),
 };
 
+/** Render with HyperFrames; when parallel capture times out under load, retry once with a single worker. */
+async function hfRender(args: string[], cwd: string) {
+  const r = await hf(args, cwd);
+  if (r.code !== 0 && /Navigation timeout|sequential capture|--workers 1/i.test(r.stderr + r.stdout)) return hf([...args, '--workers', '1'], cwd);
+  return r;
+}
+
 async function hf(args: string[], cwd: string, timeoutMs = 1_800_000) {
   const { spawn } = await import('node:child_process');
   return new Promise<{ code: number; stdout: string; stderr: string }>((resolve) => {
@@ -99,7 +106,7 @@ async function finishProject(o: { project: string; dir: string; name: string; qu
   }
   const raw = join(dir, `${name}.raw.mp4`);
   o.progress(0.45, 'rendering frames');
-  const r = await hf(['render', '.', '-o', raw, '--quality', o.quality === 'draft' ? 'draft' : 'delivery', '--fps', String(o.fps), '--quiet'], project);
+  const r = await hfRender(['render', '.', '-o', raw, '--quality', o.quality === 'draft' ? 'draft' : 'delivery', '--fps', String(o.fps), '--quiet'], project);
   if (r.code !== 0) throw new Error(`render failed: ${(r.stderr || r.stdout).slice(-900)}`);
   o.progress(0.85, 'mastering');
   const final = join(dir, `${name}.mp4`);
@@ -167,7 +174,7 @@ async function renderChapters(story: Storyboard, dir: string, brandDir: string |
       const project = join(cdir, 'project');
       const compiled = await compileStoryboard(sub, { dir: project, brandDir, deps, progress: (f, msg) => progress(0.02 + 0.8 * span(f * 0.4), `chapter ${i + 1}: ${msg ?? ''}`) });
       const raw = join(cdir, 'raw.mp4');
-      const r = await hf(['render', '.', '-o', raw, '--quality', quality === 'draft' ? 'draft' : 'delivery', '--fps', String(compiled.preset.fps ?? 30), '--quiet'], project);
+      const r = await hfRender(['render', '.', '-o', raw, '--quality', quality === 'draft' ? 'draft' : 'delivery', '--fps', String(compiled.preset.fps ?? 30), '--quiet'], project);
       if (r.code !== 0) throw new Error(`chapter ${i + 1} render failed: ${(r.stderr || r.stdout).slice(-600)}`);
       // Split picture and sound: pictures join losslessly, sound is re-mixed as one track.
       await run('ffmpeg', ['-y', '-v', 'error', '-i', raw, '-an', '-c:v', 'copy', video]);
