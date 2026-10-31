@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.0 — 2026-10-31
+
+The studio, redesigned around one question.
+
+- **Create**: one box ("What are you launching?") that detects website / repo / description, three goals (Launch kit, Social pack, Video only), and an optional *Customize* for individual formats, options and notes. Experimental formats are tucked away.
+- **Project page**: a plain-language progress line ("Reel · rendering the video…"), a card showing what Shipcast learned (one-liner, brand colors, logo, screenshots), and a gallery where every result appears as it's ready.
+- **Result drawer**: preview, Download, New version, *ask for changes* in plain words, plus Edit, Quality checks and Activity (with Claude's notes) for those who want them.
+- **Library** with cover images; **Setup** merges accounts, local engines and preferences into one page; a top bar replaces the sidebar.
+- New dark-first design system with light mode, uniform media cards, mobile layouts without sideways scrolling.
+- Steps report plain-language phases (researching, writing the script, rendering, final review).
+
 ## 0.3.1 — 2026-10-31
 
 - New scenes: typing **terminal** (command + streamed output) and animated **bar chart** for real benchmarks — the director picks them on its own for dev tools.
