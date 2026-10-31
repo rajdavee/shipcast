@@ -1,0 +1,25 @@
+{
+  "id": "feature-explainer",
+  "name": "Feature Explainer",
+  "tagline": "A narrated “how it works” video on your real product: the camera walks your screens with highlights and captions, real click-throughs, and clear diagrams of the rules. 90 s to 8 min.",
+  "category": "video",
+  "order": 5,
+  "estimate": "20–60 min",
+  "accent": "#f97316",
+  "spec": "storyboard",
+  "app": true,
+  "context": true,
+  "timeoutMinutes": 150,
+  "options": [
+    { "key": "feature", "label": "Feature", "type": "text", "default": "", "placeholder": "e.g. AI credits and top-ups — blank = the feature users ask about most" },
+    { "key": "length", "label": "Length", "type": "select", "choices": ["90 s", "3 min", "5 min", "7 min"], "default": "3 min" },
+    { "key": "audience", "label": "For", "type": "select", "choices": ["customers", "admins", "new team members", "prospects"], "default": "customers" },
+    { "key": "preset", "label": "Format", "type": "select", "choices": ["youtube", "linkedin-video", "vertical"], "default": "youtube" },
+    { "key": "voice", "label": "Voice", "type": "select", "choices": ["af_heart", "am_michael", "af_nova", "am_adam", "bf_emma", "bm_george"], "default": "af_heart" },
+    { "key": "captions", "label": "Captions", "type": "select", "choices": ["none", "clean", "karaoke"], "default": "none" }
+  ],
+  "outputs": ["video.mp4", "video.jpg", "video.srt", "video.vtt", "chapters.txt", "storyboard.json", "script.md", "*.md"],
+  "skills": [],
+  "tools": ["chrome"],
+  "roles": ["copy", "humanize"]
+}

@@ -42,6 +42,8 @@ export interface Storyboard {
   /** A file to use, or a mood for Shipcast's procedural bed. `null` = no music. Default: an uplifting bed. */
   music?: { file?: string; mood?: Mood; gainDb?: number } | null;
   captions?: CaptionStyle;
+  /** Chapter openers: `number` = big outlined number (default), `part` = calm "PART 2" card for explainers. */
+  chapterCards?: 'number' | 'part';
 }
 
 export interface CompileDeps {

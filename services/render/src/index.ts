@@ -159,7 +159,7 @@ async function renderChapters(story: Storyboard, dir: string, brandDir: string |
       ...story,
       chapters: undefined,
       music: null,
-      scenes: [...(card ? [{ scene: 'chapter', fields: { number: i + 1, title: ch.title, total: chapters.length }, transition: 'fade' as const }] : []), ...ch.scenes],
+      scenes: [...(card ? [story.chapterCards === 'part' ? { scene: 'part', fields: { label: `Part ${chapters.slice(0, i + 1).filter((c, k) => c.card ?? k > 0).length}`, title: ch.title }, transition: 'fade' as const } : { scene: 'chapter', fields: { number: i + 1, title: ch.title, total: chapters.length }, transition: 'fade' as const }] : []), ...ch.scenes],
     };
     const cdir = join(dir, 'chapters', String(i + 1).padStart(2, '0'));
     const hash = createHash('sha256').update(JSON.stringify([sub, brandDir ?? '', quality])).digest('hex').slice(0, 20);
