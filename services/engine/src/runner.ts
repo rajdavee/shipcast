@@ -1,5 +1,6 @@
 import { mkdir, writeFile, rm } from 'node:fs/promises';
-import { catalogMarkdown, renderSpec, SPEC_FILE } from './specs.ts';
+import { catalogMarkdown, checkCopy, renderSpec, SPEC_FILE } from './specs.ts';
+import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { join } from 'node:path';
@@ -319,6 +320,23 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
           break;
         }
         const fix = await execClaude(`The render service checked your ${SPEC_FILE[specKind]} and found these problems:\n${r.feedback.map((f) => `- ${f}`).join('\n')}\n\nEdit out/${SPEC_FILE[specKind]} to fix every one of them (shorter text, different layout, valid fields). Don't render anything yourself — just update the JSON.`, sessionId);
+        if (!fix.result?.ok) break;
+      }
+    }
+
+    // Copy kit: measured platform limits and AI-cliché checks, fixed in the same session (≤ 2 rounds).
+    if (ok && pack?.id === 'copy-kit' && !canceled && !timedOut) {
+      for (let round = 0; round < 2; round++) {
+        let problems: string[];
+        try {
+          problems = checkCopy(JSON.parse(await readFile(join(cwd, 'out', 'copy.json'), 'utf8')));
+        } catch {
+          problems = ['out/copy.json is missing or not valid JSON.'];
+        }
+        if (!problems.length) break;
+        await log({ step: step.id, type: 'log', text: `Copy check found ${problems.length} issue(s): ${problems.slice(0, 2).join(' · ')}` });
+        if (!sessionId || Date.now() > deadline) break;
+        const fix = await execClaude(`The copy check found these problems:\n${problems.map((p) => `- ${p}`).join('\n')}\n\nFix each one in out/copy.json and out/copy.md (keep both in sync). Keep the voice; just fix what's listed.`, sessionId);
         if (!fix.result?.ok) break;
       }
     }

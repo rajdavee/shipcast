@@ -83,7 +83,7 @@ test('campaign runs brief then deliverable, then revises with --resume', async (
 
   const done = await waitFor(id, (c) => c.steps.every((s: any) => s.status === 'done'));
   const step = done.steps[1];
-  assert.deepEqual(step.outputs, ['out/NOTES.md', 'out/copy.md']);
+  assert.deepEqual(step.outputs, ['out/NOTES.md', 'out/copy.json', 'out/copy.md']);
   assert.ok(step.sessionId);
 
   // Brief must run first, in the brief folder, with sub-agents blocked for this pack.

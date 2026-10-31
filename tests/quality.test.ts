@@ -51,3 +51,18 @@ test('every scene declares fields the director can fill', () => {
   }
   assert.ok(Object.keys(CAPTION_STYLES).includes('bold'));
 });
+
+test('copy check catches clichés and platform limits', async () => {
+  const { checkCopy } = await import('@shipcast/engine');
+  const problems = checkCopy({
+    linkedin: [{ label: 'Launch', text: 'We are excited to announce our seamless new tool. ' + 'x'.repeat(220) + '\n\nMore.' }],
+    youtube: [{ label: 'Title A', text: 'A'.repeat(80) }],
+    x: [{ label: 'Standalone 1', text: 'y'.repeat(300) }],
+  });
+  assert.ok(problems.some((p) => p.includes('excited to announce')));
+  assert.ok(problems.some((p) => p.includes('seamless')));
+  assert.ok(problems.some((p) => p.includes('210')));
+  assert.ok(problems.some((p) => p.includes('title')));
+  assert.ok(problems.some((p) => p.includes('280')));
+  assert.deepEqual(checkCopy({ linkedin: [{ label: 'ok', text: 'Short, specific hook.\n\nBody.' }] }), []);
+});

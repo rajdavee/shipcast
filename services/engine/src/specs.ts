@@ -112,3 +112,31 @@ export async function renderSpec(kind: SpecKind, cwd: string, briefDir: string, 
     return { ok: false, feedback: [(e as Error).message.slice(0, 1500)], summary: 'render failed' };
   }
 }
+
+/** Phrases that read as generic AI marketing copy (research §G). */
+export const BANNED_PHRASES = [
+  'excited to announce', 'excited to share', 'thrilled to', 'game-changer', 'game changer', 'revolutionize', 'revolutionary', 'unlock', 'supercharge',
+  'seamless', 'streamline your workflow', "in today's fast-paced", 'leverage', 'elevate', 'delve', 'empower', 'cutting-edge', 'next-level', 'harness the power',
+];
+
+/** Platform limits for the copy kit; returns problems to send back to Claude. */
+export function checkCopy(copy: Record<string, { label: string; text: string }[]>): string[] {
+  const out: string[] = [];
+  for (const [channel, items] of Object.entries(copy ?? {})) {
+    for (const it of Array.isArray(items) ? items : []) {
+      const t = String(it?.text ?? '');
+      const lower = t.toLowerCase();
+      const where = `${channel} / ${it?.label ?? '?'}`;
+      for (const p of BANNED_PHRASES) if (lower.includes(p)) out.push(`${where}: uses "${p}" — rewrite it in plain, specific words.`);
+      if (/^linkedin/i.test(channel)) {
+        const hook = t.split(/\n\s*\n/)[0];
+        if (hook.length > 210) out.push(`${where}: the hook before the first blank line is ${hook.length} chars; LinkedIn cuts at ~210 ("…see more").`);
+        if (t.length > 3000) out.push(`${where}: ${t.length} chars, over LinkedIn's 3000 limit.`);
+      }
+      if (/^(x|twitter)/i.test(channel) && !/thread/i.test(it?.label ?? '')) for (const post of t.split(/\n\s*\d+\/\d*\s*\n|\n---\n/)) if (post.trim().length > 280) out.push(`${where}: a post is ${post.trim().length} chars (X allows 280).`);
+      if (/^youtube/i.test(channel) && /title/i.test(it?.label ?? '') && t.length > 70) out.push(`${where}: title is ${t.length} chars; keep under 60 so it isn't truncated.`);
+      if ((t.match(/\p{Extended_Pictographic}/gu) ?? []).length > 3) out.push(`${where}: ${(t.match(/\p{Extended_Pictographic}/gu) ?? []).length} emoji — keep it to 2 or fewer.`);
+    }
+  }
+  return out.slice(0, 20);
+}
