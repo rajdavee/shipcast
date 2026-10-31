@@ -76,7 +76,7 @@ export interface SpecResult {
 }
 
 /** Render a spec found in `cwd/out/<file>` into `cwd/out`. */
-export async function renderSpec(kind: SpecKind, cwd: string, briefDir: string, opts: { handle?: string } = {}): Promise<SpecResult> {
+export async function renderSpec(kind: SpecKind, cwd: string, briefDir: string, opts: { handle?: string; force?: Record<string, unknown> } = {}): Promise<SpecResult> {
   const file = join(cwd, 'out', SPEC_FILE[kind]);
   if (!existsSync(file)) return { ok: false, feedback: [`out/${SPEC_FILE[kind]} was not written.`], summary: 'no spec' };
   let spec: any;
@@ -86,6 +86,12 @@ export async function renderSpec(kind: SpecKind, cwd: string, briefDir: string, 
     return { ok: false, feedback: [`out/${SPEC_FILE[kind]} is not valid JSON: ${(e as Error).message}`], summary: 'bad json' };
   }
   const out = join(cwd, 'out');
+  // Choices the user made in the format options win over whatever the model wrote.
+  for (const [k, v] of Object.entries(opts.force ?? {})) {
+    if (v === null) delete spec[k];
+    else if (v !== undefined && (k !== 'motion' || !spec.motion)) spec[k] = v;
+  }
+  if (Object.keys(opts.force ?? {}).length) await writeFile(file, JSON.stringify(spec, null, 2));
   try {
     if (kind === 'deck') {
       const r = await callService('stills', 'deck', { ...spec, handle: spec.handle ?? opts.handle, brandDir: briefDir, outDir: out });

@@ -313,7 +313,9 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
     if (ok && specKind && !canceled && !timedOut) {
       for (let round = 0; ; round++) {
         await log({ step: step.id, type: 'log', text: round ? `Re-rendering after fixes (round ${round})…` : `Rendering ${SPEC_FILE[specKind]} with the ${specKind === 'storyboard' ? 'render' : 'stills'} service…` });
-        const r = await renderSpec(specKind, cwd, join(dir, 'brief'));
+        const force: Record<string, unknown> = {};
+        if (pack?.id === 'carousel') force.motion = step.options.motion === 'no' ? null : 'chill';
+        const r = await renderSpec(specKind, cwd, join(dir, 'brief'), { force });
         await log({ step: step.id, type: 'log', text: r.ok ? `Rendered: ${r.summary}` : `Quality check found ${r.feedback.length} issue(s): ${r.feedback.slice(0, 3).join(' · ')}` });
         if (r.ok) {
           // Director's review: QA can't judge taste. Claude looks at the frames once and may revise.
