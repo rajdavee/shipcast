@@ -47,7 +47,7 @@ export interface CompileDeps {
   /** media.voice — returns audio + aligned words. */
   voice: (text: string, voice: string, speed: number, out: string) => Promise<{ file: string; duration: number; words: Word[] }>;
   /** media.music — procedural bed with SFX. */
-  music: (mood: Mood, seconds: number, sfx: { kind: string; at: number; gain?: number }[], out: string) => Promise<{ file: string; bpm: number }>;
+  music: (mood: Mood, seconds: number, sfx: { kind: string; at: number; gain?: number }[], out: string, energy?: { at: number; level: number }[]) => Promise<{ file: string; bpm: number }>;
   /** Optional stock footage for `broll` scenes (null = none available → cinematic fallback). */
   broll?: (query: string, seconds: number, orientation: 'landscape' | 'portrait' | 'square') => Promise<{ file: string; credit: string; url: string } | null>;
   /** media.mix — voice over music, mastered. */
@@ -64,6 +64,12 @@ export interface Compiled {
   preset: PlatformPreset;
   /** Attribution lines for stock footage used (Pexels asks for credit). */
   credits: string[];
+}
+
+/** How much the score should play under each scene type (0 = pads only, 1 = full band). */
+const SCENE_ENERGY: Record<string, number> = { kinetic: 1, stat: 1, logos: 1, stack3d: 0.9, outro: 1, 'logo-sting': 1, title: 0.7, chart: 0.7, compare: 0.65, product: 0.6, features: 0.6, scroll: 0.55, terminal: 0.5, chapter: 0.55, statement: 0.45, quote: 0.35, character: 0.45, cinema: 0.3, broll: 0.4 };
+export function energyCurve(scenes: { scene: string; start: number }[], count: number): { at: number; level: number }[] {
+  return scenes.map((s, i) => ({ at: s.start, level: i === count - 1 ? 1 : SCENE_ENERGY[s.scene] ?? 0.6 }));
 }
 
 const VO_LEAD = 0.3;
@@ -220,7 +226,7 @@ export async function compileStoryboard(story: Storyboard, opts: { dir: string; 
     for (const e of timeline.slice(1)) if (e.sc.scene === 'stat' || e.sc.scene === 'kinetic') sfx.push({ kind: 'riser', at: e.start, gain: 0.22 });
     // A soft hit under every punch-in, so the zoom is felt as well as seen.
     for (const e of timeline) for (const p of punchesFor(e)) sfx.push({ kind: 'pop', at: +(e.start + p).toFixed(2), gain: 0.16 });
-    const bed = await opts.deps.music(mood, total, sfx, join(dir, 'assets', 'bed.wav'));
+    const bed = await opts.deps.music(mood, total, sfx, join(dir, 'assets', 'bed.wav'), energyCurve(timeline.map((e) => ({ scene: e.sc.scene ?? 'block', start: e.start })), timeline.length));
     music = bed.file;
   }
   if (audio || music) {

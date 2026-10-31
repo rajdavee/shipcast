@@ -99,6 +99,8 @@ export interface MusicOptions {
   seed?: number;
   /** Seconds at which to place a short build-and-hit (scene cuts). */
   accents?: number[];
+  /** Energy over time (0–1) so the score follows the edit: sparse under quiet scenes, full on big moments. */
+  energy?: { at: number; level: number }[];
 }
 
 export interface Track {
@@ -216,6 +218,30 @@ export function makeMusic(o: MusicOptions): Track {
   for (const t of kickAt) {
     const st = Math.floor(t * SR);
     for (let i = 0; i < 0.3 * SR && st + i < n; i++) duck[st + i] = Math.min(duck[st + i], 1 - 0.55 * Math.exp((-i / SR) * 9));
+  }
+
+  // Energy curve: each section's level, crossfaded over ~0.6 s, gates which stems play.
+  const lvl = new Float32Array(n).fill(1);
+  if (o.energy?.length) {
+    const pts = [...o.energy].sort((a, b) => a.at - b.at);
+    const xf = 0.6 * SR;
+    let cur = pts[0].level;
+    let k = 0;
+    for (let i = 0; i < n; i++) {
+      const t = i / SR;
+      while (k + 1 < pts.length && t >= pts[k + 1].at) k++;
+      const target = pts[k].level;
+      cur += (target - cur) * Math.min(1, 1 / xf);
+      lvl[i] = cur;
+    }
+  }
+  const ramp = (e: number, lo: number, span: number) => Math.max(0, Math.min(1, (e - lo) / span));
+  for (let i = 0; i < n; i++) {
+    const e = lvl[i];
+    drums[i] *= ramp(e, 0.35, 0.3);
+    arp[i] *= ramp(e, 0.55, 0.3);
+    bass[i] *= 0.45 + 0.55 * ramp(e, 0.2, 0.4);
+    pads[i] *= 0.75 + 0.25 * e;
   }
 
   const wetPads = reverb(pads, 0.3, 1);

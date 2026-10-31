@@ -171,12 +171,12 @@ export function createMediaService() {
       },
 
       /** A procedural, license-free music bed (optionally with transition SFX baked in). */
-      music: async ({ mood = 'uplifting', seconds, bpm, seed, sfx = [], out }: { mood?: Mood; seconds: number; bpm?: number; seed?: number; sfx?: { kind: Sfx; at: number; gain?: number }[]; out: string }) => {
+      music: async ({ mood = 'uplifting', seconds, bpm, seed, sfx = [], energy, out }: { mood?: Mood; seconds: number; bpm?: number; seed?: number; sfx?: { kind: Sfx; at: number; gain?: number }[]; energy?: { at: number; level: number }[]; out: string }) => {
         if (!(mood in MOODS)) throw new Error(`mood must be one of ${Object.keys(MOODS).join(', ')}`);
         if (!(seconds > 0 && seconds <= 600)) throw new Error('seconds must be between 0 and 600');
         const o = assertInHome(out, 'out');
         await mkdir(dirname(o), { recursive: true });
-        const track = makeMusic({ mood, seconds, bpm, seed });
+        const track = makeMusic({ mood, seconds, bpm, seed, energy: Array.isArray(energy) ? energy.filter((e) => Number.isFinite(e?.at) && Number.isFinite(e?.level)).slice(0, 400) : undefined });
         sfx.forEach((s, i) => addSfx(track, s.kind, s.at, s.gain ?? 0.5, i + 1));
         await writeFile(o, toWav(track));
         return { file: o, bpm: track.bpm, beat: track.beat, mood };

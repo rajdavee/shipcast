@@ -122,3 +122,15 @@ test('variety guard flags near-copies and lets fresh structures through', () => 
   assert.equal(fb.length, 1);
   assert.match(fb[0], /uv · reel/);
 });
+
+test('music follows the energy curve of the edit', () => {
+  const t = makeMusic({ mood: 'tech', seconds: 12, seed: 3, energy: [{ at: 0, level: 0.25 }, { at: 6, level: 1 }] });
+  const rms = (a: Float32Array, s: number, e: number) => {
+    let sum = 0;
+    for (let i = Math.floor(s * 44100); i < Math.floor(e * 44100); i++) sum += a[i] * a[i];
+    return Math.sqrt(sum / ((e - s) * 44100));
+  };
+  const calm = rms(t.left, 2.5, 5.5);
+  const big = rms(t.left, 7.5, 9.5);
+  assert.ok(big > calm * 1.3, `full section (${big.toFixed(3)}) should be clearly louder than the calm one (${calm.toFixed(3)})`);
+});

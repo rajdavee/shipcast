@@ -35,7 +35,7 @@ async function cachedVoice(text: string, voice: string, speed: number, out: stri
 const deps = {
   voice: cachedVoice,
   broll: (query: string, seconds: number, orientation: 'landscape' | 'portrait' | 'square') => findBroll(query, seconds, orientation),
-  music: (mood: string, seconds: number, sfx: unknown[], out: string) => callService('media', 'music', { mood, seconds, sfx, out }),
+  music: (mood: string, seconds: number, sfx: unknown[], out: string, energy?: { at: number; level: number }[]) => callService('media', 'music', { mood, seconds, sfx, out, energy }),
   mix: (voice: string | null, music: string | null, out: string, seconds: number, gainDb?: number) => callService('media', 'mix', { voice, music, out, seconds, ...(gainDb !== undefined ? { musicGainDb: gainDb } : {}) }),
 };
 
