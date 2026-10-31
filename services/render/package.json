@@ -3,6 +3,11 @@
   "version": "0.2.0",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts" },
-  "dependencies": { "@shipcast/engine": "0.1.0" }
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@shipcast/engine": "0.1.0",
+    "@shipcast/media": "0.2.0"
+  }
 }

@@ -28,6 +28,7 @@ async function cachedVoice(text: string, voice: string, speed: number, out: stri
 
 const deps = {
   voice: cachedVoice,
+  music: (mood: string, seconds: number, sfx: unknown[], out: string) => callService('media', 'music', { mood, seconds, sfx, out }),
   mix: (voice: string | null, music: string | null, out: string, seconds: number, gainDb?: number) => callService('media', 'mix', { voice, music, out, seconds, ...(gainDb !== undefined ? { musicGainDb: gainDb } : {}) }),
 };
 

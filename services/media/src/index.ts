@@ -3,8 +3,10 @@ import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { assertInHome, createService, engineEnv, finishVideo, getPreset, measureLoudness, probe, run, SERVICE_PORTS, voiceReady } from '@shipcast/engine';
 import { alignScript, buildCues, toSrt, toVtt, type Word } from './align.ts';
+import { addSfx, makeMusic, MOODS, toWav, type Mood, type Sfx } from './synth.ts';
 
 export * from './align.ts';
+export * from './synth.ts';
 
 export const VOICES = ['af_heart', 'af_nova', 'af_sky', 'am_adam', 'am_michael', 'bf_emma', 'bf_isabella', 'bm_george'] as const;
 
@@ -56,7 +58,7 @@ export function createMediaService() {
     port: SERVICE_PORTS.media,
     version: '0.2.0',
     concurrency: 1,
-    health: async () => ({ voice: (await voiceReady()) ? 'kokoro' : 'system-fallback', voices: VOICES }),
+    health: async () => ({ voice: (await voiceReady()) ? 'kokoro' : 'system-fallback', voices: VOICES, moods: Object.keys(MOODS) }),
     handlers: {
       /** Speak a script and return the audio plus word timings aligned to the script. */
       voice: async ({ text, voice = 'af_heart', speed = 1, out }, ctx) => {
@@ -132,6 +134,18 @@ export function createMediaService() {
         const o = assertInHome(output ?? i.replace(/\.(\w+)$/, '.final.$1'), 'output');
         const r = await finishVideo(i, o, p?.loudness ? { lufs: p.loudness.lufs, truePeak: p.loudness.truePeak } : {});
         return { file: o, ...r };
+      },
+
+      /** A procedural, license-free music bed (optionally with transition SFX baked in). */
+      music: async ({ mood = 'uplifting', seconds, bpm, seed, sfx = [], out }: { mood?: Mood; seconds: number; bpm?: number; seed?: number; sfx?: { kind: Sfx; at: number; gain?: number }[]; out: string }) => {
+        if (!(mood in MOODS)) throw new Error(`mood must be one of ${Object.keys(MOODS).join(', ')}`);
+        if (!(seconds > 0 && seconds <= 600)) throw new Error('seconds must be between 0 and 600');
+        const o = assertInHome(out, 'out');
+        await mkdir(dirname(o), { recursive: true });
+        const track = makeMusic({ mood, seconds, bpm, seed });
+        sfx.forEach((s, i) => addSfx(track, s.kind, s.at, s.gain ?? 0.5, i + 1));
+        await writeFile(o, toWav(track));
+        return { file: o, bpm: track.bpm, beat: track.beat, mood };
       },
 
       /** Tempo of a music file (for cutting on the beat). */

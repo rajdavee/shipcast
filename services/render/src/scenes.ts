@@ -97,7 +97,7 @@ function bg(c: SceneCtx, mode: 'dark' | 'brand' | 'light' = 'dark') {
     markup: `<div class="bg"><i class="g1"></i><i class="g2"></i><i class="grain"></i></div>`,
     css: `${S}{position:absolute;inset:0;overflow:hidden;background:${base};color:${ink};font-family:var(--font-body)}
 ${S} .bg,${S} .bg i{position:absolute;inset:0}
-${S} .bg .g1{inset:-20%;background:radial-gradient(40% 40% at 75% 25%,color-mix(in srgb,var(--brand-primary) ${mode === 'brand' ? 0 : 45}%,transparent),transparent 70%)}
+${S} .bg .g1{inset:-20%;background:radial-gradient(40% 40% at 75% 25%,color-mix(in srgb,var(--brand-primary) ${mode === 'brand' ? 0 : mode === 'dark' ? 26 : 45}%,transparent),transparent 70%)}
 ${S} .bg .g2{inset:-20%;background:radial-gradient(45% 45% at 20% 85%,color-mix(in srgb,var(--brand-secondary) ${mode === 'brand' ? 25 : 30}%,transparent),transparent 70%)}
 ${S} .bg .grain{opacity:.08;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>")}
 ${S} .acc{color:${mode === 'brand' ? ink : mode === 'dark' ? readableOnDark(c.brand.colors.primary) : 'var(--brand-primary)'}}

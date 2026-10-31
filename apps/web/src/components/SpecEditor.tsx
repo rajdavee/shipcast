@@ -161,6 +161,13 @@ export function SpecEditor({ campaign, step, kind, images, onSaved }: Props) {
                 {['am_michael', 'af_heart', 'af_nova', 'af_sky', 'am_adam', 'bf_emma', 'bf_isabella', 'bm_george'].map((v) => <option key={v}>{v}</option>)}
               </select>
             </label>
+            <label className="field"><span>Music</span>
+              <select className="select" value={spec.music === null ? 'none' : spec.music?.file ? 'file' : (spec.music?.mood ?? 'uplifting')} onChange={(e) => update((d) => (d.music = e.target.value === 'none' ? null : e.target.value === 'file' ? d.music : { mood: e.target.value }))}>
+                {['uplifting', 'tech', 'chill', 'energetic', 'cinematic', 'playful'].map((m) => <option key={m} value={m}>{m[0].toUpperCase() + m.slice(1)} (original score)</option>)}
+                {spec.music?.file && <option value="file">Your track</option>}
+                <option value="none">No music</option>
+              </select>
+            </label>
             <label className="field"><span>Captions</span>
               <select className="select" value={spec.captions ?? 'none'} onChange={(e) => update((d) => (d.captions = e.target.value))}>
                 {Object.entries(catalog.captions).map(([k, v]) => <option key={k} value={k}>{String(v).split(' — ')[0]}</option>)}

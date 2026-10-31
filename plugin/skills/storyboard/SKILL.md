@@ -26,6 +26,7 @@ back to you to fix.
   "preset": "vertical",
   "voice": { "voice": "am_michael", "speed": 1.05 },
   "captions": "bold",
+  "music": { "mood": "tech" },
   "scenes": [
     { "scene": "title", "fields": { "title": "Your launch is *one link* away" }, "vo": "Your launch is one link away." },
     { "scene": "product", "fields": { "image": "assets/hero.png", "title": "Paste a repo", "focusX": 0.4, "focusY": 0.3, "zoom": 1.8 }, "vo": "Paste a repo.", "transition": "wipe" }
@@ -36,7 +37,7 @@ back to you to fix.
 - `preset` comes from the prompt (format option). `voice: null` and `captions: "none"` for music-only pieces.
 - Image fields take paths relative to the brief folder (`assets/…`) — only files that exist there.
 - Scene duration is automatic (voice line + breathing room, never below the scene's minimum). Set `duration` only to hold longer.
-- `music` is optional: `{ "file": "<absolute path>", "gainDb": -18 }` — only a file that exists (user uploads or an earlier render). Omit otherwise.
+- `music`: pick a mood that matches the brand voice — `uplifting` (friendly SaaS), `tech` (devtools, infra), `chill` (lifestyle, calm), `energetic` (launch hype), `cinematic` (serious, premium; no drums), `playful` (consumer, fun). Shipcast scores an original bed and snaps cuts to its beat. Use `{ "file": "<absolute path>" }` only for a track the user uploaded; `null` for silence.
 
 ## Story rules (what makes it good)
 

@@ -4,6 +4,7 @@ import { basename, extname, join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { brandCss, getPreset, loadBrand, localizeFonts, normalizeBrand, run, type BrandKit, type PlatformPreset } from '@shipcast/engine';
 import { getScene, type SceneCtx } from './scenes.ts';
+import { MOODS, type Mood } from '@shipcast/media';
 import { buildCaptions, CAPTION_STYLES, type CaptionStyle, type Word } from './captions.ts';
 
 export type Transition = 'cut' | 'flash' | 'wipe' | 'fade' | 'zoom';
@@ -28,13 +29,16 @@ export interface Storyboard {
   preset: string;
   scenes: StoryScene[];
   voice?: { voice: string; speed?: number } | null;
-  music?: { file: string; gainDb?: number } | null;
+  /** A file to use, or a mood for Shipcast's procedural bed. `null` = no music. Default: an uplifting bed. */
+  music?: { file?: string; mood?: Mood; gainDb?: number } | null;
   captions?: CaptionStyle;
 }
 
 export interface CompileDeps {
   /** media.voice — returns audio + aligned words. */
   voice: (text: string, voice: string, speed: number, out: string) => Promise<{ file: string; duration: number; words: Word[] }>;
+  /** media.music — procedural bed with SFX. */
+  music: (mood: Mood, seconds: number, sfx: { kind: string; at: number; gain?: number }[], out: string) => Promise<{ file: string; bpm: number }>;
   /** media.mix — voice over music, mastered. */
   mix: (voice: string | null, music: string | null, out: string, seconds: number, gainDb?: number) => Promise<{ file: string }>;
 }
@@ -69,6 +73,7 @@ export function validateStoryboard(s: Storyboard): string[] {
     }
     if (sc.block && !/^[a-z0-9-]+$/.test(sc.block)) errs.push(`scene ${i + 1}: bad block id`);
   });
+  if (s.music?.mood && !(s.music.mood in MOODS)) errs.push(`music.mood must be one of ${Object.keys(MOODS).join(', ')}`);
   if (s.captions && !(s.captions in CAPTION_STYLES)) errs.push(`captions must be one of ${Object.keys(CAPTION_STYLES).join(', ')}`);
   return errs;
 }
@@ -119,14 +124,17 @@ export async function compileStoryboard(story: Storyboard, opts: { dir: string; 
     }
   }
 
-  // 2. Timeline.
+  // 2. Timeline. With a procedural bed, every scene length is a whole number of beats so cuts land on the beat.
+  const mood: Mood | null = story.music === null ? null : story.music?.file ? null : (story.music?.mood ?? 'uplifting');
+  const beat = mood ? 60 / MOODS[mood].bpm : 0;
+  const snap = (d: number) => (beat ? Math.ceil(d / beat - 0.15) * beat : d);
   let t = 0;
   const timeline = story.scenes.map((sc, i) => {
     const min = sc.scene ? getScene(sc.scene).minSeconds : 3;
     const vo = voiced[i] ? voiced[i].duration + VO_LEAD + VO_TAIL : 0;
     // The last scene holds an extra beat so the closing line is read, not flashed.
     const tail = i === story.scenes.length - 1 ? 1.2 : 0;
-    const duration = Math.round(Math.max(sc.duration ?? 0, min, vo + tail) * 100) / 100;
+    const duration = Math.round(snap(Math.max(sc.duration ?? 0, min, vo + tail)) * 1000) / 1000;
     const entry = { sc, i, id: `s${i + 1}-${sc.scene ?? sc.block}`.replace(/[^\w-]/g, ''), start: Math.round(t * 100) / 100, duration };
     t += duration;
     return entry;
@@ -147,7 +155,20 @@ export async function compileStoryboard(story: Storyboard, opts: { dir: string; 
     if (r.code !== 0) throw new Error(`voice track failed: ${r.stderr.slice(-300)}`);
     audio = voiceTrack;
   }
-  const music = story.music?.file && existsSync(story.music.file) ? story.music.file : null;
+  let music = story.music?.file && existsSync(story.music.file) ? story.music.file : null;
+  if (!music && mood) {
+    progress(0.42, `scoring (${mood})`);
+    // Transition hits: whoosh into wipes/zooms, a soft impact on flashes, a pop when a stat lands.
+    const sfx: { kind: string; at: number; gain?: number }[] = [];
+    for (const e of timeline.slice(1)) {
+      const kind = e.sc.transition ?? 'wipe';
+      if (kind === 'wipe' || kind === 'zoom') sfx.push({ kind: 'whoosh', at: e.start, gain: 0.35 });
+      if (kind === 'flash') sfx.push({ kind: 'impact', at: e.start, gain: 0.4 });
+    }
+    for (const e of timeline) if (e.sc.scene === 'stat') sfx.push({ kind: 'pop', at: e.start + 0.12, gain: 0.3 });
+    const bed = await opts.deps.music(mood, total, sfx, join(dir, 'assets', 'bed.wav'));
+    music = bed.file;
+  }
   if (audio || music) {
     progress(0.45, 'mixing audio');
     const mixed = await opts.deps.mix(audio ?? null, music, join(dir, 'assets', 'soundtrack.m4a'), total, story.music?.gainDb);
