@@ -67,7 +67,8 @@ ${
     karaoke: `${S} .cw{text-shadow:0 3px 12px rgba(0,0,0,.6);opacity:.55}${S} .cw.on{opacity:1;color:${accent}}`,
     pop: `${S} .cw{text-shadow:0 4px 14px rgba(0,0,0,.65);-webkit-text-stroke:${Math.max(2, Math.round(3 * u))}px #000;paint-order:stroke fill}`,
     bold: `${S} .cw{-webkit-text-stroke:${Math.max(3, Math.round(8 * u))}px #000;paint-order:stroke fill;text-shadow:0 ${Math.round(8 * u)}px 0 rgba(0,0,0,.5)}${S} .cw.on{color:${accent}}`,
-    clean: `${S} .cue{font-weight:600;text-shadow:0 2px 14px rgba(0,0,0,.55)}`,
+    // Clean captions sit on a soft dark plate so they read over light scenes too.
+    clean: `${S} .cue{font-weight:600;display:flex;justify-content:center}${S} .cue>span.plate{background:rgba(8,9,12,.62);border-radius:${Math.round(14 * u)}px;padding:${Math.round(8 * u)}px ${Math.round(20 * u)}px;box-decoration-break:clone;-webkit-box-decoration-break:clone}`,
     boxed: `${S} .cue{display:flex;justify-content:center}${S} .cue>span.box{background:rgba(10,12,16,.82);border-radius:${Math.round(20 * u)}px;padding:${Math.round(14 * u)}px ${Math.round(26 * u)}px}${S} .cw{border-radius:${Math.round(10 * u)}px;padding:0 ${Math.round(8 * u)}px}${S} .cw.on{background:${accent};color:${onAccent}}`,
     typewriter: `${S} .cue{font-family:var(--font-mono);font-weight:700;text-shadow:0 2px 12px rgba(0,0,0,.6)}${S} .ch{opacity:0}`,
     none: '',
@@ -75,6 +76,7 @@ ${
 }`;
   // Boxed wraps words in a single box span; typewriter splits into characters.
   let html = markup;
+  if (style === 'clean') html = markup.replace(/<div class="cue" data-i="(\d+)">/g, '<div class="cue" data-i="$1"><span class="plate">').replace(/<\/div>/g, '</span></div>');
   if (style === 'boxed') html = markup.replace(/<div class="cue" data-i="(\d+)">/g, '<div class="cue" data-i="$1"><span class="box">').replace(/<\/div>/g, '</span></div>');
   if (style === 'typewriter') html = markup.replace(/<span class="cw" data-j="(\d+)">([^<]*)<\/span>/g, (_, j, t) => `<span class="cw" data-j="${j}">${[...t].map((ch: string) => `<span class="ch">${ch}</span>`).join('')}</span>`);
 

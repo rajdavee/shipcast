@@ -159,7 +159,7 @@ async function prepareSource(c: Campaign): Promise<string[]> {
   if (c.source.type === 'github') {
     const repo = parseRepo(c.source.value);
     if (!repo) throw new Error(`Not a GitHub repo: ${c.source.value}`);
-    await appendEvent(c.id, { step: 'brief', type: 'log', text: `Cloning ${repo}…` });
+    if (!existsSync(src)) await appendEvent(c.id, { step: 'brief', type: 'log', text: `Cloning ${repo}…` });
     const r = await cloneRepo(repo, src, c.source.ref);
     if (!r.ok) throw new Error(`Clone failed: ${r.message}`);
   } else if (c.source.type === 'text' && !existsSync(src)) {

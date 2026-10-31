@@ -334,8 +334,8 @@ ${S} .who{margin-top:${Math.round(40 * u)}px;opacity:.85}${S} .who span{opacity:
   {
     id: 'compare',
     label: 'Before / after',
-    use: 'Old way vs new way. 2–3 short lines per side. The old side greys out, the new side lands.',
-    minSeconds: 4,
+    use: 'Old way vs new way. 2–3 short lines per side. The old side holds long enough to read, greys out, then the new side lands.',
+    minSeconds: 5,
     fields: [
       { id: 'leftLabel', type: 'text', label: 'Old label', max: 18 },
       { id: 'left', type: 'list', label: 'Old way', max: 3 },
@@ -356,7 +356,7 @@ ${S} .col.new{background:var(--brand-primary);color:var(--brand-on-primary);bord
 ${S} h5{margin:0 0 ${Math.round(26 * u)}px;font-weight:800;letter-spacing:.04em;opacity:.75}
 ${S} .col p{margin:${Math.round(14 * u)}px 0 0;font-weight:700;letter-spacing:-.02em;font-family:var(--font-display);display:flex;gap:${Math.round(18 * u)}px;align-items:baseline}
 ${S} .col b{opacity:.8}`,
-        js: b.js + `tl.fromTo("${S} .old",{y:${50 * u},opacity:0},{y:0,opacity:1,duration:.8,ease:"expo.out"},.05);tl.fromTo("${S} .old p",{opacity:0},{opacity:1,stagger:.12,duration:.4},.35);tl.to("${S} .old",{opacity:.45,filter:"grayscale(1)",duration:.6,ease:"power2.out"},1.6);tl.fromTo("${S} .new",{y:${70 * u},opacity:0,scale:.96},{y:0,opacity:1,scale:1,duration:.85,ease:"expo.out"},1.55);tl.fromTo("${S} .new p",{x:${-30 * u},opacity:0},{x:0,opacity:1,stagger:.14,duration:.55,ease:"expo.out"},1.85);`,
+        js: b.js + `tl.fromTo("${S} .old",{y:${50 * u},opacity:0},{y:0,opacity:1,duration:.8,ease:"expo.out"},.05);tl.fromTo("${S} .old p",{opacity:0},{opacity:1,stagger:.12,duration:.4},.35);tl.to("${S} .old",{opacity:.5,filter:"grayscale(1)",duration:.6,ease:"power2.out"},${(Math.max(2.4, c.duration * 0.45)).toFixed(2)});tl.fromTo("${S} .new",{y:${70 * u},opacity:0,scale:.96},{y:0,opacity:1,scale:1,duration:.85,ease:"expo.out"},${(Math.max(2.3, c.duration * 0.43)).toFixed(2)});tl.fromTo("${S} .new p",{x:${-30 * u},opacity:0},{x:0,opacity:1,stagger:.14,duration:.55,ease:"expo.out"},${(Math.max(2.6, c.duration * 0.45 + 0.3)).toFixed(2)});`,
       };
     },
   },
