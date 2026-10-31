@@ -122,6 +122,105 @@ async function finishProject(o: { project: string; dir: string; name: string; qu
   return { file: final, poster, sheet, project, lint: lintJson?.summary ?? lintJson ?? undefined, qa };
 }
 
+
+const ts = (sec: number) => {
+  const s = Math.floor(sec);
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60;
+  return h ? `${h}:${String(m).padStart(2, '0')}:${String(r).padStart(2, '0')}` : `${m}:${String(r).padStart(2, '0')}`;
+};
+
+/**
+ * Long-form: every chapter is its own HyperFrames project (voice only),
+ * cached by a hash of its content, so a 10-minute video renders in pieces
+ * that fit in memory and an edit to one chapter re-renders only that one.
+ * Chapters join without re-encoding; one continuous music bed and one
+ * master pass go over the whole thing. Also writes YouTube chapter
+ * timestamps and a full SRT.
+ */
+async function renderChapters(story: Storyboard, dir: string, brandDir: string | undefined, name: string, quality: string, progress: (f: number, m?: string) => void) {
+  const chapters = story.chapters!;
+  const parts: { video: string; audio: string; duration: number; title: string; start: number }[] = [];
+  const words: { text: string; start: number; end: number }[] = [];
+  let t = 0;
+  let preset: { id: string; fps?: number } | undefined;
+  for (const [i, ch] of chapters.entries()) {
+    const card = ch.card ?? i > 0;
+    const sub: Storyboard = {
+      ...story,
+      chapters: undefined,
+      music: null,
+      scenes: [...(card ? [{ scene: 'chapter', fields: { number: i + 1, title: ch.title, total: chapters.length }, transition: 'fade' as const }] : []), ...ch.scenes],
+    };
+    const cdir = join(dir, 'chapters', String(i + 1).padStart(2, '0'));
+    const hash = createHash('sha256').update(JSON.stringify([sub, brandDir ?? '', quality])).digest('hex').slice(0, 20);
+    const video = join(cdir, 'video.mp4');
+    const audio = join(cdir, 'audio.wav');
+    const meta = join(cdir, 'chapter.json');
+    let m: { hash: string; duration: number; words: typeof words; preset: { id: string; fps?: number } } | null = null;
+    try {
+      m = JSON.parse(await readFile(meta, 'utf8'));
+    } catch {}
+    const span = (f: number) => (i + f) / chapters.length;
+    if (!m || m.hash !== hash || !existsSync(video) || !existsSync(audio)) {
+      progress(0.02 + 0.8 * span(0), `chapter ${i + 1}/${chapters.length}: ${ch.title}`);
+      await run('rm', ['-rf', cdir]);
+      const project = join(cdir, 'project');
+      const compiled = await compileStoryboard(sub, { dir: project, brandDir, deps, progress: (f, msg) => progress(0.02 + 0.8 * span(f * 0.4), `chapter ${i + 1}: ${msg ?? ''}`) });
+      const raw = join(cdir, 'raw.mp4');
+      const r = await hf(['render', '.', '-o', raw, '--quality', quality === 'draft' ? 'draft' : 'delivery', '--fps', String(compiled.preset.fps ?? 30), '--quiet'], project);
+      if (r.code !== 0) throw new Error(`chapter ${i + 1} render failed: ${(r.stderr || r.stdout).slice(-600)}`);
+      // Split picture and sound: pictures join losslessly, sound is re-mixed as one track.
+      await run('ffmpeg', ['-y', '-v', 'error', '-i', raw, '-an', '-c:v', 'copy', video]);
+      const hasAudio = (await run('ffprobe', ['-v', 'error', '-select_streams', 'a', '-show_entries', 'stream=index', '-of', 'csv=p=0', raw])).stdout.trim().length > 0;
+      if (hasAudio) await run('ffmpeg', ['-y', '-v', 'error', '-i', raw, '-vn', '-ac', '2', '-ar', '48000', '-t', String(compiled.duration), audio]);
+      else await run('ffmpeg', ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo', '-t', String(compiled.duration), audio]);
+      await run('rm', ['-f', raw]);
+      m = { hash, duration: compiled.duration, words: compiled.words, preset: { id: compiled.preset.id, fps: compiled.preset.fps } };
+      await writeFile(meta, JSON.stringify(m));
+    } else progress(0.02 + 0.8 * span(1), `chapter ${i + 1}: unchanged, reused`);
+    preset = m.preset;
+    parts.push({ video, audio, duration: m.duration, title: ch.title, start: t });
+    for (const w of m.words) words.push({ text: w.text, start: +(w.start + t).toFixed(3), end: +(w.end + t).toFixed(3) });
+    t += m.duration;
+  }
+  const total = Math.round(t * 100) / 100;
+  progress(0.84, 'joining chapters');
+  const vlist = join(dir, 'chapters', 'video.txt');
+  const alist = join(dir, 'chapters', 'audio.txt');
+  await writeFile(vlist, parts.map((p) => `file '${p.video}'`).join('\n'));
+  await writeFile(alist, parts.map((p) => `file '${p.audio}'`).join('\n'));
+  const joinedV = join(dir, `${name}.video.mp4`);
+  const joinedA = join(dir, `${name}.voice.wav`);
+  let r = await run('ffmpeg', ['-y', '-v', 'error', '-f', 'concat', '-safe', '0', '-i', vlist, '-c', 'copy', joinedV], { timeoutMs: 900_000 });
+  if (r.code !== 0) throw new Error(`joining chapters failed: ${r.stderr.slice(-300)}`);
+  r = await run('ffmpeg', ['-y', '-v', 'error', '-f', 'concat', '-safe', '0', '-i', alist, '-c', 'pcm_s16le', joinedA], { timeoutMs: 900_000 });
+  if (r.code !== 0) throw new Error(`joining audio failed: ${r.stderr.slice(-300)}`);
+  // One continuous bed under the whole video, with a whoosh at every chapter.
+  const mood = story.music === null ? null : story.music?.mood ?? 'chill';
+  let bed: string | null = story.music?.file && existsSync(story.music.file) ? story.music.file : null;
+  if (!bed && mood) {
+    progress(0.87, `scoring (${mood})`);
+    bed = (await deps.music(mood, total, parts.slice(1).map((p) => ({ kind: 'whoosh', at: p.start, gain: 0.35 })), join(dir, 'chapters', 'bed.wav'))).file;
+  }
+  progress(0.9, 'mixing and mastering');
+  const sound = (await deps.mix(joinedA, bed, join(dir, 'chapters', 'soundtrack.m4a'), total, story.music?.gainDb ?? -20)).file;
+  const raw = join(dir, `${name}.raw.mp4`);
+  r = await run('ffmpeg', ['-y', '-v', 'error', '-i', joinedV, '-i', sound, '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-shortest', raw], { timeoutMs: 900_000 });
+  if (r.code !== 0) throw new Error(`muxing failed: ${r.stderr.slice(-300)}`);
+  const final = join(dir, `${name}.mp4`);
+  await callService('media', 'finish', { input: raw, output: final, preset: preset?.id });
+  await run('rm', ['-f', raw, joinedV, joinedA]);
+  const poster = join(dir, `${name}.jpg`);
+  await run('ffmpeg', ['-y', '-v', 'error', '-ss', String(Math.min(2, total / 3)), '-i', final, '-frames:v', '1', '-q:v', '2', poster]);
+  const sheet = await contactSheet(final, join(dir, `${name}.sheet.jpg`));
+  // YouTube needs the first chapter at 0:00, at least three, each ≥ 10 s.
+  const stamps = parts.map((p, i) => `${ts(i ? p.start : 0)} ${p.title}`).join('\n');
+  await writeFile(join(dir, 'chapters.txt'), stamps + '\n');
+  if (words.length) await callService('media', 'captions', { words, out: join(dir, `${name}.srt`), maxWords: 7, maxChars: 42 });
+  progress(0.95, 'quality checks');
+  const qa = await callService('qa', 'video', { file: final, preset: preset?.id }).catch((e: Error) => ({ pass: false, issues: [{ rule: 'qa.unavailable', severity: 'warn', message: e.message }], facts: {} }));
+  return { file: final, poster, sheet, qa, duration: total, chapters: parts.map((p) => ({ title: p.title, start: p.start, duration: p.duration })), timestamps: stamps };
+}
 /**
  * render — storyboards → HyperFrames projects → MP4. Draft renders are
  * quick previews; final renders are mastered (loudness, codec) and gated
@@ -157,6 +256,7 @@ export function createRenderService() {
       /** Full render: compile → lint → render → finish → qa. */
       render: async ({ storyboard, outDir, brandDir, name = 'video', quality = 'final' }, ctx) => {
         const dir = assertInHome(outDir, 'outDir');
+        if (Array.isArray((storyboard as Storyboard).chapters)) return renderChapters(storyboard as Storyboard, dir, brandDir ? assertInHome(brandDir, 'brandDir') : undefined, name, quality, ctx.progress);
         const project = join(dir, 'project');
         const compiled = await compileStoryboard(storyboard as Storyboard, { dir: project, brandDir: brandDir ? assertInHome(brandDir, 'brandDir') : undefined, deps, progress: (f, m) => ctx.progress(f * 0.4, m) });
         const firstScene = compiled.scenes[0];

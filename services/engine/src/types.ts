@@ -105,6 +105,8 @@ export interface Pack {
   subagents?: boolean;
   /** Sort order in the UI (lower first). */
   order?: number;
+  /** Long jobs (e.g. 10-minute videos) may need more than the global step timeout. */
+  timeoutMinutes?: number;
   prompt: string;
   dir: string;
 }

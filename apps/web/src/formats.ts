@@ -6,6 +6,7 @@ export const FORMATS: { id: string; title: string; line: string; img?: string; r
   { id: 'carousel', title: 'Carousel', line: 'Swipe slides for LinkedIn and Instagram', img: '/formats/carousel.jpg', ratio: 4 / 5 },
   { id: 'reel', title: 'Reel', line: 'Vertical video with captions', img: '/formats/reel.jpg', ratio: 9 / 16 },
   { id: 'launch-film', title: 'Launch film', line: '30-second video for launch day', img: '/formats/launch-film.jpg', ratio: 16 / 9 },
+  { id: 'youtube-video', title: 'YouTube video', line: '3–10 minutes in chapters, with timestamps', img: '/formats/youtube-video.jpg', ratio: 16 / 9 },
   { id: 'explainer-video', title: 'Explainer', line: 'Narrated 60-second walkthrough', img: '/formats/explainer-video.jpg', ratio: 16 / 9 },
   { id: 'thumbnails', title: 'Thumbnails', line: 'YouTube, link cards and banners', img: '/formats/thumbnails.jpg', ratio: 16 / 9 },
   { id: 'copy-kit', title: 'Posts', line: 'Ready-to-paste posts for every channel', ratio: 4 / 5 },

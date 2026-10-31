@@ -159,6 +159,11 @@ export async function renderSpec(kind: SpecKind, cwd: string, briefDir: string, 
     if (v.errors.length) return { ok: false, feedback: v.errors, summary: 'invalid storyboard' };
     const r = await callService('render', 'render', { storyboard: spec, outDir: out, brandDir: briefDir, name: 'video' });
     await writeFile(join(out, 'qa.json'), JSON.stringify(r.qa, null, 2));
+    // Long-form: drop the real chapter timestamps into the YouTube description.
+    if (r.timestamps && existsSync(join(out, 'description.md'))) {
+      const d = await readFile(join(out, 'description.md'), 'utf8');
+      await writeFile(join(out, 'description.md'), d.includes('{{timestamps}}') ? d.replace('{{timestamps}}', r.timestamps) : `${d.trimEnd()}\n\n${r.timestamps}\n`);
+    }
     const fb = (r.qa?.issues ?? []).filter((i: any) => i.severity === 'error').map((i: any) => `${i.message}${i.fix ? ` Fix: ${i.fix}` : ''}`);
     return { ok: !fb.length, feedback: fb, summary: `${r.duration.toFixed(1)}s video, QA ${r.qa?.pass ? 'passed' : 'flagged issues'}` };
   } catch (e) {

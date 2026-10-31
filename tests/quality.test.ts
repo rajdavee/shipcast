@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { contrastRatio, ensureContrast, normalizeBrand, brandCss, PRESETS, getPreset, VERTICAL_SAFE } from '@shipcast/engine';
 import { makeMusic, MOODS, toWav, addSfx } from '@shipcast/media';
-import { CAPTION_STYLES, SCENES, validateInfographic } from '@shipcast/render';
+import { CAPTION_STYLES, SCENES, validateInfographic, validateStoryboard } from '@shipcast/render';
 
 test('brand tokens always meet contrast on their ground', () => {
   for (const [primary, bg] of [['#6965db', '#121212'], ['#ffd400', '#ffffff'], ['#1a1a1a', '#0b0d12'], ['#2b3bff', '#eceff3']]) {
@@ -81,4 +81,13 @@ test('infographic specs are validated before rendering', () => {
   assert.deepEqual(validateInfographic(ok as any), []);
   assert.ok(validateInfographic({ ...ok, rows: [row('Only one')] } as any).some((e) => /rows/.test(e)));
   assert.ok(validateInfographic({ ...ok, rows: [...ok.rows, ['Short row', 'x']] } as any).length > 0, 'cell count must match columns');
+});
+
+test('long-form storyboards validate per chapter', () => {
+  const title = (t: string) => ({ scene: 'title', fields: { title: t } });
+  const ok = { preset: 'youtube', chapters: [{ title: 'Cold open', card: false, scenes: [title('Hook')] }, { title: 'Part two', scenes: [title('Two')] }] };
+  assert.deepEqual(validateStoryboard(ok as any), []);
+  assert.ok(validateStoryboard({ ...ok, chapters: [ok.chapters[0]] } as any).some((e) => /2–16/.test(e)), 'needs at least two chapters');
+  assert.ok(validateStoryboard({ ...ok, chapters: [...ok.chapters, { title: 'Bad', scenes: [{ scene: 'title', fields: {} }] }] } as any).some((e) => /chapter 3/.test(e)));
+  assert.ok(SCENES.some((s) => s.id === 'chapter'), 'chapter card scene exists');
 });

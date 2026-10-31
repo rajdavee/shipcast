@@ -650,6 +650,46 @@ for(let s=1;s<n;s++){const t=.4+s*${slot.toFixed(2)};
     },
   },
   {
+    id: 'chapter',
+    label: 'Chapter card',
+    use: 'Opens a chapter in a long video: big chapter number, the chapter title, and progress through the video. Added automatically for chapters; use directly only for a manual section break.',
+    minSeconds: 2.2,
+    fields: [
+      { id: 'number', type: 'number', label: 'Chapter number' },
+      { id: 'title', type: 'text', label: 'Chapter title', max: 60 },
+      { id: 'total', type: 'number', label: 'Total chapters', optional: true },
+    ],
+    build: (f, c) => {
+      const { u, vertical, pad, S } = frame(c);
+      const b = bg(c, 'dark');
+      const n = Math.max(1, Number(f.number) || 1);
+      const total = Math.max(n, Number(f.total) || n);
+      const accent = readableOnDark(c.brand.colors.primary);
+      const size = fit(f.title, u, vertical ? [[18, 130], [34, 108], [60, 88]] : [[18, 140], [34, 116], [60, 92]], 80);
+      return {
+        markup:
+          b.markup +
+          stage(
+            c,
+            `<div class="cn">${String(n).padStart(2, '0')}</div><h2 style="font-size:${size}px">${words(f.title)}</h2><div class="dots">${Array.from({ length: total }, (_, i) => `<i class="${i < n - 1 ? 'past' : i === n - 1 ? 'now' : ''}"></i>`).join('')}</div>`,
+          ),
+        css:
+          b.css +
+          headCss(S) +
+          `${S} .cn{font:900 ${Math.round((vertical ? 300 : 280) * u)}px/.82 var(--font-display);letter-spacing:-.06em;color:transparent;-webkit-text-stroke:${Math.round(3 * u)}px ${accent};margin-bottom:${Math.round(26 * u)}px}
+${S} .dots{display:flex;gap:${Math.round(12 * u)}px;margin-top:${Math.round(52 * u)}px}
+${S} .dots i{width:${Math.round(44 * u)}px;height:${Math.round(8 * u)}px;border-radius:99px;background:rgba(255,255,255,.18)}
+${S} .dots i.past{background:rgba(255,255,255,.55)}${S} .dots i.now{background:${accent};width:${Math.round(88 * u)}px}`,
+        js:
+          b.js +
+          `tl.fromTo("${S} .cn",{xPercent:-12,opacity:0},{xPercent:0,opacity:1,duration:.8,ease:"expo.out"},.05);` +
+          wordIn(S, 'h2', 0.3) +
+          `tl.fromTo("${S} .dots i",{scaleX:0},{scaleX:1,duration:.4,ease:"power3.out",stagger:.04,transformOrigin:"0% 50%"},.6);
+tl.fromTo("${S} .stage",{scale:1},{scale:1.04,duration:${c.duration},ease:"none",transformOrigin:"0% 50%"},0);`,
+      };
+    },
+  },
+  {
     id: 'outro',
     label: 'Logo + CTA outro',
     use: 'Last scene. Logo, closing line, a button and the URL. Hold ≥ 2.5 s.',

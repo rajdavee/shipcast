@@ -238,7 +238,7 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
     let canceled = false;
     let costUsd = 0;
     let sessionId = step.sessionId;
-    const deadline = Date.now() + settings.stepTimeoutMinutes * 60_000;
+    const deadline = Date.now() + Math.max(settings.stepTimeoutMinutes, pack?.timeoutMinutes ?? 0) * 60_000;
     const execClaude = async (p: string, resumeId?: string) => {
       const handle = runClaude({
         prompt: p,
@@ -388,7 +388,7 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
     if (canceled) {
       Object.assign(patch, { status: 'canceled' });
     } else if (timedOut) {
-      Object.assign(patch, { status: 'failed', error: `Stopped after ${settings.stepTimeoutMinutes} minutes` });
+      Object.assign(patch, { status: 'failed', error: `Stopped after ${Math.max(settings.stepTimeoutMinutes, pack?.timeoutMinutes ?? 0)} minutes` });
     } else if (ok && (step.kind === 'brief' ? files.includes('brief.md') : files.some((f) => f !== 'out/NOTES.md' && !f.endsWith('.json')))) {
       Object.assign(patch, { status: 'done' });
     } else {

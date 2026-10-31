@@ -1,0 +1,90 @@
+{
+  "id": "youtube-video",
+  "name": "YouTube video",
+  "tagline": "A 3\u201310 minute narrated YouTube video in chapters: cold-open hook, re-hooks, a mid-video peak, chapter cards, captions, timestamps for the description.",
+  "category": "video",
+  "order": 3,
+  "estimate": "20\u201345 min",
+  "accent": "#ff3d3d",
+  "spec": "storyboard",
+  "timeoutMinutes": 120,
+  "options": [
+    {
+      "key": "length",
+      "label": "Length",
+      "type": "select",
+      "choices": [
+        "3 min",
+        "5 min",
+        "8 min",
+        "10 min"
+      ],
+      "default": "5 min"
+    },
+    {
+      "key": "topic",
+      "label": "Topic",
+      "type": "text",
+      "default": "",
+      "placeholder": "Blank = the video this audience would most want to watch"
+    },
+    {
+      "key": "style",
+      "label": "Style",
+      "type": "select",
+      "choices": [
+        "explainer",
+        "video essay",
+        "tutorial",
+        "listicle",
+        "story"
+      ],
+      "default": "explainer"
+    },
+    {
+      "key": "voice",
+      "label": "Voice",
+      "type": "select",
+      "choices": [
+        "am_michael",
+        "af_heart",
+        "af_nova",
+        "am_adam",
+        "bf_emma",
+        "bm_george"
+      ],
+      "default": "am_michael"
+    },
+    {
+      "key": "captions",
+      "label": "Captions",
+      "type": "select",
+      "choices": [
+        "clean",
+        "karaoke",
+        "pop",
+        "bold",
+        "boxed",
+        "none"
+      ],
+      "default": "clean"
+    }
+  ],
+  "outputs": [
+    "video.mp4",
+    "video.jpg",
+    "video.srt",
+    "video.vtt",
+    "chapters.txt",
+    "storyboard.json",
+    "qa.json",
+    "title.txt",
+    "description.md",
+    "*.md"
+  ],
+  "skills": [],
+  "tools": [
+    "ffmpeg",
+    "chrome"
+  ]
+}

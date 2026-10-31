@@ -24,10 +24,19 @@ export interface StoryScene {
   transition?: Transition;
 }
 
+export interface StoryChapter {
+  title: string;
+  scenes: StoryScene[];
+  /** false = no chapter card (e.g. the cold open). Default true from chapter 2 on. */
+  card?: boolean;
+}
+
 export interface Storyboard {
   title?: string;
   preset: string;
   scenes: StoryScene[];
+  /** Long-form: chapters render separately (cached), then join into one video. Replaces `scenes`. */
+  chapters?: StoryChapter[];
   voice?: { voice: string; speed?: number } | null;
   /** A file to use, or a mood for Shipcast's procedural bed. `null` = no music. Default: an uplifting bed. */
   music?: { file?: string; mood?: Mood; gainDb?: number } | null;
@@ -60,6 +69,15 @@ const VO_TAIL = 0.55;
 export function validateStoryboard(s: Storyboard): string[] {
   const errs: string[] = [];
   if (!getPreset(s.preset)) errs.push(`unknown preset "${s.preset}"`);
+  if (Array.isArray(s.chapters)) {
+    if (s.chapters.length < 2 || s.chapters.length > 16) errs.push('chapters must have 2–16 entries');
+    s.chapters.forEach((ch, k) => {
+      if (!ch?.title?.trim()) errs.push(`chapter ${k + 1} needs a title`);
+      if (!Array.isArray(ch?.scenes) || !ch.scenes.length) errs.push(`chapter ${k + 1} needs scenes`);
+      for (const e of validateStoryboard({ ...s, chapters: undefined, scenes: ch?.scenes ?? [] })) errs.push(`chapter ${k + 1}: ${e}`);
+    });
+    return [...new Set(errs)];
+  }
   if (!Array.isArray(s.scenes) || !s.scenes.length) errs.push('scenes must be a non-empty array');
   (s.scenes ?? []).forEach((sc, i) => {
     if (!sc.scene && !sc.block) errs.push(`scene ${i + 1}: needs "scene" or "block"`);
