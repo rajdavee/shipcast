@@ -95,6 +95,10 @@ export interface Pack {
   /** Globs (relative to the deliverable's out/ folder) that count as results. */
   outputs: string[];
   skills: SkillDep[];
+  /** Skill Hub roles this pack wants a specialist for (e.g. motion, design-taste, diagram). */
+  roles?: string[];
+  /** Skill Hub packages this pack always loads. */
+  hub?: string[];
   /** Binaries the pack needs on PATH (checked by doctor). */
   tools: string[];
   /** Pipeline formats run entirely in the services — no Claude turn. */

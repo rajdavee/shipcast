@@ -111,7 +111,7 @@ export function parseStreamLine(line: string): StreamEvent[] {
 export interface RunOptions {
   prompt: string;
   cwd: string;
-  pluginDir?: string;
+  pluginDir?: string | string[];
   addDirs?: string[];
   allowedTools: string[];
   model?: string;
@@ -130,7 +130,7 @@ export function buildArgs(o: Omit<RunOptions, 'onEvent' | 'cwd'>): string[] {
   // Sub-agents multiply usage; only workflows that are built around them get them.
   if (o.allowSubagents) args[args.indexOf('--allowedTools') + 1] += ',Task,Agent';
   else args.push('--disallowedTools', 'Task,Agent');
-  if (o.pluginDir) args.push('--plugin-dir', o.pluginDir);
+  for (const d of [o.pluginDir ?? []].flat()) args.push('--plugin-dir', d);
   for (const d of o.addDirs ?? []) args.push('--add-dir', d);
   if (o.model) args.push('--model', o.model);
   if (o.resume) args.push('--resume', o.resume);

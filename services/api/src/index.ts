@@ -41,6 +41,14 @@ import {
   type Source,
   type Step,
   elevenVoices,
+  loadRegistry,
+  hubState,
+  installPackage,
+  setPackage,
+  setRole,
+  isEnabled,
+  isInstalled,
+  isPermissive,
   chatterboxReady,
   brainstorm,
   pexelsCheck,
@@ -272,6 +280,36 @@ router.post('/api/brainstorm', async (req) => {
   } catch (e) {
     throw new HttpError(502, (e as Error).message);
   }
+});
+
+// ── Skill Hub: upstream skills, installed pinned and isolated, mixed per role ─
+async function skillsView() {
+  const [reg, s] = await Promise.all([loadRegistry(), hubState()]);
+  const roles: Record<string, { candidates: { id: string; skill: string; name: string }[]; chosen?: string }> = {};
+  for (const p of reg) for (const [role, skill] of Object.entries(p.roles)) (roles[role] ??= { candidates: [] }).candidates.push({ id: p.id, skill, name: p.name });
+  for (const r of Object.keys(roles)) roles[r].chosen = s.roles[r];
+  return {
+    packages: reg.map((p) => ({ ...p, installed: isInstalled(p, s), enabled: isEnabled(p, s), permissive: isPermissive(p.licence), accepted: !!s.accepted[p.id] })),
+    roles,
+  };
+}
+router.get('/api/skills', () => skillsView());
+router.post('/api/skills/:id/install', async (req, _r, p) => {
+  const b = await readJson(req).catch(() => ({}));
+  const r = await installPackage(p.id, { acceptLicence: b?.acceptLicence === true });
+  if (!r.ok) throw new HttpError(400, r.log);
+  return { ...(await skillsView()), log: r.log };
+});
+router.put('/api/skills/roles', async (req) => {
+  const b = await readJson(req);
+  if (typeof b.role !== 'string' || !/^[\w-]{1,40}$/.test(b.role)) throw new HttpError(400, 'role is required');
+  await setRole(b.role, typeof b.id === 'string' && b.id ? b.id : null);
+  return skillsView();
+});
+router.put('/api/skills/:id', async (req, _r, p) => {
+  const b = await readJson(req);
+  await setPackage(p.id, { enabled: typeof b.enabled === 'boolean' ? b.enabled : undefined });
+  return skillsView();
 });
 
 // ── campaigns ──────────────────────────────────────────────────────────

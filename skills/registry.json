@@ -1,0 +1,79 @@
+{
+  "$comment": "Curated upstream Claude skills for Shipcast's Skill Hub. Each package installs from its repo at the pinned ref into ~/.shipcast/skills (never into ~/.claude). Nothing here is vendored.",
+  "packages": [
+    {
+      "id": "hyperframes-workflows",
+      "name": "HyperFrames video workflows",
+      "repo": "heygen-com/hyperframes",
+      "ref": "207c8a4daf6480d697f203784f1fd422727569e3",
+      "paths": [
+        "skills/product-launch-video",
+        "skills/motion-graphics",
+        "skills/general-video",
+        "skills/faceless-explainer",
+        "skills/pr-to-video",
+        "skills/embedded-captions",
+        "skills/music-to-video",
+        "skills/talking-head-recut",
+        "skills/slideshow",
+        "skills/hyperframes",
+        "skills/hyperframes-core",
+        "skills/hyperframes-animation",
+        "skills/hyperframes-creative",
+        "skills/hyperframes-keyframes",
+        "skills/hyperframes-audio",
+        "skills/hyperframes-registry",
+        "skills/hyperframes-cli",
+        "skills/media-use",
+        "skills/remotion-to-hyperframes"
+      ],
+      "licence": "Apache-2.0",
+      "area": "motion",
+      "roles": {
+        "launch-video": "product-launch-video",
+        "motion": "motion-graphics",
+        "explainer": "faceless-explainer",
+        "long-video": "general-video",
+        "code-video": "pr-to-video",
+        "captions": "embedded-captions",
+        "music-video": "music-to-video",
+        "motion-craft": "hyperframes-animation",
+        "audio-mix": "hyperframes-audio",
+        "camera": "hyperframes-keyframes"
+      },
+      "summary": "HeyGen's official HyperFrames skills: launch videos, motion graphics, faceless explainers, PR videos, captions, music videos, plus the animation, keyframe, audio and registry knowledge they build on. Pinned to the last release that shipped the workflow skills.",
+      "verdict": 5,
+      "needs": [
+        "node",
+        "ffmpeg",
+        "chrome"
+      ],
+      "stars": 76533,
+      "default": true
+    },
+    {
+      "id": "brag",
+      "name": "brag \u2014 launch videos from a project",
+      "repo": "latent-spaces/brag",
+      "ref": "669ab9286aa28b6c3ee30e75f181ee74319d012a",
+      "paths": [
+        "skills/brag",
+        "skills/brag-slim"
+      ],
+      "licence": "MIT",
+      "area": "motion",
+      "roles": {
+        "launch-video": "brag-slim"
+      },
+      "summary": "Reads a project or website and makes a short, polished launch video with HyperFrames, music, motion and share copy.",
+      "verdict": 4,
+      "needs": [
+        "node",
+        "ffmpeg",
+        "chrome"
+      ],
+      "stars": 19770,
+      "default": true
+    }
+  ]
+}

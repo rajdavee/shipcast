@@ -426,3 +426,26 @@ code { font-size: 0.92em; background: var(--bg-2); padding: 1px 6px; border-radi
 .brain-dir q { font-size: 15px; line-height: 1.4; color: var(--text); quotes: '“' '”'; }
 .brain-dir small { font-size: 13px; color: var(--muted); line-height: 1.45; }
 .brain-dir .use { font-size: 13px; font-weight: 650; color: var(--accent); margin-top: 4px; }
+
+/* ── skill hub ─────────────────────────────────────── */
+.roles-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; padding: 16px; border-radius: var(--r-3); background: var(--surface); box-shadow: var(--print); }
+.role-pick > span { text-transform: capitalize; }
+.skill-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+.skill-card { display: grid; gap: 10px; align-content: start; padding: 16px 18px; border-radius: var(--r-3); background: var(--surface); box-shadow: var(--print); border: 1.5px solid transparent; }
+.skill-card.on { border-color: color-mix(in srgb, var(--ok) 55%, transparent); }
+.skill-card header { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.skill-card header b { font: 700 16px/1.25 var(--display); letter-spacing: -0.01em; }
+.skill-card .verdict { font-size: 11px; letter-spacing: 1px; color: var(--accent); white-space: nowrap; }
+.skill-card .repo { font-size: 12.5px; color: var(--muted); text-decoration: none; }
+.skill-card .repo:hover { color: var(--text); text-decoration: underline; }
+.skill-card p { font-size: 13.5px; line-height: 1.5; color: var(--text-2); }
+.skill-card .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.skill-card .tags span { font-size: 11.5px; padding: 3px 8px; border-radius: 999px; background: var(--bg-2); color: var(--text-2); text-transform: capitalize; }
+.skill-card .tags .lic { text-transform: none; font-weight: 650; }
+.skill-card .tags .lic.ok { background: color-mix(in srgb, var(--ok) 16%, var(--surface)); color: var(--ok); }
+.skill-card .tags .lic.warn { background: color-mix(in srgb, var(--warn) 18%, var(--surface)); color: var(--warn); }
+.skill-card .tags .need { text-transform: none; }
+.skill-card footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 4px; }
+.consent { font-size: 12.5px; display: flex; gap: 6px; align-items: center; color: var(--text-2); }
+.switch { display: inline-flex; gap: 8px; align-items: center; font-size: 13px; font-weight: 600; }
+.switch input { accent-color: var(--ok); width: 18px; height: 18px; }

@@ -14,6 +14,7 @@ import { runClaude, type StreamEvent } from './claude.ts';
 import { cloneRepo, parseRepo } from './github.ts';
 import { matchOutputs } from './files.ts';
 import { installSkill, isSkillInstalled } from './skills.ts';
+import { ensureForRoles, hubPluginDir, rolesPrompt } from './skillhub.ts';
 import type { Campaign, Pack, Step } from './types.ts';
 
 export const WORKER_ID = `${hostname()}:${process.pid}`;
@@ -201,15 +202,23 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
     } else {
       const pack = await getPack(step.pack!);
       if (!pack) throw new Error(`Unknown pack ${step.pack}`);
-      // Third-party engine skills install from their own repos on first use.
+      // Upstream skills come from the Skill Hub (pinned, isolated); unknown sources fall back to the skills CLI.
+      const HUB_FOR: Record<string, string> = { 'heygen-com/hyperframes': 'hyperframes-workflows', 'latent-spaces/brag': 'brag' };
+      const hubPkgs = [...(pack.hub ?? []), ...pack.skills.map((d) => HUB_FOR[d.source]).filter(Boolean)];
+      let hubNote = '';
+      if (hubPkgs.length || pack.roles?.length) {
+        const { assigned, log: hubLog } = await ensureForRoles(pack.roles ?? [], hubPkgs);
+        for (const l of hubLog) await log({ step: step.id, type: 'log', text: `Skill Hub: ${l}` });
+        hubNote = rolesPrompt(assigned);
+      }
       for (const dep of pack.skills) {
-        if (isSkillInstalled(dep.name)) continue;
+        if (HUB_FOR[dep.source] || isSkillInstalled(dep.name)) continue;
         await log({ step: step.id, type: 'log', text: `Installing the ${dep.name} skill from ${dep.source}…` });
         const r = await installSkill(dep);
         if (!r.ok) throw new Error(`Couldn't install the ${dep.name} skill from ${dep.source}. Run: npx skills add ${dep.source} -g -a claude-code\n${r.log.slice(-400)}`);
       }
       cwd = join(dir, 'deliverables', step.id);
-      prompt = packPrompt(campaign, pack, step);
+      prompt = packPrompt(campaign, pack, step) + hubNote;
       allowSubagents = !!pack.subagents && settings.subagents !== 'never';
       outputs = pack.outputs.map((g) => `out/${g}`).concat('out/NOTES.md');
     }
@@ -245,7 +254,7 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
       const handle = runClaude({
         prompt: p,
         cwd,
-        pluginDir: PLUGIN_DIR,
+        pluginDir: existsSync(join(hubPluginDir(), 'skills')) ? [PLUGIN_DIR, hubPluginDir()] : PLUGIN_DIR,
         addDirs: extraDirs,
         allowedTools: settings.allowedTools,
         model: settings.model || undefined,

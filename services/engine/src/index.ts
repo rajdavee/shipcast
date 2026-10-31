@@ -24,3 +24,4 @@ export * from './broll.ts';
 export * from './brainstorm.ts';
 export * from './variety.ts';
 export * from './chatterbox.ts';
+export * from './skillhub.ts';

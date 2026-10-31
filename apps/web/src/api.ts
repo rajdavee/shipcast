@@ -1,6 +1,8 @@
 // Types mirror services/engine/src/types.ts; the web app talks to it only over HTTP.
 export type SourceType = 'url' | 'github' | 'local' | 'text';
 export type Source = { type: SourceType; value: string };
+export interface HubPackage { id: string; name: string; repo: string; ref: string; paths: string[]; licence: string; area: string; roles: Record<string, string>; summary: string; verdict: number; needs?: string[]; stars?: number }
+export interface SkillsView { packages: (HubPackage & { installed: boolean; enabled: boolean; permissive: boolean; accepted: boolean })[]; roles: Record<string, { candidates: { id: string; skill: string; name: string }[]; chosen?: string }> }
 export interface BrainQuestion { id: string; question: string; why?: string; options: string[] }
 export interface BrainDirection { id: string; title: string; hook: string; angle: string; tone: string }
 export interface BrainTurn { understood: string; questions: BrainQuestion[]; directions: BrainDirection[] }
@@ -133,6 +135,10 @@ export const api = {
   installPack: (id: string) => call<{ pack: Pack; results: { skill: string; ok: boolean; log: string }[] }>('POST', `/api/packs/${id}/install`),
   settings: () => call<Settings>('GET', '/api/settings'),
   brainstorm: (b: { source: Source; formats: string[]; notes?: string; asked?: BrainQuestion[]; answers?: Record<string, string> }) => call<BrainTurn>('POST', '/api/brainstorm', b),
+  skills: () => call<SkillsView>('GET', '/api/skills'),
+  installSkill: (id: string, acceptLicence = false) => call<SkillsView>('POST', `/api/skills/${id}/install`, { acceptLicence }),
+  setSkill: (id: string, enabled: boolean) => call<SkillsView>('PUT', `/api/skills/${id}`, { enabled }),
+  setSkillRole: (role: string, id: string | null) => call<SkillsView>('PUT', '/api/skills/roles', { role, id }),
   voice: () => call<VoiceState>('GET', '/api/voice'),
   saveVoice: (b: { apiKey?: string; provider?: 'kokoro' | 'elevenlabs' | 'chatterbox'; voice?: string; model?: string }) => call<VoiceState>('PUT', '/api/voice', b),
   disconnectVoice: () => call<VoiceState>('DELETE', '/api/voice/elevenlabs'),
