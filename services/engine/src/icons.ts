@@ -34,6 +34,24 @@ const ALIASES: Record<string, string> = {
   notion: 'logos:notion-icon',
   figma: 'logos:figma',
   medium: 'logos:medium-icon',
+  'ruby on rails': 'logos:rails',
+  rails: 'logos:rails',
+  '.net': 'logos:dotnet',
+  dotnet: 'logos:dotnet',
+  go: 'logos:go',
+  golang: 'logos:go',
+  spring: 'logos:spring-icon',
+  vite: 'logos:vitejs',
+  'node.js': 'logos:nodejs-icon',
+  nodejs: 'logos:nodejs-icon',
+  'next.js': 'logos:nextjs-icon',
+  nextjs: 'logos:nextjs-icon',
+  'vue.js': 'logos:vue',
+  vue: 'logos:vue',
+  'github actions': 'logos:github-actions',
+  'google colab': 'logos:google-colaboratory',
+  pypi: 'logos:pypi',
+  homebrew: 'logos:homebrew',
   'dev.to': 'logos:dev-icon',
   devto: 'logos:dev-icon',
   stackblitz: 'logos:stackblitz-icon',
@@ -106,43 +124,86 @@ function candidates(name: string): string[] {
   return [`logos:${slug}-icon`, `logos:${slug}`, `simple-icons:${compact}`];
 }
 
-async function fetchIcon(id: string): Promise<string | null> {
-  const [ref, color] = id.split('#');
-  const [set, icon] = ref.split(':');
-  const file = join(cacheDir(), `${createHash('sha1').update(id).digest('hex').slice(0, 16)}.svg`);
-  if (existsSync(file)) {
-    const s = await readFile(file, 'utf8');
-    return s === 'missing' ? null : s;
-  }
-  await mkdir(cacheDir(), { recursive: true });
-  try {
-    const r = await fetch(`https://api.iconify.design/${set}/${icon}.svg${color ? `?color=%23${color}` : ''}`, { signal: AbortSignal.timeout(10_000) });
-    if (!r.ok) {
-      await writeFile(file, 'missing');
-      return null;
+const fileFor = (id: string) => join(cacheDir(), `${createHash('sha1').update(id).digest('hex').slice(0, 16)}.svg`);
+
+async function cached(id: string): Promise<string | null | undefined> {
+  const file = fileFor(id);
+  if (!existsSync(file)) return undefined;
+  const s = await readFile(file, 'utf8');
+  return s === 'missing' ? null : s;
+}
+
+/** GET with backoff: Iconify rate-limits bursts (429). Returns null on network failure. */
+async function getJson(url: string): Promise<any | null> {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      const r = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+      if (r.status === 429 || r.status >= 500) {
+        await new Promise((res) => setTimeout(res, 800 * 2 ** attempt));
+        continue;
+      }
+      return r.ok ? await r.json() : null;
+    } catch {
+      await new Promise((res) => setTimeout(res, 500 * 2 ** attempt));
     }
-    const svg = await r.text();
-    await writeFile(file, svg);
-    return svg;
-  } catch {
-    return null;
+  }
+  return null;
+}
+
+/**
+ * Fetch many icons with one request per set (Iconify's JSON API), cache each
+ * as an SVG. Only icons the API says don't exist are cached as missing —
+ * a rate limit or network error never poisons the cache.
+ */
+async function prefetch(ids: string[]): Promise<void> {
+  const todo: string[] = [];
+  for (const id of new Set(ids)) if ((await cached(id)) === undefined) todo.push(id);
+  if (!todo.length) return;
+  await mkdir(cacheDir(), { recursive: true });
+  const bySet = new Map<string, string[]>();
+  for (const id of todo) {
+    const set = id.split('#')[0].split(':')[0];
+    bySet.set(set, [...(bySet.get(set) ?? []), id]);
+  }
+  for (const [set, list] of bySet) {
+    for (let k = 0; k < list.length; k += 40) {
+      const chunk = list.slice(k, k + 40);
+      const names = [...new Set(chunk.map((id) => id.split('#')[0].split(':')[1]))];
+      const data = await getJson(`https://api.iconify.design/${set}.json?icons=${names.map(encodeURIComponent).join(',')}`);
+      if (!data) continue;
+      const missing = new Set<string>(data.not_found ?? []);
+      for (const id of chunk) {
+        const [ref, color] = id.split('#');
+        const name = ref.split(':')[1];
+        const icon = data.icons?.[name] ?? data.icons?.[data.aliases?.[name]?.parent];
+        if (icon) {
+          const w = icon.width ?? data.width ?? 24;
+          const h = icon.height ?? data.height ?? 24;
+          const body = String(icon.body).replace(/currentColor/g, color ? `#${color}` : '#1b1d22');
+          await writeFile(fileFor(id), `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">${body}</svg>`);
+        } else if (missing.has(name)) await writeFile(fileFor(id), 'missing');
+      }
+    }
   }
 }
 
 /** Resolve a platform/brand name to an inline SVG data URI, or null (callers draw a monogram). */
 export async function iconDataUri(name: string): Promise<string | null> {
-  for (const id of candidates(name)) {
-    const svg = await fetchIcon(id);
+  const ids = candidates(name);
+  await prefetch(ids);
+  for (const id of ids) {
+    const svg = await cached(id);
     if (svg) return `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
   }
   return null;
 }
 
-/** Resolve many names at once (deduplicated). */
+/** Resolve many names at once (deduplicated, batched per icon set). */
 export async function resolveIcons(names: string[]): Promise<Record<string, string | null>> {
   const uniq = [...new Set(names.map((n) => n.trim()).filter(Boolean))];
+  await prefetch(uniq.flatMap(candidates));
   const out: Record<string, string | null> = {};
-  await Promise.all(uniq.map(async (n) => (out[n] = await iconDataUri(n))));
+  for (const n of uniq) out[n] = await iconDataUri(n);
   return out;
 }
 

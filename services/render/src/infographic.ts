@@ -191,6 +191,23 @@ async function avatarUri(ref: string | undefined, brandDir?: string): Promise<st
   }
 }
 
+/** Width/height of an SVG or PNG data URI (1 when unknown) — wide logos are wordmarks. */
+function aspectOf(uri: string): number {
+  try {
+    const [head, b64] = uri.split(',');
+    const buf = Buffer.from(b64, 'base64');
+    if (head.includes('svg')) {
+      const t = buf.toString('utf8', 0, 4000);
+      const vb = t.match(/viewBox=["']\s*[-\d.]+[\s,]+[-\d.]+[\s,]+([\d.]+)[\s,]+([\d.]+)/);
+      if (vb) return Number(vb[1]) / Number(vb[2]);
+      const w = t.match(/\bwidth=["']([\d.]+)/), h = t.match(/\bheight=["']([\d.]+)/);
+      return w && h ? Number(w[1]) / Number(h[1]) : 1;
+    }
+    if (head.includes('png')) return buf.readUInt32BE(16) / buf.readUInt32BE(20);
+  } catch {}
+  return 1;
+}
+
 export async function compileInfographic(spec: InfographicSpec, o: { dir: string; brandDir?: string; brand?: Partial<BrandKit> }) {
   const errs = validateInfographic(spec);
   if (errs.length) throw new Error(`infographic is invalid:\n- ${errs.join('\n- ')}`);
@@ -402,10 +419,13 @@ ${bodyCss}
 .who b{display:block;font:700 22px/1.1 ${stageFont};letter-spacing:-.01em}
 .who small{display:block;font:500 15px/1.3 ${mono};opacity:.75}
 .brandmark{font:800 24px/1 ${stageFont};letter-spacing:-.02em;display:flex;align-items:center;gap:10px}
-.brandmark img{height:34px;max-width:46px;object-fit:contain}
+.brandmark img{height:34px;max-width:180px;object-fit:contain}
+.brandmark.wordmark img{height:30px}.brandmark.wordmark span{display:none}
 #rough{position:absolute;inset:0;z-index:0;pointer-events:none}
+${dark ? '.brandmark img{background:#fff;padding:5px 9px;border-radius:8px;box-sizing:content-box;height:26px!important}' : ''}
 ${dark ? '.chip .ico,.side-head .ico{background-color:#fff;border-radius:50%;box-shadow:0 0 0 2px #fff;background-size:78%}' : ''}
 ${T.css}
+${look === 'paper' ? `.stage .st-label,.who b,.brandmark{font-family:${body};font-weight:650;letter-spacing:-.01em}` : ''}
 </style></head><body>
 <div id="main" data-composition-id="main" data-start="0" data-width="${W}" data-height="${H}" data-duration="${total}">
 ${look === 'sketch' ? `<svg id="rough" width="${W}" height="${H}"></svg>` : ''}
@@ -423,7 +443,7 @@ ${bodyHtml}
 ${spec.cursor ? `<div class="cursor" id="cur"><svg width="26" height="26" viewBox="0 0 24 24"><path d="M4 2l15 9-6.5 1.6L9.5 19z" fill="${accent}" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/></svg><span class="tag">${esc(spec.cursor)}</span></div>` : ''}
 <div class="foot">
   <div class="who"><span class="av">${avatar ? `<img src="${avatar}" alt="">` : initials}</span><div><b>${esc(who)}</b><small>${esc(handle)}</small></div></div>
-  <span class="brandmark">${logo ? `<img src="${logo}" alt="">` : ''}${esc(footer.brand ?? brand.name)}</span>
+  <span class="brandmark${logo && aspectOf(logo) > 2.2 ? ' wordmark' : ''}" id="bm">${logo ? `<img src="${logo}" alt="">` : ''}<span>${esc(footer.brand ?? brand.name)}</span></span>
 </div>
 </div>
 <script>(()=>{
