@@ -95,7 +95,7 @@ re-render without another Claude run.
 | **Feature Spotlight** | 8–15s silent motion graphic for the feed |
 | **Explainer** | 45–75s narrated explainer — teach first, sell last |
 | **Captions** | Upload a talking-head clip → word-timed captions (6 styles), hook title, mastered audio. No Claude turn, about a minute |
-| **LinkedIn Carousel** | 6–10 slides in 4 themes × 9 layouts, upload-ready PDF, post caption |
+| **LinkedIn Carousel** | 6–10 slides in 4 themes × 9 layouts, upload-ready PDF, animated MP4 with music, post caption |
 | **Thumbnails & Cards** | 3 YouTube thumbnails for Test & Compare, OG / GitHub cards, X & LinkedIn images, stories, banners |
 | **Launch Copy Kit** | LinkedIn posts, X thread, YouTube metadata, Product Hunt, Show HN, newsletter, ads |
 
@@ -108,7 +108,7 @@ Discovery Journey, changelog video from a pull request, talking-head captions.
 Third-party skills are **not bundled**; Shipcast installs them from their own
 repositories on first use, under their own licenses.
 
-Every video gets an **original music bed** (6 moods, cuts snapped to its beat, whooshes on transitions), a **Kokoro voiceover** aligned word-by-word to the script, and a **director's review**: after the automated checks pass, Claude looks at the rendered frames once and fixes what a human editor would.
+Videos are built from 12 motion scenes — kinetic title, highlight statement, stat count-up, product zoom with cursor click (browser or phone frame), typing terminal, animated bar chart, feature reveal, testimonial, before/after, page scroll, logo sting and CTA outro — plus any of HyperFrames' ~450 registry blocks. Every video gets an **original music bed** (6 moods, cuts snapped to its beat, whooshes on transitions), a **Kokoro voiceover** aligned word-by-word to the script, and a **director's review**: after the automated checks pass, Claude looks at the rendered frames once and fixes what a human editor would.
 
 ### What "quality" means here
 
