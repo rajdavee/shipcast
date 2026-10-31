@@ -2,6 +2,7 @@ import { mkdir, writeFile, rm } from 'node:fs/promises';
 import { catalogMarkdown, checkCopy, renderSpec, SPEC_FILE } from './specs.ts';
 import { readFile, readdir, rename, stat } from 'node:fs/promises';
 import { shortsFromStoryboard } from './shorts.ts';
+import { recentPatterns, scenePattern, varietyFeedback } from './variety.ts';
 import { callService } from './service.ts';
 import { existsSync } from 'node:fs';
 import { hostname } from 'node:os';
@@ -348,6 +349,19 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
     // Spec formats: render through the services; hand problems back to the same session (≤ 2 fix rounds).
     let reviewed = false;
     if (ok && specKind && !canceled && !timedOut) {
+      // Variety guard: a near-copy of a recent video gets one rewrite before it renders.
+      if (specKind === 'storyboard' && !renderOnly && sessionId && !canceled && !timedOut) {
+        try {
+          const sb = JSON.parse(await readFile(join(cwd, 'out', SPEC_FILE.storyboard), 'utf8'));
+          const fb = varietyFeedback(scenePattern(sb), await recentPatterns(step.id));
+          if (fb.length) {
+            await log({ step: step.id, type: 'log', text: 'Variety check: too close to a recent video — asking for a fresher structure' });
+            await execClaude(`${fb[0]}\n\nEdit out/storyboard.json accordingly (same message, different structure). Don't render anything yourself.`, sessionId);
+          }
+        } catch {
+          /* no storyboard yet: the render loop reports it */
+        }
+      }
       for (let round = 0; ; round++) {
         await phase(round ? 'Applying fixes' : specKind === 'storyboard' ? 'Rendering the video' : specKind === 'infographic' ? 'Animating the infographic' : 'Rendering');
         await log({ step: step.id, type: 'log', text: round ? `Re-rendering after fixes (round ${round})…` : `Rendering ${SPEC_FILE[specKind]} with the ${specKind === 'storyboard' || specKind === 'infographic' ? 'render' : 'stills'} service…` });

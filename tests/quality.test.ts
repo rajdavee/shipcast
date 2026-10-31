@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { contrastRatio, ensureContrast, normalizeBrand, brandCss, PRESETS, getPreset, VERTICAL_SAFE, shortsFromStoryboard } from '@shipcast/engine';
+import { contrastRatio, ensureContrast, normalizeBrand, brandCss, PRESETS, getPreset, VERTICAL_SAFE, shortsFromStoryboard, patternSimilarity, varietyFeedback } from '@shipcast/engine';
 import { makeMusic, MOODS, toWav, addSfx } from '@shipcast/media';
 import { CAPTION_STYLES, SCENES, validateInfographic, validateStoryboard } from '@shipcast/render';
 
@@ -112,4 +112,13 @@ test('shorts pick the strongest chapters and stay short', () => {
     assert.equal(s.scenes!.at(-1)!.scene, 'outro', 'every short ends on the outro');
     assert.ok(s.scenes!.length < 15, 'trimmed to about 45 s');
   }
+});
+
+test('variety guard flags near-copies and lets fresh structures through', () => {
+  const a = ['kinetic', 'statement', 'product', 'product', 'stat', 'outro'];
+  assert.ok(patternSimilarity(a, a) > 0.9);
+  assert.equal(varietyFeedback(a, [{ label: 'x', pattern: ['cinema', 'terminal', 'chart', 'logos', 'quote', 'outro'] }]).length, 0);
+  const fb = varietyFeedback(a, [{ label: 'uv · reel', pattern: [...a] }]);
+  assert.equal(fb.length, 1);
+  assert.match(fb[0], /uv · reel/);
 });
