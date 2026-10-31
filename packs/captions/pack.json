@@ -1,17 +1,48 @@
 {
   "id": "captions",
   "name": "Talking-Head Captions",
-  "tagline": "Upload a talking-head clip — get styled, word-timed captions burned in, plus SRT. Transcribed locally.",
+  "tagline": "Upload a talking-head clip \u2014 get styled, word-timed captions burned in, plus SRT. Transcribed locally.",
   "category": "video",
-  "order": 11,
-  "estimate": "10–20 min",
+  "order": 27,
+  "estimate": "10\u201320 min",
   "accent": "#f97316",
   "subagents": true,
   "options": [
-    { "key": "video", "label": "Uploaded file", "type": "text", "default": "", "placeholder": "file name from Uploads, e.g. intro.mp4" },
-    { "key": "look", "label": "Look", "type": "select", "choices": ["clean", "bold-pop", "cinematic", "behind-subject"], "default": "bold-pop" }
+    {
+      "key": "video",
+      "label": "Uploaded file",
+      "type": "text",
+      "default": "",
+      "placeholder": "file name from Uploads, e.g. intro.mp4"
+    },
+    {
+      "key": "look",
+      "label": "Look",
+      "type": "select",
+      "choices": [
+        "clean",
+        "bold-pop",
+        "cinematic",
+        "behind-subject"
+      ],
+      "default": "bold-pop"
+    }
   ],
-  "outputs": ["*.mp4", "*.srt", "*.vtt", "*.md"],
-  "skills": [{ "name": "embedded-captions", "source": "heygen-com/hyperframes" }],
-  "tools": ["ffmpeg", "chrome", "whisper-cli"]
+  "outputs": [
+    "*.mp4",
+    "*.srt",
+    "*.vtt",
+    "*.md"
+  ],
+  "skills": [
+    {
+      "name": "embedded-captions",
+      "source": "heygen-com/hyperframes"
+    }
+  ],
+  "tools": [
+    "ffmpeg",
+    "chrome",
+    "whisper-cli"
+  ]
 }

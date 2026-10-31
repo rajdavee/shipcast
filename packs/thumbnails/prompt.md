@@ -1,1 +1,1 @@
-Use the `shipcast:thumbnails` skill. Set: `{{set}}`.{{#headline}} Headline to use: "{{headline}}".{{/headline}}
+Use the `shipcast:thumbnails` skill. Set: `{{set}}`.{{#headline}} Lead headline: "{{headline}}".{{/headline}}

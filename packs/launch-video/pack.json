@@ -1,17 +1,62 @@
 {
   "id": "launch-video",
-  "name": "Launch Video",
+  "name": "Launch Video \u00b7 brag",
   "tagline": "A 20-second, music-driven launch film built from your real product UI.",
   "category": "video",
-  "order": 1,
-  "estimate": "10–20 min",
+  "order": 20,
+  "estimate": "10\u201320 min",
   "accent": "#ff5a36",
   "options": [
-    { "key": "style", "label": "Tone", "type": "select", "choices": ["default", "polished", "cinematic", "app-store", "yc-parody", "chaotic", "deadpan"], "default": "default" },
-    { "key": "format", "label": "Format", "type": "select", "choices": ["landscape", "vertical", "square"], "default": "landscape" },
-    { "key": "duration", "label": "Seconds", "type": "number", "default": "20", "min": 10, "max": 45 }
+    {
+      "key": "style",
+      "label": "Tone",
+      "type": "select",
+      "choices": [
+        "default",
+        "polished",
+        "cinematic",
+        "app-store",
+        "yc-parody",
+        "chaotic",
+        "deadpan"
+      ],
+      "default": "default"
+    },
+    {
+      "key": "format",
+      "label": "Format",
+      "type": "select",
+      "choices": [
+        "landscape",
+        "vertical",
+        "square"
+      ],
+      "default": "landscape"
+    },
+    {
+      "key": "duration",
+      "label": "Seconds",
+      "type": "number",
+      "default": "20",
+      "min": 10,
+      "max": 45
+    }
   ],
-  "outputs": ["*.mp4", "*.jpg", "*.txt", "*.md"],
-  "skills": [{ "name": "brag-slim", "source": "latent-spaces/brag", "skill": "brag-slim" }],
-  "tools": ["ffmpeg", "chrome"]
+  "outputs": [
+    "*.mp4",
+    "*.jpg",
+    "*.txt",
+    "*.md"
+  ],
+  "skills": [
+    {
+      "name": "brag-slim",
+      "source": "latent-spaces/brag",
+      "skill": "brag-slim"
+    }
+  ],
+  "tools": [
+    "ffmpeg",
+    "chrome"
+  ]
 }

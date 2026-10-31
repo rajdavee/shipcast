@@ -73,17 +73,17 @@ test('lists packs with install status', async () => {
 test('campaign runs brief then deliverable, then revises with --resume', async () => {
   const created = await api('/api/campaigns', {
     method: 'POST',
-    json: { name: 'Demo', source: { type: 'url', value: 'example.com' }, goal: 'launch', deliverables: [{ pack: 'carousel', options: { slides: '6' } }] },
+    json: { name: 'Demo', source: { type: 'url', value: 'example.com' }, goal: 'launch', deliverables: [{ pack: 'copy-kit', options: { voice: 'brand' } }] },
   });
   assert.equal(created.status, 200);
   const id = created.body.id;
   assert.equal(created.body.source.value, 'https://example.com');
-  assert.equal(created.body.steps[1].options.slides, '6');
-  assert.equal(created.body.steps[1].options.angle, 'problem-solution');
+  assert.equal(created.body.steps[1].options.voice, 'brand');
+  assert.equal(created.body.steps[1].options.channels, 'all');
 
   const done = await waitFor(id, (c) => c.steps.every((s: any) => s.status === 'done'));
   const step = done.steps[1];
-  assert.deepEqual(step.outputs, ['out/NOTES.md', 'out/carousel.pdf', 'out/copy.md', 'out/slides/slide-01.png']);
+  assert.deepEqual(step.outputs, ['out/NOTES.md', 'out/copy.md']);
   assert.ok(step.sessionId);
 
   // Brief must run first, in the brief folder, with sub-agents blocked for this pack.
@@ -93,9 +93,9 @@ test('campaign runs brief then deliverable, then revises with --resume', async (
   assert.ok(calls[1].args.includes('--plugin-dir'));
 
   // Files are served with a sandbox CSP and range support.
-  const f = await fetch(`${base}/api/campaigns/${id}/files/deliverables/${step.id}/out/carousel.pdf`, { headers: { range: 'bytes=0-1' } });
+  const f = await fetch(`${base}/api/campaigns/${id}/files/deliverables/${step.id}/out/copy.md`, { headers: { range: 'bytes=0-1' } });
   assert.equal(f.status, 206);
-  assert.equal(await f.text(), 'pd');
+  assert.equal(await f.text(), '# ');
   assert.match(f.headers.get('content-security-policy') ?? '', /sandbox/);
   assert.equal((await fetch(`${base}/api/campaigns/${id}/files/../../settings.json`)).status, 404);
   assert.equal((await fetch(`${base}/api/campaigns/${id}/files/%2e%2e%2f%2e%2e%2fx`)).status, 403);

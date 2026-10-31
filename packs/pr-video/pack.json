@@ -3,17 +3,58 @@
   "name": "Changelog / PR Video",
   "tagline": "Turn a merged pull request into a feature-reveal or changelog video, straight from the diff.",
   "category": "video",
-  "order": 7,
-  "estimate": "15–30 min",
+  "order": 26,
+  "estimate": "15\u201330 min",
   "accent": "#2ea043",
   "subagents": true,
-  "sources": ["github"],
-  "options": [
-    { "key": "pr", "label": "PR number", "type": "text", "default": "", "placeholder": "e.g. 128 (blank = latest merged)" },
-    { "key": "aspect", "label": "Aspect", "type": "select", "choices": ["1920x1080", "1080x1920", "1080x1080"], "default": "1920x1080" },
-    { "key": "audience", "label": "Audience", "type": "select", "choices": ["users", "developers"], "default": "users" }
+  "sources": [
+    "github"
   ],
-  "outputs": ["*.mp4", "*.jpg", "*.md", "*.txt"],
-  "skills": [{ "name": "pr-to-video", "source": "heygen-com/hyperframes" }],
-  "tools": ["ffmpeg", "chrome", "gh"]
+  "options": [
+    {
+      "key": "pr",
+      "label": "PR number",
+      "type": "text",
+      "default": "",
+      "placeholder": "e.g. 128 (blank = latest merged)"
+    },
+    {
+      "key": "aspect",
+      "label": "Aspect",
+      "type": "select",
+      "choices": [
+        "1920x1080",
+        "1080x1920",
+        "1080x1080"
+      ],
+      "default": "1920x1080"
+    },
+    {
+      "key": "audience",
+      "label": "Audience",
+      "type": "select",
+      "choices": [
+        "users",
+        "developers"
+      ],
+      "default": "users"
+    }
+  ],
+  "outputs": [
+    "*.mp4",
+    "*.jpg",
+    "*.md",
+    "*.txt"
+  ],
+  "skills": [
+    {
+      "name": "pr-to-video",
+      "source": "heygen-com/hyperframes"
+    }
+  ],
+  "tools": [
+    "ffmpeg",
+    "chrome",
+    "gh"
+  ]
 }

@@ -1,19 +1,73 @@
 {
   "id": "explainer",
-  "name": "Explainer",
-  "tagline": "Faceless, narrated explainer of the problem you solve — kinetic type, diagrams, data-viz.",
+  "name": "Explainer \u00b7 freeform",
+  "tagline": "Faceless, narrated explainer of the problem you solve \u2014 kinetic type, diagrams, data-viz.",
   "category": "video",
-  "order": 3,
-  "estimate": "20–40 min",
+  "order": 22,
+  "estimate": "20\u201340 min",
   "accent": "#00b894",
   "subagents": true,
   "options": [
-    { "key": "topic", "label": "Topic", "type": "text", "default": "", "placeholder": "Blank = the problem your product solves" },
-    { "key": "length", "label": "Length", "type": "select", "choices": ["30s", "60s", "90s"], "default": "60s" },
-    { "key": "aspect", "label": "Aspect", "type": "select", "choices": ["1920x1080", "1080x1920", "1080x1080"], "default": "1080x1920" },
-    { "key": "voice", "label": "Voice", "type": "select", "choices": ["af_heart", "af_nova", "af_sky", "am_adam", "am_michael", "bf_emma", "bm_george"], "default": "am_michael" }
+    {
+      "key": "topic",
+      "label": "Topic",
+      "type": "text",
+      "default": "",
+      "placeholder": "Blank = the problem your product solves"
+    },
+    {
+      "key": "length",
+      "label": "Length",
+      "type": "select",
+      "choices": [
+        "30s",
+        "60s",
+        "90s"
+      ],
+      "default": "60s"
+    },
+    {
+      "key": "aspect",
+      "label": "Aspect",
+      "type": "select",
+      "choices": [
+        "1920x1080",
+        "1080x1920",
+        "1080x1080"
+      ],
+      "default": "1080x1920"
+    },
+    {
+      "key": "voice",
+      "label": "Voice",
+      "type": "select",
+      "choices": [
+        "af_heart",
+        "af_nova",
+        "af_sky",
+        "am_adam",
+        "am_michael",
+        "bf_emma",
+        "bm_george"
+      ],
+      "default": "am_michael"
+    }
   ],
-  "outputs": ["*.mp4", "*.jpg", "*.srt", "*.vtt", "*.md"],
-  "skills": [{ "name": "faceless-explainer", "source": "heygen-com/hyperframes" }],
-  "tools": ["ffmpeg", "chrome"]
+  "outputs": [
+    "*.mp4",
+    "*.jpg",
+    "*.srt",
+    "*.vtt",
+    "*.md"
+  ],
+  "skills": [
+    {
+      "name": "faceless-explainer",
+      "source": "heygen-com/hyperframes"
+    }
+  ],
+  "tools": [
+    "ffmpeg",
+    "chrome"
+  ]
 }

@@ -1,0 +1,19 @@
+{
+  "id": "explainer-video",
+  "name": "Explainer",
+  "tagline": "45–75s narrated explainer: the problem, the insight, how it works, why it's different — teach first, sell last.",
+  "category": "video",
+  "order": 4,
+  "estimate": "6–12 min",
+  "accent": "#00b894",
+  "spec": "storyboard",
+  "options": [
+    { "key": "preset", "label": "Format", "type": "select", "choices": ["youtube", "vertical", "linkedin-video"], "default": "youtube" },
+    { "key": "voice", "label": "Voice", "type": "select", "choices": ["am_michael", "af_heart", "af_nova", "am_adam", "bf_emma", "bm_george"], "default": "af_heart" },
+    { "key": "captions", "label": "Captions", "type": "select", "choices": ["clean", "karaoke", "boxed", "bold"], "default": "clean" },
+    { "key": "topic", "label": "Topic", "type": "text", "default": "", "placeholder": "Blank = the problem the product solves" }
+  ],
+  "outputs": ["video.mp4", "video.jpg", "video.sheet.jpg", "storyboard.json", "*.md"],
+  "skills": [],
+  "tools": ["ffmpeg", "chrome"]
+}

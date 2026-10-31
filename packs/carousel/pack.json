@@ -1,18 +1,19 @@
 {
   "id": "carousel",
   "name": "LinkedIn Carousel",
-  "tagline": "Editorial swipe slides — PNGs, an upload-ready PDF, an optional animated MP4, and the caption.",
+  "tagline": "6–10 editorial slides with a hook cover and CTA — PNGs, an upload-ready PDF and the post caption. Edit any slide afterwards.",
   "category": "design",
-  "order": 8,
-  "estimate": "6–12 min",
+  "order": 5,
+  "estimate": "2–4 min",
   "accent": "#0a66c2",
+  "spec": "deck",
   "options": [
     { "key": "angle", "label": "Angle", "type": "select", "choices": ["problem-solution", "how-it-works", "listicle", "before-after", "myth-buster", "launch"], "default": "problem-solution" },
-    { "key": "slides", "label": "Slides", "type": "number", "default": "8", "min": 4, "max": 12 },
-    { "key": "platform", "label": "Size", "type": "select", "choices": ["linkedin", "instagram", "square"], "default": "linkedin" },
-    { "key": "motion", "label": "Animated MP4", "type": "select", "choices": ["yes", "no"], "default": "yes" }
+    { "key": "slides", "label": "Slides", "type": "number", "default": "8", "min": 5, "max": 12 },
+    { "key": "theme", "label": "Theme", "type": "select", "choices": ["auto", "editorial", "swiss", "bold", "midnight"], "default": "auto" },
+    { "key": "platform", "label": "Size", "type": "select", "choices": ["linkedin-carousel", "instagram-carousel", "1080x1080"], "default": "linkedin-carousel" }
   ],
-  "outputs": ["slides/*.png", "*.pdf", "*.mp4", "caption.md", "*.md"],
+  "outputs": ["slides/*.png", "carousel.pdf", "caption.md", "deck.json", "*.md"],
   "skills": [],
-  "tools": ["chrome", "ffmpeg"]
+  "tools": ["chrome"]
 }

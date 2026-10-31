@@ -1,18 +1,61 @@
 {
   "id": "discovery-journey",
   "name": "Discovery Journey",
-  "tagline": "The trending \"where customers really find you\" story — search, threads, reviews, AI answers — all animated, ending on your product.",
+  "tagline": "The trending \"where customers really find you\" story \u2014 search, threads, reviews, AI answers \u2014 all animated, ending on your product.",
   "category": "motion",
-  "order": 5,
-  "estimate": "20–35 min",
+  "order": 24,
+  "estimate": "20\u201335 min",
   "accent": "#18c8ff",
   "subagents": true,
   "options": [
-    { "key": "aspect", "label": "Aspect", "type": "select", "choices": ["1080x1350", "1080x1920", "1080x1080", "1920x1080"], "default": "1080x1350" },
-    { "key": "length", "label": "Length", "type": "select", "choices": ["15s", "20s", "30s"], "default": "20s" },
-    { "key": "voiceover", "label": "Voiceover", "type": "select", "choices": ["no", "yes"], "default": "no" }
+    {
+      "key": "aspect",
+      "label": "Aspect",
+      "type": "select",
+      "choices": [
+        "1080x1350",
+        "1080x1920",
+        "1080x1080",
+        "1920x1080"
+      ],
+      "default": "1080x1350"
+    },
+    {
+      "key": "length",
+      "label": "Length",
+      "type": "select",
+      "choices": [
+        "15s",
+        "20s",
+        "30s"
+      ],
+      "default": "20s"
+    },
+    {
+      "key": "voiceover",
+      "label": "Voiceover",
+      "type": "select",
+      "choices": [
+        "no",
+        "yes"
+      ],
+      "default": "no"
+    }
   ],
-  "outputs": ["*.mp4", "*.jpg", "*.md", "*.txt"],
-  "skills": [{ "name": "general-video", "source": "heygen-com/hyperframes" }],
-  "tools": ["ffmpeg", "chrome"]
+  "outputs": [
+    "*.mp4",
+    "*.jpg",
+    "*.md",
+    "*.txt"
+  ],
+  "skills": [
+    {
+      "name": "general-video",
+      "source": "heygen-com/hyperframes"
+    }
+  ],
+  "tools": [
+    "ffmpeg",
+    "chrome"
+  ]
 }

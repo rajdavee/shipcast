@@ -1,18 +1,70 @@
 {
   "id": "social-short",
-  "name": "Reel / Short",
-  "tagline": "9:16 vertical for Reels, Shorts and TikTok — 1-second hook, punchy cuts, word-by-word captions.",
+  "name": "Reel \u00b7 freeform",
+  "tagline": "9:16 vertical for Reels, Shorts and TikTok \u2014 1-second hook, punchy cuts, word-by-word captions.",
   "category": "video",
-  "order": 6,
-  "estimate": "20–35 min",
+  "order": 25,
+  "estimate": "20\u201335 min",
   "accent": "#ff3d8b",
   "subagents": true,
   "options": [
-    { "key": "length", "label": "Length", "type": "select", "choices": ["15s", "30s", "45s"], "default": "30s" },
-    { "key": "hookStyle", "label": "Hook style", "type": "select", "choices": ["auto", "contrarian", "number", "question", "before-after", "story"], "default": "auto" },
-    { "key": "voice", "label": "Voice", "type": "select", "choices": ["af_heart", "af_nova", "af_sky", "am_adam", "am_michael", "bf_emma", "bm_george", "none"], "default": "af_nova" }
+    {
+      "key": "length",
+      "label": "Length",
+      "type": "select",
+      "choices": [
+        "15s",
+        "30s",
+        "45s"
+      ],
+      "default": "30s"
+    },
+    {
+      "key": "hookStyle",
+      "label": "Hook style",
+      "type": "select",
+      "choices": [
+        "auto",
+        "contrarian",
+        "number",
+        "question",
+        "before-after",
+        "story"
+      ],
+      "default": "auto"
+    },
+    {
+      "key": "voice",
+      "label": "Voice",
+      "type": "select",
+      "choices": [
+        "af_heart",
+        "af_nova",
+        "af_sky",
+        "am_adam",
+        "am_michael",
+        "bf_emma",
+        "bm_george",
+        "none"
+      ],
+      "default": "af_nova"
+    }
   ],
-  "outputs": ["*.mp4", "*.jpg", "*.srt", "*.md", "*.txt"],
-  "skills": [{ "name": "faceless-explainer", "source": "heygen-com/hyperframes" }],
-  "tools": ["ffmpeg", "chrome"]
+  "outputs": [
+    "*.mp4",
+    "*.jpg",
+    "*.srt",
+    "*.md",
+    "*.txt"
+  ],
+  "skills": [
+    {
+      "name": "faceless-explainer",
+      "source": "heygen-com/hyperframes"
+    }
+  ],
+  "tools": [
+    "ffmpeg",
+    "chrome"
+  ]
 }

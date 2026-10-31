@@ -1,0 +1,19 @@
+{
+  "id": "reel",
+  "name": "Reel / Short",
+  "tagline": "9:16 for Reels, Shorts and TikTok — 1-second hook, voiceover, word-timed bold captions, safe-zone aware.",
+  "category": "video",
+  "order": 1,
+  "estimate": "4–8 min",
+  "accent": "#ff3d8b",
+  "spec": "storyboard",
+  "options": [
+    { "key": "length", "label": "Length", "type": "select", "choices": ["15s", "20s", "30s", "45s"], "default": "20s" },
+    { "key": "voice", "label": "Voice", "type": "select", "choices": ["am_michael","af_heart","af_nova","af_sky","am_adam","bf_emma","bm_george","none"], "default": "am_michael" },
+    { "key": "captions", "label": "Captions", "type": "select", "choices": ["bold", "pop", "karaoke", "boxed", "clean", "typewriter"], "default": "bold" },
+    { "key": "angle", "label": "Angle", "type": "text", "default": "", "placeholder": "e.g. the 3 things it replaces" }
+  ],
+  "outputs": ["video.mp4", "video.jpg", "video.sheet.jpg", "storyboard.json", "*.md"],
+  "skills": [],
+  "tools": ["ffmpeg", "chrome"]
+}

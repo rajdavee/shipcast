@@ -1,19 +1,73 @@
 {
   "id": "motion-graphics",
-  "name": "Motion Graphics",
+  "name": "Motion Graphics \u00b7 freeform",
   "tagline": "Short design-led motion: logo sting, stat count-up, kinetic type, animated testimonial or UI callout.",
   "category": "motion",
-  "order": 4,
-  "estimate": "10–25 min",
+  "order": 23,
+  "estimate": "10\u201325 min",
   "accent": "#ffb020",
   "subagents": true,
   "options": [
-    { "key": "kind", "label": "Kind", "type": "select", "choices": ["auto", "logo-sting", "stat-countup", "kinetic-type", "animated-testimonial", "ui-callout", "feature-grid"], "default": "auto" },
-    { "key": "aspect", "label": "Aspect", "type": "select", "choices": ["1920x1080", "1080x1920", "1080x1080", "1080x1350"], "default": "1080x1080" },
-    { "key": "transparent", "label": "Transparent overlay", "type": "select", "choices": ["no", "yes"], "default": "no" },
-    { "key": "focus", "label": "Focus", "type": "text", "default": "", "placeholder": "e.g. the 10x faster benchmark" }
+    {
+      "key": "kind",
+      "label": "Kind",
+      "type": "select",
+      "choices": [
+        "auto",
+        "logo-sting",
+        "stat-countup",
+        "kinetic-type",
+        "animated-testimonial",
+        "ui-callout",
+        "feature-grid"
+      ],
+      "default": "auto"
+    },
+    {
+      "key": "aspect",
+      "label": "Aspect",
+      "type": "select",
+      "choices": [
+        "1920x1080",
+        "1080x1920",
+        "1080x1080",
+        "1080x1350"
+      ],
+      "default": "1080x1080"
+    },
+    {
+      "key": "transparent",
+      "label": "Transparent overlay",
+      "type": "select",
+      "choices": [
+        "no",
+        "yes"
+      ],
+      "default": "no"
+    },
+    {
+      "key": "focus",
+      "label": "Focus",
+      "type": "text",
+      "default": "",
+      "placeholder": "e.g. the 10x faster benchmark"
+    }
   ],
-  "outputs": ["*.mp4", "*.webm", "*.mov", "*.jpg", "*.md"],
-  "skills": [{ "name": "motion-graphics", "source": "heygen-com/hyperframes" }],
-  "tools": ["ffmpeg", "chrome"]
+  "outputs": [
+    "*.mp4",
+    "*.webm",
+    "*.mov",
+    "*.jpg",
+    "*.md"
+  ],
+  "skills": [
+    {
+      "name": "motion-graphics",
+      "source": "heygen-com/hyperframes"
+    }
+  ],
+  "tools": [
+    "ffmpeg",
+    "chrome"
+  ]
 }
