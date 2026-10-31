@@ -2,10 +2,11 @@ import { copyFile, mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
-import { assertInHome, callService, contactSheet, createService, home, PRESETS, run, SERVICE_PORTS, engineEnv } from '@shipcast/engine';
+import { assertInHome, callService, contactSheet, createService, home, PRESETS, presetForSize, run, SERVICE_PORTS, engineEnv } from '@shipcast/engine';
 import { SCENES } from './scenes.ts';
 import { CAPTION_STYLES } from './captions.ts';
 import { compileStoryboard, validateStoryboard, type Storyboard } from './compile.ts';
+import { compileCaptionVideo } from './captionVideo.ts';
 
 export { SCENES, CAPTION_STYLES, compileStoryboard, validateStoryboard };
 export type { Storyboard };
@@ -81,6 +82,42 @@ async function compositionFindings(project: string) {
   return out.slice(0, 30);
 }
 
+/** Shared tail of every render: lint → render → master → poster frame 0 → contact sheet → QA. */
+async function finishProject(o: { project: string; dir: string; name: string; quality: string; fps: number; preset?: string; posterAt: number; progress: (f: number, m?: string) => void }) {
+  const { project, dir, name } = o;
+  o.progress(0.42, 'lint');
+  const lint = await hf(['lint', '.', '--json'], project, 300_000);
+  let lintJson: any = null;
+  try {
+    lintJson = JSON.parse(lint.stdout.slice(lint.stdout.indexOf('{')));
+  } catch {
+    /* non-JSON output */
+  }
+  const raw = join(dir, `${name}.raw.mp4`);
+  o.progress(0.45, 'rendering frames');
+  const r = await hf(['render', '.', '-o', raw, '--quality', o.quality === 'draft' ? 'draft' : 'delivery', '--fps', String(o.fps), '--quiet'], project);
+  if (r.code !== 0) throw new Error(`render failed: ${(r.stderr || r.stdout).slice(-900)}`);
+  o.progress(0.85, 'mastering');
+  const final = join(dir, `${name}.mp4`);
+  await callService('media', 'finish', { input: raw, output: final, preset: o.preset });
+  await run('rm', ['-f', raw]);
+  const poster = join(dir, `${name}.jpg`);
+  await run('ffmpeg', ['-y', '-v', 'error', '-ss', o.posterAt.toFixed(2), '-i', final, '-frames:v', '1', '-q:v', '2', poster]);
+  // Frame 0 is the thumbnail on most social players: make it the settled hook frame.
+  const withPoster = join(dir, `${name}.p.mp4`);
+  const pr = await run('ffmpeg', ['-y', '-v', 'error', '-i', final, '-i', poster, '-filter_complex', "[1:v]scale=iw:ih[p];[0:v][p]overlay=enable='eq(n\\,0)'", '-c:v', 'libx264', '-profile:v', 'high', '-crf', '18', '-pix_fmt', 'yuv420p', '-c:a', 'copy', '-movflags', '+faststart', withPoster]);
+  if (pr.code === 0) await run('mv', [withPoster, final]);
+  const sheet = await contactSheet(final, join(dir, `${name}.sheet.jpg`));
+  o.progress(0.9, 'quality checks');
+  const [qa, layout] = await Promise.all([
+    callService('qa', 'video', { file: final, preset: o.preset }).catch((e: Error) => ({ pass: false, issues: [{ rule: 'qa.unavailable', severity: 'warn', message: e.message }], facts: {} })),
+    compositionFindings(project),
+  ]);
+  qa.issues.push(...layout);
+  qa.pass = !qa.issues.some((i: any) => i.severity === 'error');
+  return { file: final, poster, sheet, project, lint: lintJson?.summary ?? lintJson ?? undefined, qa };
+}
+
 /**
  * render — storyboards → HyperFrames projects → MP4. Draft renders are
  * quick previews; final renders are mastered (loudness, codec) and gated
@@ -118,38 +155,25 @@ export function createRenderService() {
         const dir = assertInHome(outDir, 'outDir');
         const project = join(dir, 'project');
         const compiled = await compileStoryboard(storyboard as Storyboard, { dir: project, brandDir: brandDir ? assertInHome(brandDir, 'brandDir') : undefined, deps, progress: (f, m) => ctx.progress(f * 0.4, m) });
-        ctx.progress(0.42, 'lint');
-        const lint = await hf(['lint', '.', '--json'], project, 300_000);
-        let lintJson: any = null;
-        try {
-          lintJson = JSON.parse(lint.stdout.slice(lint.stdout.indexOf('{')));
-        } catch {
-          /* non-JSON output */
-        }
-        const raw = join(dir, `${name}.raw.mp4`);
-        ctx.progress(0.45, 'rendering frames');
-        const r = await hf(['render', '.', '-o', raw, '--quality', quality === 'draft' ? 'draft' : 'delivery', '--fps', String(compiled.preset.fps ?? 30), '--quiet'], project);
-        if (r.code !== 0) throw new Error(`render failed: ${(r.stderr || r.stdout).slice(-900)}`);
-        ctx.progress(0.85, 'mastering');
-        const final = join(dir, `${name}.mp4`);
-        await callService('media', 'finish', { input: raw, output: final, preset: compiled.preset.id });
-        await run('rm', ['-f', raw]);
-        const poster = join(dir, `${name}.jpg`);
-        const mid = compiled.scenes[0] ? compiled.scenes[0].start + Math.min(compiled.scenes[0].duration * 0.8, compiled.scenes[0].duration - 0.1) : 1;
-        await run('ffmpeg', ['-y', '-v', 'error', '-ss', mid.toFixed(2), '-i', final, '-frames:v', '1', '-q:v', '2', poster]);
-        // Frame 0 is the thumbnail on most social players: make it the settled hook frame.
-        const withPoster = join(dir, `${name}.p.mp4`);
-        const pr = await run('ffmpeg', ['-y', '-v', 'error', '-i', final, '-i', poster, '-filter_complex', "[1:v]scale=iw:ih[p];[0:v][p]overlay=enable='eq(n\\,0)'", '-c:v', 'libx264', '-profile:v', 'high', '-crf', '18', '-pix_fmt', 'yuv420p', '-c:a', 'copy', '-movflags', '+faststart', withPoster]);
-        if (pr.code === 0) await run('mv', [withPoster, final]);
-        const sheet = await contactSheet(final, join(dir, `${name}.sheet.jpg`));
-        ctx.progress(0.9, 'quality checks');
-        const [qa, layout] = await Promise.all([
-          callService('qa', 'video', { file: final, preset: compiled.preset.id }).catch((e: Error) => ({ pass: false, issues: [{ rule: 'qa.unavailable', severity: 'warn', message: e.message }], facts: {} })),
-          compositionFindings(project),
-        ]);
-        qa.issues.push(...layout);
-        qa.pass = !qa.issues.some((i: any) => i.severity === 'error');
-        return { file: final, poster, sheet, duration: compiled.duration, scenes: compiled.scenes, project, lint: lintJson?.summary ?? lintJson ?? undefined, qa };
+        const firstScene = compiled.scenes[0];
+        const posterAt = firstScene ? firstScene.start + Math.min(firstScene.duration * 0.8, firstScene.duration - 0.1) : 1;
+        const out = await finishProject({ project, dir, name, quality, fps: compiled.preset.fps ?? 30, preset: compiled.preset.id, posterAt, progress: ctx.progress });
+        return { ...out, duration: compiled.duration, scenes: compiled.scenes };
+      },
+
+      /** Your footage + word-timed captions (+ optional hook title), mastered and checked. */
+      captions: async ({ video, outDir, brandDir, style = 'bold', hook, name = 'captioned' }, ctx) => {
+        const dir = assertInHome(outDir, 'outDir');
+        const src = assertInHome(video, 'video');
+        ctx.progress(0.05, 'transcribing');
+        const { words } = await callService('media', 'transcribe', { file: src });
+        if (!words?.length) throw new Error('no speech found in the video');
+        const project = join(dir, 'project');
+        const c = await compileCaptionVideo({ dir: project, video: src, words, style, hook, brandDir: brandDir ? assertInHome(brandDir, 'brandDir') : undefined });
+        const p = presetForSize(c.width, c.height, 'video');
+        const out = await finishProject({ project, dir, name, quality: 'final', fps: 30, preset: p?.id, posterAt: Math.min(1.5, c.duration / 2), progress: (f, m) => ctx.progress(0.2 + f * 0.8, m) });
+        await callService('media', 'captions', { words, out: join(dir, `${name}.srt`) });
+        return { ...out, duration: c.duration, words: words.length };
       },
     },
   });

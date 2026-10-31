@@ -196,17 +196,17 @@ export function CampaignView({ id }: { id: string }) {
           {step.status === 'blocked' && <div className="banner info">This starts once the research & brief step succeeds.</div>}
           {step.pendingNote && step.status === 'queued' && <div className="banner info">Revision queued: “{step.pendingNote}”</div>}
 
-          {pack?.spec && step.outputs.length > 0 && (
+          {(pack?.spec || step.outputs.some((o) => o.endsWith('qa.json'))) && step.outputs.length > 0 && (
             <div className="tabs" role="tablist">
               <button role="tab" aria-selected={tab === 'result'} onClick={() => setTab('result')}>Result</button>
-              <button role="tab" aria-selected={tab === 'edit'} onClick={() => setTab('edit')}>Edit {pack.spec === 'deck' ? 'slides' : pack.spec === 'graphics' ? 'graphics' : 'scenes'}</button>
+              {pack?.spec && <button role="tab" aria-selected={tab === 'edit'} onClick={() => setTab('edit')}>Edit {pack.spec === 'deck' ? 'slides' : pack.spec === 'graphics' ? 'graphics' : 'scenes'}</button>}
               {step.outputs.some((o) => o.endsWith('qa.json')) && <button role="tab" aria-selected={tab === 'quality'} onClick={() => setTab('quality')}>Quality checks</button>}
             </div>
           )}
 
           {pack?.spec && tab === 'edit' && step.outputs.length > 0 ? (
             <SpecEditor campaign={campaign} step={step} kind={pack.spec} images={images} onSaved={(c) => { setCampaign(c); setTab('result'); }} />
-          ) : pack?.spec && tab === 'quality' ? (
+          ) : tab === 'quality' ? (
             <QualityReport campaign={campaign} step={step} />
           ) : (
             <OutputViewer campaign={campaign} step={step} events={events} />

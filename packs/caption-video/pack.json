@@ -1,0 +1,18 @@
+{
+  "id": "caption-video",
+  "name": "Captions",
+  "tagline": "Upload a talking-head clip: word-timed captions in 6 styles, an optional hook title, mastered audio. No Claude turn — done in minutes.",
+  "category": "video",
+  "order": 5,
+  "estimate": "1–4 min",
+  "accent": "#f97316",
+  "pipeline": "captions",
+  "options": [
+    { "key": "style", "label": "Style", "type": "select", "choices": ["bold", "pop", "karaoke", "boxed", "clean", "typewriter"], "default": "bold" },
+    { "key": "hook", "label": "Hook title", "type": "text", "default": "", "placeholder": "Optional — shows for the first 3 seconds" },
+    { "key": "video", "label": "Upload", "type": "text", "default": "", "placeholder": "Blank = your newest uploaded video" }
+  ],
+  "outputs": ["captioned.mp4", "captioned.jpg", "captioned.sheet.jpg", "captioned.srt", "qa.json"],
+  "skills": [],
+  "tools": ["ffmpeg", "chrome", "whisper-cli"]
+}

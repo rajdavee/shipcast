@@ -157,9 +157,9 @@ export function NewCampaign({ status }: { status: Status | null }) {
         </div>
         {packs.error && <p className="error-text">{packs.error}</p>}
         {[
-          { label: 'Studio · rendered, quality-checked, editable', test: (p: Pack) => !!p.spec },
-          { label: 'Copy', test: (p: Pack) => !p.spec && p.category === 'copy' },
-          { label: 'Freeform · made directly by Claude with HyperFrames or brag — for custom ideas', test: (p: Pack) => !p.spec && p.category !== 'copy' },
+          { label: 'Studio · rendered, quality-checked, editable', test: (p: Pack) => !!p.spec || !!p.pipeline },
+          { label: 'Copy', test: (p: Pack) => !p.spec && !p.pipeline && p.category === 'copy' },
+          { label: 'Freeform · made directly by Claude with HyperFrames or brag — for custom ideas', test: (p: Pack) => !p.spec && !p.pipeline && p.category !== 'copy' },
         ].map((group) => {
           const items = all.filter(group.test);
           if (!items.length) return null;
@@ -187,7 +187,7 @@ export function NewCampaign({ status }: { status: Status | null }) {
                       <span className="tile-line">{p.tagline}</span>
                       <span className="tile-meta">
                         <span className="tnum">{p.estimate}</span>
-                        {p.spec ? <span className="chip-mini">Editable</span> : p.skills.some((s) => !s.installed) ? <span>needs install</span> : null}
+                        {p.pipeline ? <span className="chip-mini">No Claude turn</span> : p.spec ? <span className="chip-mini">Editable</span> : p.skills.some((s) => !s.installed) ? <span>needs install</span> : null}
                       </span>
                     </button>
                   );

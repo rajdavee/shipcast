@@ -1,7 +1,7 @@
 {
   "id": "captions",
-  "name": "Talking-Head Captions",
-  "tagline": "Upload a talking-head clip \u2014 get styled, word-timed captions burned in, plus SRT. Transcribed locally.",
+  "name": "Captions \u00b7 freeform",
+  "tagline": "Agent-made captions with HyperFrames effects, including captions that sit behind the speaker.",
   "category": "video",
   "order": 27,
   "estimate": "10\u201320 min",

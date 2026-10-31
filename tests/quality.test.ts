@@ -66,3 +66,10 @@ test('copy check catches clichés and platform limits', async () => {
   assert.ok(problems.some((p) => p.includes('280')));
   assert.deepEqual(checkCopy({ linkedin: [{ label: 'ok', text: 'Short, specific hook.\n\nBody.' }] }), []);
 });
+
+test('preset lookup never crosses kinds', async () => {
+  const { presetForSize } = await import('@shipcast/engine');
+  assert.equal(presetForSize(1280, 720, 'video'), undefined);
+  assert.equal(presetForSize(1280, 720, 'image')?.id, 'youtube-thumbnail');
+  assert.equal(presetForSize(1080, 1920, 'video')?.id, 'vertical');
+});

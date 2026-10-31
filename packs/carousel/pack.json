@@ -1,19 +1,69 @@
 {
   "id": "carousel",
   "name": "LinkedIn Carousel",
-  "tagline": "6–10 editorial slides with a hook cover and CTA — PNGs, an upload-ready PDF and the post caption. Edit any slide afterwards.",
+  "tagline": "6\u201310 editorial slides with a hook cover and CTA \u2014 PNGs, an upload-ready PDF and the post caption. Edit any slide afterwards.",
   "category": "design",
-  "order": 5,
-  "estimate": "2–4 min",
+  "order": 6,
+  "estimate": "2\u20134 min",
   "accent": "#0a66c2",
   "spec": "deck",
   "options": [
-    { "key": "angle", "label": "Angle", "type": "select", "choices": ["problem-solution", "how-it-works", "listicle", "before-after", "myth-buster", "launch"], "default": "problem-solution" },
-    { "key": "slides", "label": "Slides", "type": "number", "default": "8", "min": 5, "max": 12 },
-    { "key": "theme", "label": "Theme", "type": "select", "choices": ["auto", "editorial", "swiss", "bold", "midnight"], "default": "auto" },
-    { "key": "platform", "label": "Size", "type": "select", "choices": ["linkedin-carousel", "instagram-carousel", "1080x1080"], "default": "linkedin-carousel" }
+    {
+      "key": "angle",
+      "label": "Angle",
+      "type": "select",
+      "choices": [
+        "problem-solution",
+        "how-it-works",
+        "listicle",
+        "before-after",
+        "myth-buster",
+        "launch"
+      ],
+      "default": "problem-solution"
+    },
+    {
+      "key": "slides",
+      "label": "Slides",
+      "type": "number",
+      "default": "8",
+      "min": 5,
+      "max": 12
+    },
+    {
+      "key": "theme",
+      "label": "Theme",
+      "type": "select",
+      "choices": [
+        "auto",
+        "editorial",
+        "swiss",
+        "bold",
+        "midnight"
+      ],
+      "default": "auto"
+    },
+    {
+      "key": "platform",
+      "label": "Size",
+      "type": "select",
+      "choices": [
+        "linkedin-carousel",
+        "instagram-carousel",
+        "1080x1080"
+      ],
+      "default": "linkedin-carousel"
+    }
   ],
-  "outputs": ["slides/*.png", "carousel.pdf", "caption.md", "deck.json", "*.md"],
+  "outputs": [
+    "slides/*.png",
+    "carousel.pdf",
+    "caption.md",
+    "deck.json",
+    "*.md"
+  ],
   "skills": [],
-  "tools": ["chrome"]
+  "tools": [
+    "chrome"
+  ]
 }

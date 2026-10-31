@@ -75,7 +75,8 @@ export function getPreset(id: string): PlatformPreset | undefined {
 /** Find the preset whose canvas matches a size, preferring the given kind. */
 export function presetForSize(width: number, height: number, kind?: PlatformPreset['kind']): PlatformPreset | undefined {
   const same = PRESETS.filter((p) => p.width === width && p.height === height);
-  return same.find((p) => !kind || p.kind === kind) ?? same[0];
+  // Never match across kinds: a 1280×720 video is not a YouTube thumbnail.
+  return kind ? same.find((p) => p.kind === kind) : same[0];
 }
 
 /** Caption readability limits used by the QA service and caption styles. */

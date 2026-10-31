@@ -64,7 +64,7 @@ ${S} .cue{position:absolute;left:${Math.max(safe.left, 60 * u)}px;right:${Math.m
 ${S} .cw{display:inline-block}
 ${
   {
-    karaoke: `${S} .cw{text-shadow:0 3px 12px rgba(0,0,0,.6);opacity:.55}${S} .cw.on{opacity:1;color:${accent}}`,
+    karaoke: `${S} .cue{display:flex;justify-content:center}${S} .cue>span.plate{background:rgba(8,9,12,.66);border-radius:${Math.round(16 * u)}px;padding:${Math.round(10 * u)}px ${Math.round(22 * u)}px}${S} .cw{color:rgba(255,255,255,.72)}${S} .cw.on{color:${accent}}`,
     pop: `${S} .cw{text-shadow:0 4px 14px rgba(0,0,0,.65);-webkit-text-stroke:${Math.max(2, Math.round(3 * u))}px #000;paint-order:stroke fill}`,
     bold: `${S} .cw{-webkit-text-stroke:${Math.max(3, Math.round(8 * u))}px #000;paint-order:stroke fill;text-shadow:0 ${Math.round(8 * u)}px 0 rgba(0,0,0,.5)}${S} .cw.on{color:${accent}}`,
     // Clean captions sit on a soft dark plate so they read over light scenes too.
@@ -76,7 +76,7 @@ ${
 }`;
   // Boxed wraps words in a single box span; typewriter splits into characters.
   let html = markup;
-  if (style === 'clean') html = markup.replace(/<div class="cue" data-i="(\d+)">/g, '<div class="cue" data-i="$1"><span class="plate">').replace(/<\/div>/g, '</span></div>');
+  if (style === 'clean' || style === 'karaoke') html = markup.replace(/<div class="cue" data-i="(\d+)">/g, '<div class="cue" data-i="$1"><span class="plate">').replace(/<\/div>/g, '</span></div>');
   if (style === 'boxed') html = markup.replace(/<div class="cue" data-i="(\d+)">/g, '<div class="cue" data-i="$1"><span class="box">').replace(/<\/div>/g, '</span></div>');
   if (style === 'typewriter') html = markup.replace(/<span class="cw" data-j="(\d+)">([^<]*)<\/span>/g, (_, j, t) => `<span class="cw" data-j="${j}">${[...t].map((ch: string) => `<span class="ch">${ch}</span>`).join('')}</span>`);
 

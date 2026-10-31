@@ -49,6 +49,7 @@ const router = new Router();
 const packView = (p: Pack) => ({
   id: p.id,
   spec: p.spec ?? null,
+  pipeline: p.pipeline ?? null,
   order: p.order ?? 99,
   name: p.name,
   tagline: p.tagline,

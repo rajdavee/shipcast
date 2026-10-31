@@ -3,15 +3,39 @@
   "name": "Thumbnails & Cards",
   "tagline": "Three YouTube thumbnails to A/B test, link-preview and GitHub cards, X/LinkedIn images, stories and banners.",
   "category": "design",
-  "order": 6,
-  "estimate": "2–4 min",
+  "order": 7,
+  "estimate": "2\u20134 min",
   "accent": "#e11d48",
   "spec": "graphics",
   "options": [
-    { "key": "set", "label": "Set", "type": "select", "choices": ["all", "youtube", "social", "github"], "default": "all" },
-    { "key": "headline", "label": "Headline", "type": "text", "default": "", "placeholder": "Blank = pick from the brief's hooks" }
+    {
+      "key": "set",
+      "label": "Set",
+      "type": "select",
+      "choices": [
+        "all",
+        "youtube",
+        "social",
+        "github"
+      ],
+      "default": "all"
+    },
+    {
+      "key": "headline",
+      "label": "Headline",
+      "type": "text",
+      "default": "",
+      "placeholder": "Blank = pick from the brief's hooks"
+    }
   ],
-  "outputs": ["*.png", "*.jpg", "graphics.json", "*.md"],
+  "outputs": [
+    "*.png",
+    "*.jpg",
+    "graphics.json",
+    "*.md"
+  ],
   "skills": [],
-  "tools": ["chrome"]
+  "tools": [
+    "chrome"
+  ]
 }

@@ -1,6 +1,7 @@
 import { mkdir, writeFile, rm } from 'node:fs/promises';
 import { catalogMarkdown, checkCopy, renderSpec, SPEC_FILE } from './specs.ts';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir, stat } from 'node:fs/promises';
+import { callService } from './service.ts';
 import { existsSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { join } from 'node:path';
@@ -280,7 +281,27 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
     let ok = true;
     let why = '';
     let resultText = '';
-    if (!renderOnly) {
+    if (pack?.pipeline === 'captions') {
+      // No Claude: transcribe the upload, style the captions, render, master, check.
+      const uploads = join(dir, 'uploads');
+      const wanted = String(step.options.video ?? '').trim();
+      const vids = (await readdir(uploads).catch(() => [] as string[])).filter((f) => /\.(mp4|mov|m4v|webm|mkv)$/i.test(f));
+      const pick = wanted ? vids.find((f) => f === wanted) : (await Promise.all(vids.map(async (f) => ({ f, t: (await stat(join(uploads, f))).mtimeMs })))).sort((a, b) => b.t - a.t)[0]?.f;
+      if (!pick) {
+        ok = false;
+        why = wanted ? `No upload named "${wanted}". Upload the video first (Upload media), then try again.` : 'Upload a video first (Upload media), then try again.';
+      } else {
+        await log({ step: step.id, type: 'log', text: `Captioning ${pick}…` });
+        try {
+          const r = await callService('render', 'captions', { video: join(uploads, pick), outDir: join(cwd, 'out'), brandDir: join(dir, 'brief'), style: step.options.style || 'bold', hook: step.options.hook || undefined });
+          await writeFile(join(cwd, 'out', 'qa.json'), JSON.stringify(r.qa, null, 2));
+          await log({ step: step.id, type: 'log', text: `Rendered: ${r.duration.toFixed(1)}s, ${r.words} words, QA ${r.qa?.pass ? 'passed' : 'flagged issues'}` });
+        } catch (e) {
+          ok = false;
+          why = (e as Error).message;
+        }
+      }
+    } else if (!renderOnly) {
       const res = await execClaude(prompt, resume);
       ok = !!res.result?.ok;
       resultText = res.result?.text ?? '';
