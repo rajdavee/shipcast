@@ -75,7 +75,8 @@
     "video.srt",
     "storyboard.json",
     "qa.json",
-    "*.md"
+    "*.md",
+    "credits.txt"
   ],
   "skills": [],
   "tools": [

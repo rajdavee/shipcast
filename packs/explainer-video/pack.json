@@ -59,7 +59,8 @@
     "video.sheet.jpg",
     "storyboard.json",
     "*.md",
-    "qa.json"
+    "qa.json",
+    "credits.txt"
   ],
   "skills": [],
   "tools": [

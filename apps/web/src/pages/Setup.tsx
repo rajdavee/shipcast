@@ -106,6 +106,8 @@ export function Setup({ status, onChange }: { status: Status | null; onChange: (
 
       <VoiceSection />
 
+      <BrollSection />
+
       <section className="setup-section">
         <h2>On this computer</h2>
         <p>Everything renders locally — nothing is uploaded anywhere.</p>
@@ -266,6 +268,36 @@ function VoiceSection() {
               </label>
               {current?.preview && <audio controls src={current.preview} style={{ height: 36 }} />}
             </div>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/** Optional stock footage for B-roll scenes, with the user's own free Pexels key. */
+function BrollSection() {
+  const b = useLoad(() => api.broll());
+  const [key, setKey] = useState('');
+  const [busy, setBusy] = useState(false);
+  return (
+    <section className="setup-section">
+      <h2>Stock footage</h2>
+      <p>Long videos and stories can use real B-roll. Add a free Pexels API key (pexels.com/api) — clips download to this computer, and credits are written next to each video.</p>
+      <div className="rows">
+        <div className="srow">
+          <i className={`dot ${b.data?.connected ? 'ok' : ''}`} />
+          <div>
+            <h3>Pexels</h3>
+            <p>{b.data?.connected ? 'Connected — B-roll scenes use real footage.' : 'Not connected — B-roll scenes become cinematic shots instead.'}</p>
+          </div>
+          {b.data?.connected ? (
+            <button className="btn ghost" onClick={async () => { await api.disconnectBroll(); await b.reload(); toast('Pexels disconnected'); }}>Disconnect</button>
+          ) : (
+            <form className="row-actions" onSubmit={async (e) => { e.preventDefault(); if (!key.trim()) return; setBusy(true); try { await api.saveBroll(key.trim()); await b.reload(); setKey(''); toast('Pexels connected'); } catch (err) { toast(String((err as Error).message)); } finally { setBusy(false); } }}>
+              <input className="input" type="password" autoComplete="off" placeholder="Pexels API key" value={key} onChange={(e) => setKey(e.target.value)} style={{ width: 220 }} aria-label="Pexels API key" />
+              <button className="btn primary" disabled={busy || !key.trim()}>{busy ? 'Checking…' : 'Connect'}</button>
+            </form>
           )}
         </div>
       </div>

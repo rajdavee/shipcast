@@ -81,7 +81,8 @@
     "qa.json",
     "title.txt",
     "description.md",
-    "*.md"
+    "*.md",
+    "credits.txt"
   ],
   "skills": [],
   "tools": [

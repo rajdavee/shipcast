@@ -2,7 +2,7 @@ import { copyFile, mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
-import { assertInHome, callService, contactSheet, createService, home, PRESETS, presetForSize, run, SERVICE_PORTS, engineEnv, getSecret, readSettings } from '@shipcast/engine';
+import { assertInHome, callService, contactSheet, createService, home, PRESETS, presetForSize, run, SERVICE_PORTS, engineEnv, findBroll, getSecret, readSettings } from '@shipcast/engine';
 import { SCENES } from './scenes.ts';
 import { CAPTION_STYLES } from './captions.ts';
 import { compileStoryboard, validateStoryboard, type Storyboard } from './compile.ts';
@@ -33,6 +33,7 @@ async function cachedVoice(text: string, voice: string, speed: number, out: stri
 
 const deps = {
   voice: cachedVoice,
+  broll: (query: string, seconds: number, orientation: 'landscape' | 'portrait' | 'square') => findBroll(query, seconds, orientation),
   music: (mood: string, seconds: number, sfx: unknown[], out: string) => callService('media', 'music', { mood, seconds, sfx, out }),
   mix: (voice: string | null, music: string | null, out: string, seconds: number, gainDb?: number) => callService('media', 'mix', { voice, music, out, seconds, ...(gainDb !== undefined ? { musicGainDb: gainDb } : {}) }),
 };
@@ -148,6 +149,7 @@ async function renderChapters(story: Storyboard, dir: string, brandDir: string |
   const chapters = story.chapters!;
   const parts: { video: string; audio: string; duration: number; title: string; start: number }[] = [];
   const words: { text: string; start: number; end: number }[] = [];
+  const credits: string[] = [];
   let t = 0;
   let preset: { id: string; fps?: number } | undefined;
   for (const [i, ch] of chapters.entries()) {
@@ -163,7 +165,7 @@ async function renderChapters(story: Storyboard, dir: string, brandDir: string |
     const video = join(cdir, 'video.mp4');
     const audio = join(cdir, 'audio.wav');
     const meta = join(cdir, 'chapter.json');
-    let m: { hash: string; duration: number; words: typeof words; preset: { id: string; fps?: number } } | null = null;
+    let m: { hash: string; duration: number; words: typeof words; preset: { id: string; fps?: number }; credits?: string[] } | null = null;
     try {
       m = JSON.parse(await readFile(meta, 'utf8'));
     } catch {}
@@ -182,10 +184,11 @@ async function renderChapters(story: Storyboard, dir: string, brandDir: string |
       if (hasAudio) await run('ffmpeg', ['-y', '-v', 'error', '-i', raw, '-vn', '-ac', '2', '-ar', '48000', '-t', String(compiled.duration), audio]);
       else await run('ffmpeg', ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo', '-t', String(compiled.duration), audio]);
       await run('rm', ['-f', raw]);
-      m = { hash, duration: compiled.duration, words: compiled.words, preset: { id: compiled.preset.id, fps: compiled.preset.fps } };
+      m = { hash, duration: compiled.duration, words: compiled.words, preset: { id: compiled.preset.id, fps: compiled.preset.fps }, credits: compiled.credits };
       await writeFile(meta, JSON.stringify(m));
     } else progress(0.02 + 0.8 * span(1), `chapter ${i + 1}: unchanged, reused`);
     preset = m.preset;
+    credits.push(...(m.credits ?? []));
     parts.push({ video, audio, duration: m.duration, title: ch.title, start: t });
     for (const w of m.words) words.push({ text: w.text, start: +(w.start + t).toFixed(3), end: +(w.end + t).toFixed(3) });
     t += m.duration;
@@ -223,6 +226,7 @@ async function renderChapters(story: Storyboard, dir: string, brandDir: string |
   // YouTube needs the first chapter at 0:00, at least three, each ≥ 10 s.
   const stamps = parts.map((p, i) => `${ts(i ? p.start : 0)} ${p.title}`).join('\n');
   await writeFile(join(dir, 'chapters.txt'), stamps + '\n');
+  if (credits.length) await writeFile(join(dir, 'credits.txt'), `Stock footage\n${[...new Set(credits)].map((c) => `- ${c}`).join('\n')}\n`);
   if (words.length) await callService('media', 'captions', { words, out: join(dir, `${name}.srt`), maxWords: 7, maxChars: 42 });
   progress(0.95, 'quality checks');
   const qa = await callService('qa', 'video', { file: final, preset: preset?.id }).catch((e: Error) => ({ pass: false, issues: [{ rule: 'qa.unavailable', severity: 'warn', message: e.message }], facts: {} }));
@@ -269,6 +273,7 @@ export function createRenderService() {
         const firstScene = compiled.scenes[0];
         const posterAt = firstScene ? firstScene.start + Math.min(firstScene.duration * 0.8, firstScene.duration - 0.1) : 1;
         const out = await finishProject({ project, dir, name, quality, fps: compiled.preset.fps ?? 30, preset: compiled.preset.id, posterAt, progress: ctx.progress });
+        if (compiled.credits.length) await writeFile(join(dir, 'credits.txt'), `Stock footage\n${compiled.credits.map((c) => `- ${c}`).join('\n')}\n`);
         return { ...out, duration: compiled.duration, scenes: compiled.scenes };
       },
 

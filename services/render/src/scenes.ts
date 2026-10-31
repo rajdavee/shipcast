@@ -655,6 +655,31 @@ for(let s=1;s<n;s++){const t=.4+s*${slot.toFixed(2)};
     },
   },
   {
+    id: 'broll',
+    label: 'Stock B-roll',
+    use: 'Real stock footage behind one line, for long videos and stories (a city at night, hands typing, a crowded inbox). Give a concrete visual search `query`. Needs a Pexels key in Setup; otherwise it becomes a cinematic shot automatically. Use sparingly: max ~1 in 4 scenes.',
+    minSeconds: 3,
+    fields: [
+      { id: 'query', type: 'text', label: 'Footage search', max: 60, help: 'Concrete and visual: "developer typing at night", "busy train station"' },
+      { id: 'line', type: 'text', label: 'On-screen line', optional: true, max: 90 },
+      { id: 'kicker', type: 'text', label: 'Kicker', optional: true, max: 40 },
+    ],
+    build: (f, c) => {
+      const { u, vertical, pad, S } = frame(c);
+      const size = fit(f.line, u, vertical ? [[40, 80], [70, 68], [90, 60]] : [[40, 84], [70, 72], [90, 64]], 56);
+      return {
+        markup: `<i class="scrim"></i>${f.line ? `<div class="txt" style="left:${pad.l}px;right:${pad.r}px;bottom:${pad.b + Math.round(20 * u)}px">${f.kicker ? `<span class="k">${esc(f.kicker)}</span>` : ''}<p style="font-size:${size}px">${words(f.line)}</p></div>` : ''}`,
+        css: `${S}{position:absolute;left:0;top:0;width:${c.width}px;height:${c.height}px;overflow:hidden;color:#fff;font-family:var(--font-body)}
+${S} .scrim{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.25) 0%,transparent 30%,transparent 50%,rgba(0,0,0,.72) 100%)}
+${S} .txt{position:absolute;text-align:${vertical ? 'center' : 'left'}}
+${S} .txt .k{display:block;font:700 ${Math.round(26 * u)}px/1 var(--font-body);letter-spacing:.14em;text-transform:uppercase;opacity:.8;margin-bottom:${Math.round(16 * u)}px}
+${S} .txt p{margin:0;font-family:var(--font-display);font-weight:750;letter-spacing:-.02em;line-height:1.12;max-width:22ch;${vertical ? 'margin:0 auto;' : ''}text-shadow:0 2px 30px rgba(0,0,0,.65)}
+${S} .w-m{display:inline-block;overflow:hidden;vertical-align:top}${S} .w{display:inline-block}`,
+        js: wordIn(S, '.txt p', 0.35) + has(`${S} .k`, `tl.fromTo("${S} .k",{opacity:0},{opacity:.8,duration:.6},.2);`),
+      };
+    },
+  },
+  {
     id: 'cinema',
     label: 'Cinematic shot',
     use: 'Short-film moment: letterboxed frame, slow camera drift over a real image (or a moody gradient), film grain, one narrative line fading in. For stories, origin tales, "imagine…" openings. Line ≤ 90 chars.',

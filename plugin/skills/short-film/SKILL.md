@@ -28,6 +28,7 @@ apply. This skill is about **story**, not features.
 - **Mostly `cinema` scenes** (60–70 %), each held 3–6 s; use the brief's real
   screenshots as `image` where they fit, otherwise leave `image` empty for
   the moody gradient. Mix in 1–2 `statement` or `kinetic` beats for rhythm.
+- **Real footage**: `broll` scenes with a concrete visual `query` ("rain on a window at night", "hands on a laptop keyboard") make the film feel shot, not designed. They fall back to `cinema` shots without a Pexels key.
 - **Music**: `{ "mood": "cinematic" }`. Transitions: mostly `fade`, one `cut`
   at the turn.
 - **Never invent** testimonials, numbers or people presented as real. A

@@ -48,6 +48,8 @@ export interface CompileDeps {
   voice: (text: string, voice: string, speed: number, out: string) => Promise<{ file: string; duration: number; words: Word[] }>;
   /** media.music — procedural bed with SFX. */
   music: (mood: Mood, seconds: number, sfx: { kind: string; at: number; gain?: number }[], out: string) => Promise<{ file: string; bpm: number }>;
+  /** Optional stock footage for `broll` scenes (null = none available → cinematic fallback). */
+  broll?: (query: string, seconds: number, orientation: 'landscape' | 'portrait' | 'square') => Promise<{ file: string; credit: string; url: string } | null>;
   /** media.mix — voice over music, mastered. */
   mix: (voice: string | null, music: string | null, out: string, seconds: number, gainDb?: number) => Promise<{ file: string }>;
 }
@@ -60,6 +62,8 @@ export interface Compiled {
   captions?: string;
   words: Word[];
   preset: PlatformPreset;
+  /** Attribution lines for stock footage used (Pexels asks for credit). */
+  credits: string[];
 }
 
 const VO_LEAD = 0.3;
@@ -248,6 +252,21 @@ export async function compileStoryboard(story: Storyboard, opts: { dir: string; 
   // Logos for scenes that show real tools (same resolver and cache as the infographics).
   const iconNames = timeline.flatMap((e) => (e.sc.scene === 'logos' ? String(Array.isArray(e.sc.fields?.items) ? (e.sc.fields!.items as string[]).join('\n') : (e.sc.fields?.items ?? '')).split('\n').map((x) => x.trim()).filter(Boolean) : []));
   const icons = iconNames.length ? await resolveIcons(iconNames) : {};
+  // Stock B-roll plays underneath its scene as a timed clip; without footage the scene becomes a cinematic shot.
+  const clips: string[] = [];
+  const credits: string[] = [];
+  for (const e of timeline) {
+    if (e.sc.scene !== 'broll') continue;
+    const f = (e.sc.fields ?? {}) as Record<string, string>;
+    const clip = opts.deps.broll ? await opts.deps.broll(String(f.query ?? f.line ?? ''), e.duration, vertical ? 'portrait' : width === height ? 'square' : 'landscape').catch(() => null) : null;
+    if (!clip) {
+      e.sc = { ...e.sc, scene: 'cinema', fields: { line: f.line ?? f.query ?? '', kicker: f.kicker } };
+      continue;
+    }
+    const rel = asset(clip.file);
+    clips.push(`<video id="clip-${e.id}" src="${rel}" muted playsinline data-has-audio="false" data-volume="0" data-start="${e.start}" data-duration="${e.duration}" data-track-index="0" style="position:absolute;left:0;top:0;width:${width}px;height:${height}px;object-fit:cover"></video>`);
+    credits.push(`${clip.credit} — ${clip.url}`);
+  }
   for (const e of timeline) {
     const sctx: SceneCtx = { id: e.id, width, height, duration: e.duration, safe: preset.safe, brand: fallbackBrand, assetsDir: opts.brandDir, asset, icons, captionBand: e.sc.scene === 'product' || e.sc.scene === 'scroll' ? 0 : captionBand };
     if (e.sc.scene) {
@@ -323,6 +342,7 @@ html,body{margin:0;background:#000}
 </style></head>
 <body>
 <div id="main" data-composition-id="main" data-start="0" data-width="${width}" data-height="${height}" data-duration="${total}">
+${clips.join('\n')}
 ${hosts.join('\n')}
 ${tx.join('\n')}
 ${audioRel ? `<audio id="soundtrack" src="${audioRel}" data-start="0" data-duration="${total}" data-track-index="9" data-volume="1"></audio>` : ''}
@@ -345,6 +365,7 @@ window.__timelines["main"]=tl;})();</script>
     captions: captionsFile,
     words,
     preset,
+    credits,
   };
 }
 

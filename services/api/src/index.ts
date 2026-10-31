@@ -41,6 +41,7 @@ import {
   type Source,
   type Step,
   elevenVoices,
+  pexelsCheck,
   getSecret,
   setSecret,
 } from '@shipcast/engine';
@@ -234,6 +235,25 @@ router.delete('/api/voice/elevenlabs', async () => {
   voiceList = null;
   await writeSettings({ voiceProvider: 'kokoro' });
   return { provider: 'kokoro', connected: false };
+});
+
+// ── stock B-roll (optional: your own free Pexels key) ─────────────────
+router.get('/api/broll', async () => ({ connected: !!(await getSecret('pexels')) }));
+router.put('/api/broll', async (req) => {
+  const b = await readJson(req);
+  const key = typeof b.apiKey === 'string' ? b.apiKey.trim() : '';
+  if (!key) throw new HttpError(400, 'apiKey is required');
+  try {
+    await pexelsCheck(key);
+  } catch (e) {
+    throw new HttpError(400, (e as Error).message);
+  }
+  await setSecret('pexels', key);
+  return { connected: true };
+});
+router.delete('/api/broll', async () => {
+  await setSecret('pexels', null);
+  return { connected: false };
 });
 
 // ── campaigns ──────────────────────────────────────────────────────────
