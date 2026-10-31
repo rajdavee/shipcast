@@ -53,11 +53,22 @@
         "1080x1080"
       ],
       "default": "linkedin-carousel"
+    },
+    {
+      "key": "motion",
+      "label": "Animated MP4",
+      "type": "select",
+      "choices": [
+        "yes",
+        "no"
+      ],
+      "default": "yes"
     }
   ],
   "outputs": [
     "slides/*.png",
     "carousel.pdf",
+    "carousel.mp4",
     "caption.md",
     "deck.json",
     "*.md"

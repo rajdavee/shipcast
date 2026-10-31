@@ -2,6 +2,8 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { callService } from './service.ts';
+import { run } from './exec.ts';
+import { PLUGIN_DIR } from './paths.ts';
 
 /**
  * Spec formats: Claude writes a JSON spec, a capability service renders it.
@@ -45,6 +47,7 @@ export async function catalogMarkdown(kind: SpecKind): Promise<string> {
       '',
       `Themes: ${Object.entries(c.carousel.themes).map(([k, v]) => `\`${k}\` — ${v}`).join('; ')}`,
       'Presets: `linkedin-carousel` (1080×1350, default), `instagram-carousel` (1080×1350), `1080x1080`',
+      'Motion: add `"motion": "chill"` (or any music mood) to also get carousel.mp4 — slides with push-ins, transitions and an original bed, for Reels / LinkedIn video.',
       'Rich text in any text field: `*word*` accent · `**word**` bold · `==word==` highlight.',
       '',
       '## Layouts',
@@ -86,6 +89,20 @@ export async function renderSpec(kind: SpecKind, cwd: string, briefDir: string, 
   try {
     if (kind === 'deck') {
       const r = await callService('stills', 'deck', { ...spec, handle: spec.handle ?? opts.handle, brandDir: briefDir, outDir: out });
+      // Motion version: slides → MP4 with push-ins and slide transitions over an original bed.
+      if (spec.motion) {
+        const slides = r.slides.map((x: any) => x.file);
+        const hold = 2.6;
+        const seconds = slides.length * hold + 0.35;
+        const bed = await callService('media', 'music', { mood: spec.motion === true ? 'chill' : String(spec.motion), seconds, out: join(out, 'work-bed.wav'), sfx: slides.slice(1).map((_: string, i: number) => ({ kind: 'whoosh', at: (i + 1) * hold, gain: 0.25 })) });
+        const silent = join(out, 'carousel.silent.mp4');
+        const mv = await run('node', [join(PLUGIN_DIR, 'scripts', 'slides-to-video.mjs'), '--out', silent, '--size', `${r.width}x${r.height}`, '--hold', String(hold), '--transition', 'slideleft', ...slides], { timeoutMs: 600_000 });
+        if (mv.code === 0) {
+          const mix = await callService('media', 'mix', { music: bed.file, out: join(out, 'carousel.m4a'), seconds });
+          await run('ffmpeg', ['-y', '-v', 'error', '-i', silent, '-i', mix.file, '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'copy', '-shortest', '-movflags', '+faststart', join(out, 'carousel.mp4')]);
+        }
+        await run('rm', ['-f', silent, join(out, 'carousel.m4a'), bed.file]);
+      }
       const fb = r.slides.flatMap((s: any, i: number) => [
         ...s.audit.overflow.map((x: string) => `Slide ${i + 1}: text overflows its box (${x}). Shorten it.`),
         ...s.audit.offCanvas.map((x: string) => `Slide ${i + 1}: text runs off the canvas (${x}). Shorten it.`),

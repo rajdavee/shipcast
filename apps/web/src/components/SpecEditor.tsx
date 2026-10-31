@@ -157,6 +157,12 @@ export function SpecEditor({ campaign, step, kind, images, onSaved }: Props) {
                 {Object.entries(catalog.carousel.themes).map(([k, v]) => <option key={k} value={k}>{String(v).split(' — ')[0]}</option>)}
               </select>
             </label>
+            <label className="field"><span>Animated MP4</span>
+              <select className="select" value={spec.motion ? String(spec.motion) : ''} onChange={(e) => update((d) => (d.motion = e.target.value || undefined))}>
+                <option value="">Off — slides and PDF only</option>
+                {['chill', 'uplifting', 'tech', 'energetic', 'cinematic', 'playful'].map((m) => <option key={m} value={m}>On · {m} music</option>)}
+              </select>
+            </label>
             <label className="field"><span>Handle on every slide</span>
               <input className="input" value={spec.handle ?? ''} onChange={(e) => update((d) => (d.handle = e.target.value))} placeholder="@you" />
             </label>
