@@ -2,7 +2,7 @@ import { copyFile, mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
-import { assertInHome, callService, contactSheet, createService, home, PRESETS, presetForSize, run, SERVICE_PORTS, engineEnv } from '@shipcast/engine';
+import { assertInHome, callService, contactSheet, createService, home, PRESETS, presetForSize, run, SERVICE_PORTS, engineEnv, getSecret, readSettings } from '@shipcast/engine';
 import { SCENES } from './scenes.ts';
 import { CAPTION_STYLES } from './captions.ts';
 import { compileStoryboard, validateStoryboard, type Storyboard } from './compile.ts';
@@ -14,6 +14,9 @@ export type { Storyboard };
 
 /** Voice lines are cached by (text, voice, speed): editing visuals never re-synthesizes speech. */
 async function cachedVoice(text: string, voice: string, speed: number, out: string) {
+  // Your own ElevenLabs voice replaces Kokoro everywhere when it's switched on.
+  const s = await readSettings();
+  if (s.voiceProvider === 'elevenlabs' && s.elevenVoice && !voice.startsWith('eleven:') && (await getSecret('elevenlabs'))) voice = `eleven:${s.elevenVoice}:${s.elevenModel || 'eleven_multilingual_v2'}`;
   const key = createHash('sha256').update(JSON.stringify([text, voice, speed])).digest('hex').slice(0, 24);
   const dir = join(home(), 'cache', 'voice');
   const wav = join(dir, `${key}.wav`);

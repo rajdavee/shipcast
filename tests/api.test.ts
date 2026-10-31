@@ -161,3 +161,15 @@ test('files route refuses symlinks that point outside the campaign', async () =>
   assert.equal((await fetch(`${base}/api/campaigns/${body.id}/files/uploads/link.txt`)).status, 403);
   await waitFor(body.id, (c) => c.steps.every((s: any) => s.status === 'done'));
 });
+
+test('voice defaults to local Kokoro and never exposes a key', async () => {
+  const v = await api('/api/voice');
+  assert.equal(v.body.provider, 'kokoro');
+  assert.equal(v.body.connected, false);
+  assert.equal(JSON.stringify(v.body).includes('apiKey'), false);
+  const off = await api('/api/voice/elevenlabs', { method: 'DELETE' });
+  assert.equal(off.body.provider, 'kokoro');
+  const s = await api('/api/settings');
+  assert.equal(s.body.voiceProvider, 'kokoro');
+  assert.equal(JSON.stringify(s.body).includes('sk_'), false);
+});

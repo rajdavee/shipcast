@@ -107,6 +107,15 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
   return data as T;
 }
 
+export interface VoiceState {
+  provider: 'kokoro' | 'elevenlabs';
+  connected: boolean;
+  voice?: string;
+  model?: string;
+  voices?: { id: string; name: string; category?: string; labels?: Record<string, string>; preview?: string }[];
+  error?: string;
+}
+
 export const api = {
   status: () => call<Status>('GET', '/api/status'),
   doctor: () => call<Check[]>('GET', '/api/doctor'),
@@ -118,6 +127,9 @@ export const api = {
   packs: () => call<Pack[]>('GET', '/api/packs'),
   installPack: (id: string) => call<{ pack: Pack; results: { skill: string; ok: boolean; log: string }[] }>('POST', `/api/packs/${id}/install`),
   settings: () => call<Settings>('GET', '/api/settings'),
+  voice: () => call<VoiceState>('GET', '/api/voice'),
+  saveVoice: (b: { apiKey?: string; provider?: 'kokoro' | 'elevenlabs'; voice?: string; model?: string }) => call<VoiceState>('PUT', '/api/voice', b),
+  disconnectVoice: () => call<VoiceState>('DELETE', '/api/voice/elevenlabs'),
   saveSettings: (s: Partial<Settings>) => call<Settings>('PUT', '/api/settings', s),
   campaigns: () => call<Campaign[]>('GET', '/api/campaigns'),
   campaign: (id: string) => call<Campaign>('GET', `/api/campaigns/${id}`),

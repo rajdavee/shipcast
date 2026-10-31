@@ -12,6 +12,9 @@ export const DEFAULT_SETTINGS: Settings = {
   subagents: 'pack',
   directorReview: true,
   extraArgs: [],
+  voiceProvider: 'kokoro',
+  elevenVoice: '',
+  elevenModel: 'eleven_multilingual_v2',
 };
 
 export function newId(prefix = ''): string {

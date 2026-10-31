@@ -104,6 +104,8 @@ export function Setup({ status, onChange }: { status: Status | null; onChange: (
         </div>
       </section>
 
+      <VoiceSection />
+
       <section className="setup-section">
         <h2>On this computer</h2>
         <p>Everything renders locally — nothing is uploaded anywhere.</p>
@@ -189,5 +191,84 @@ export function Setup({ status, onChange }: { status: Status | null; onChange: (
         </section>
       )}
     </main>
+  );
+}
+
+const MODELS: [string, string][] = [
+  ['eleven_multilingual_v2', 'Multilingual v2 — best quality'],
+  ['eleven_turbo_v2_5', 'Turbo v2.5 — faster, cheaper'],
+  ['eleven_flash_v2_5', 'Flash v2.5 — fastest, cheapest'],
+];
+
+/** Voiceover engine: free local Kokoro, or the user's own ElevenLabs account. */
+function VoiceSection() {
+  const v = useLoad(() => api.voice());
+  const [key, setKey] = useState('');
+  const [busy, setBusy] = useState(false);
+  const d = v.data;
+  const save = async (b: Parameters<typeof api.saveVoice>[0], msg: string) => {
+    setBusy(true);
+    try {
+      await api.saveVoice(b);
+      await v.reload();
+      toast(msg);
+      setKey('');
+    } catch (e) {
+      toast(String((e as Error).message));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const current = d?.voices?.find((x) => x.id === d.voice);
+  return (
+    <section className="setup-section">
+      <h2>Voiceover</h2>
+      <p>Kokoro runs on this computer for free. Connect your own ElevenLabs account for more natural voices — your key stays on this computer.</p>
+      <div className="rows">
+        <div className="srow">
+          <i className={`dot ${d && (!d.connected || d.provider === 'kokoro') ? 'ok' : ''}`} />
+          <div>
+            <h3>Kokoro (free, local)</h3>
+            <p>{d?.provider === 'kokoro' || !d?.connected ? 'In use for every voiceover.' : 'Available as the fallback if ElevenLabs fails.'}</p>
+          </div>
+          {d?.connected && d.provider !== 'kokoro' && <button className="btn" disabled={busy} onClick={() => save({ provider: 'kokoro' }, 'Using Kokoro')}>Use Kokoro</button>}
+        </div>
+        <div className="srow">
+          <i className={`dot ${d?.connected && d.provider === 'elevenlabs' ? 'ok' : ''}`} />
+          <div>
+            <h3>ElevenLabs (your account)</h3>
+            <p>{d?.connected ? (d.error ? d.error : d.provider === 'elevenlabs' ? `In use · ${current?.name ?? 'pick a voice'}` : 'Connected, not in use') : 'Paste an API key from elevenlabs.io → Profile → API keys.'}</p>
+          </div>
+          {d?.connected ? (
+            <div className="row-actions">
+              {d.provider !== 'elevenlabs' && <button className="btn primary" disabled={busy} onClick={() => save({ provider: 'elevenlabs' }, 'Using ElevenLabs')}>Use it</button>}
+              <button className="btn ghost" disabled={busy} onClick={async () => { await api.disconnectVoice(); await v.reload(); toast('ElevenLabs disconnected'); }}>Disconnect</button>
+            </div>
+          ) : (
+            <form className="row-actions" onSubmit={(e) => { e.preventDefault(); if (key.trim()) save({ apiKey: key.trim() }, 'ElevenLabs connected'); }}>
+              <input className="input" type="password" autoComplete="off" placeholder="sk_…" value={key} onChange={(e) => setKey(e.target.value)} style={{ width: 220 }} aria-label="ElevenLabs API key" />
+              <button className="btn primary" disabled={busy || !key.trim()}>{busy ? 'Checking…' : 'Connect'}</button>
+            </form>
+          )}
+          {d?.connected && (d.voices?.length ?? 0) > 0 && (
+            <div className="device-code" style={{ background: 'var(--bg-2)' }}>
+              <label className="field" style={{ minWidth: 240 }}>
+                <span>Voice</span>
+                <select className="select" value={d.voice ?? ''} onChange={(e) => save({ voice: e.target.value }, 'Voice saved')}>
+                  {d.voices!.map((x) => <option key={x.id} value={x.id}>{x.name}{x.labels?.accent ? ` · ${x.labels.accent}` : ''}{x.labels?.gender ? ` · ${x.labels.gender}` : ''}</option>)}
+                </select>
+              </label>
+              <label className="field" style={{ minWidth: 240 }}>
+                <span>Model</span>
+                <select className="select" value={d.model ?? MODELS[0][0]} onChange={(e) => save({ model: e.target.value }, 'Model saved')}>
+                  {MODELS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+                </select>
+              </label>
+              {current?.preview && <audio controls src={current.preview} style={{ height: 36 }} />}
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
   );
 }

@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { assertInHome, createService, engineEnv, finishVideo, getPreset, measureLoudness, probe, run, SERVICE_PORTS, voiceReady } from '@shipcast/engine';
+import { assertInHome, createService, elevenSpeak, engineEnv, finishVideo, getPreset, measureLoudness, probe, run, SERVICE_PORTS, voiceReady } from '@shipcast/engine';
 import { alignScript, buildCues, toSrt, toVtt, type Word } from './align.ts';
 import { addSfx, makeMusic, MOODS, toWav, type Mood, type Sfx } from './synth.ts';
 
@@ -63,10 +63,30 @@ export function createMediaService() {
       /** Speak a script and return the audio plus word timings aligned to the script. */
       voice: async ({ text, voice = 'af_heart', speed = 1, out }, ctx) => {
         if (!text?.trim()) throw new Error('text is required');
-        if (!VOICES.includes(voice)) throw new Error(`voice must be one of ${VOICES.join(', ')}`);
+        const eleven = typeof voice === 'string' && voice.startsWith('eleven:');
+        if (!eleven && !VOICES.includes(voice)) throw new Error(`voice must be one of ${VOICES.join(', ')} or eleven:<voice id>`);
         const wav = out ? assertInHome(out, 'out') : join(ctx.dir, 'voice.wav');
         await mkdir(dirname(wav), { recursive: true });
         ctx.progress(0.1, 'synthesizing');
+        if (eleven) {
+          // Your own ElevenLabs voice: timings come from the provider's alignment.
+          try {
+            const [, id, model] = voice.split(':');
+            const sp = await elevenSpeak(text, id, { model, speed });
+            const pcm = wav.replace(/\.wav$/, '.pcm');
+            await writeFile(pcm, sp.pcm);
+            const conv = await run('ffmpeg', ['-y', '-v', 'error', '-f', 's16le', '-ar', '24000', '-ac', '1', '-i', pcm, wav]);
+            await run('rm', ['-f', pcm]);
+            if (conv.code !== 0) throw new Error(conv.stderr.slice(-200));
+            const words = sp.words.length ? alignScript(text, sp.words) : alignScript(text, await transcribe(wav, ctx.dir));
+            const p = await probe(wav);
+            await writeFile(wav.replace(/\.wav$/, '.words.json'), JSON.stringify(words, null, 1));
+            return { file: wav, duration: p.duration, engine: 'elevenlabs', voice, words };
+          } catch (e) {
+            ctx.progress(0.15, `ElevenLabs failed (${(e as Error).message.slice(0, 120)}); using Kokoro`);
+            voice = 'af_heart';
+          }
+        }
         let engine = 'kokoro';
         const r = await hf(['tts', text, '-v', voice, '-s', String(speed), '-o', wav, '--json']);
         if (!lastJson(r.stdout)?.ok) {

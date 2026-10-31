@@ -40,6 +40,9 @@ import {
   type Pack,
   type Source,
   type Step,
+  elevenVoices,
+  getSecret,
+  setSecret,
 } from '@shipcast/engine';
 import { HttpError, json, readJson, Router, sendFile } from './http.ts';
 import { loginState, startClaudeLogin, startGithubLogin } from './connect.ts';
@@ -184,6 +187,53 @@ router.put('/api/settings', async (req) => {
   if (typeof body.directorReview === 'boolean') patch.directorReview = body.directorReview;
   if (Number.isFinite(body.stepTimeoutMinutes)) patch.stepTimeoutMinutes = Math.min(240, Math.max(5, Number(body.stepTimeoutMinutes)));
   return writeSettings(patch);
+});
+
+// ── voice (optional: your own ElevenLabs key; Kokoro is the free default) ─
+let voiceList: { at: number; voices: unknown[] } | null = null;
+router.get('/api/voice', async () => {
+  const s = await readSettings();
+  const connected = !!(await getSecret('elevenlabs'));
+  let voices: unknown[] = [];
+  let error: string | undefined;
+  if (connected) {
+    try {
+      if (!voiceList || Date.now() - voiceList.at > 10 * 60_000) voiceList = { at: Date.now(), voices: await elevenVoices() };
+      voices = voiceList.voices;
+    } catch (e) {
+      error = (e as Error).message;
+    }
+  }
+  return { provider: connected ? s.voiceProvider : 'kokoro', connected, voice: s.elevenVoice, model: s.elevenModel, voices, error };
+});
+router.put('/api/voice', async (req) => {
+  const b = await readJson(req);
+  if (typeof b.apiKey === 'string' && b.apiKey.trim()) {
+    const key = b.apiKey.trim();
+    let voices;
+    try {
+      voices = await elevenVoices(key);
+    } catch (e) {
+      throw new HttpError(400, (e as Error).message);
+    }
+    await setSecret('elevenlabs', key);
+    voiceList = { at: Date.now(), voices };
+    const s = await readSettings();
+    await writeSettings({ voiceProvider: 'elevenlabs', elevenVoice: s.elevenVoice || voices[0]?.id || '' });
+  }
+  const patch: Record<string, unknown> = {};
+  if (b.provider === 'kokoro' || b.provider === 'elevenlabs') patch.voiceProvider = b.provider;
+  if (typeof b.voice === 'string' && /^[\w-]{0,64}$/.test(b.voice)) patch.elevenVoice = b.voice;
+  if (typeof b.model === 'string' && /^[\w.-]{1,64}$/.test(b.model)) patch.elevenModel = b.model;
+  if (Object.keys(patch).length) await writeSettings(patch);
+  const s = await readSettings();
+  return { provider: s.voiceProvider, connected: !!(await getSecret('elevenlabs')), voice: s.elevenVoice, model: s.elevenModel };
+});
+router.delete('/api/voice/elevenlabs', async () => {
+  await setSecret('elevenlabs', null);
+  voiceList = null;
+  await writeSettings({ voiceProvider: 'kokoro' });
+  return { provider: 'kokoro', connected: false };
 });
 
 // ── campaigns ──────────────────────────────────────────────────────────
