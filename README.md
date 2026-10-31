@@ -18,11 +18,11 @@
 </p>
 
 <p align="center">
-  <a href="docs/assets/shipcast-launch.mp4"><img src="docs/assets/shipcast-launch.jpg" alt="Play the Shipcast launch video" width="900" /></a><br />
-  <sub>▶ The launch video above (and the banner, and <a href="docs/assets/shipcast-promo.mp4">this narrated promo</a>) were made by Shipcast, from this repo, in one campaign.</sub>
+  <a href="docs/assets/shipcast-explainer.mp4"><img src="docs/assets/videos.jpg" alt="Shipcast's own explainer and reel" width="900" /></a><br />
+  <sub>▶ <a href="docs/assets/shipcast-explainer.mp4">Explainer (62 s)</a> · <a href="docs/assets/shipcast-reel.mp4">Reel (27 s)</a> — written, scored, voiced and quality-checked by Shipcast from this repo. Banner above too.</sub>
 </p>
 
-<p align="center"><img src="docs/assets/studio-run.png" alt="A Shipcast campaign: research brief, carousel, copy kit, thumbnails, launch video and motion graphic, with the 20-second vertical launch video playing" width="900" /></p>
+<p align="center"><img src="docs/assets/carousel.jpg" alt="An 8-slide LinkedIn carousel Shipcast made about itself" width="900" /></p>
 
 ---
 
@@ -77,7 +77,10 @@ Python environment under `~/.shipcast/voice` — nothing is added to your system
 Python — and narrated formats use it automatically. Without it, videos fall
 back to your OS voice.
 
-<p align="center"><img src="docs/assets/studio-new.png" alt="New campaign: paste a URL, pick formats" width="900" /></p>
+<p align="center">
+  <img src="docs/assets/studio-run.png" alt="Run sheet: research, then each deliverable, with the reel playing" width="440" />
+  <img src="docs/assets/studio-editor.png" alt="Scene editor: change any field, preview frames, re-render without Claude" width="440" />
+</p>
 
 ## Formats
 

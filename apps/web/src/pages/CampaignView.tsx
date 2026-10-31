@@ -27,7 +27,15 @@ function useCampaignStream(id: string) {
     const es = new EventSource(`/api/campaigns/${id}/events`);
     es.addEventListener('campaign', (e) => setCampaign(JSON.parse((e as MessageEvent).data)));
     es.addEventListener('log', (e) => setEvents((xs) => [...xs.slice(-1500), JSON.parse((e as MessageEvent).data)]));
-    es.onerror = () => api.campaign(id).catch(() => setGone(true));
+    // EventSource reconnects by itself; only a real 404 means the campaign is gone.
+    es.onerror = () => {
+      api.campaign(id).catch((e: Error) => {
+        if (/not found|404/i.test(String(e.message))) {
+          setGone(true);
+          es.close();
+        }
+      });
+    };
     return () => es.close();
   }, [id]);
   return { campaign, events, gone, setCampaign };
