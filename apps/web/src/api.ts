@@ -50,7 +50,7 @@ export type OptionField =
 
 export interface Pack {
   id: string;
-  spec: 'deck' | 'graphics' | 'storyboard' | null;
+  spec: 'deck' | 'graphics' | 'storyboard' | 'infographic' | null;
   pipeline: string | null;
   order: number;
   name: string;

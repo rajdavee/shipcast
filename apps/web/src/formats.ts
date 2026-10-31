@@ -13,7 +13,7 @@ export const GOALS = [
     id: 'social',
     title: 'Social pack',
     blurb: 'A reel, a silent feature clip, an animated carousel and posts for the week.',
-    packs: ['reel', 'feature-spotlight', 'carousel', 'copy-kit'],
+    packs: ['infographic', 'reel', 'carousel', 'copy-kit'],
     shapes: [[12, 22], [18, 22], [18, 22], [14, 20]],
   },
   {
@@ -27,6 +27,7 @@ export const GOALS = [
 
 /** Friendly one-liners shown in Customize (falls back to the pack's tagline). */
 export const PLAIN: Record<string, string> = {
+  infographic: 'A save-worthy animated framework post with real platform logos — GIF, video and post text',
   'launch-film': 'A 20–40 s film for YouTube, LinkedIn or your site',
   reel: 'Vertical 9:16 for Reels, Shorts and TikTok, with captions',
   'feature-spotlight': 'A short silent clip that loops in the feed',

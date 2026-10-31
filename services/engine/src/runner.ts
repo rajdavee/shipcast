@@ -284,7 +284,7 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
     let resultText = '';
     if (step.kind === 'brief') await phase('Researching your product');
     else if (pack?.pipeline) await phase('Transcribing and captioning');
-    else if (!renderOnly) await phase(specKind === 'storyboard' ? 'Writing the script' : specKind === 'deck' ? 'Writing the slides' : specKind === 'graphics' ? 'Designing the graphics' : pack?.id === 'copy-kit' ? 'Writing the posts' : 'Making it');
+    else if (!renderOnly) await phase(specKind === 'storyboard' ? 'Writing the script' : specKind === 'infographic' ? 'Researching the framework' : specKind === 'deck' ? 'Writing the slides' : specKind === 'graphics' ? 'Designing the graphics' : pack?.id === 'copy-kit' ? 'Writing the posts' : 'Making it');
     if (pack?.pipeline === 'captions') {
       // No Claude: transcribe the upload, style the captions, render, master, check.
       const uploads = join(dir, 'uploads');
@@ -316,8 +316,8 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
     let reviewed = false;
     if (ok && specKind && !canceled && !timedOut) {
       for (let round = 0; ; round++) {
-        await phase(round ? 'Applying fixes' : specKind === 'storyboard' ? 'Rendering the video' : 'Rendering');
-        await log({ step: step.id, type: 'log', text: round ? `Re-rendering after fixes (round ${round})…` : `Rendering ${SPEC_FILE[specKind]} with the ${specKind === 'storyboard' ? 'render' : 'stills'} service…` });
+        await phase(round ? 'Applying fixes' : specKind === 'storyboard' ? 'Rendering the video' : specKind === 'infographic' ? 'Animating the infographic' : 'Rendering');
+        await log({ step: step.id, type: 'log', text: round ? `Re-rendering after fixes (round ${round})…` : `Rendering ${SPEC_FILE[specKind]} with the ${specKind === 'storyboard' || specKind === 'infographic' ? 'render' : 'stills'} service…` });
         const force: Record<string, unknown> = {};
         if (pack?.id === 'carousel') force.motion = step.options.motion === 'no' ? null : 'chill';
         const r = await renderSpec(specKind, cwd, join(dir, 'brief'), { force });

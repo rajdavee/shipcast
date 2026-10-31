@@ -7,8 +7,9 @@ import { SCENES } from './scenes.ts';
 import { CAPTION_STYLES } from './captions.ts';
 import { compileStoryboard, validateStoryboard, type Storyboard } from './compile.ts';
 import { compileCaptionVideo } from './captionVideo.ts';
+import { compileInfographic, validateInfographic } from './infographic.ts';
 
-export { SCENES, CAPTION_STYLES, compileStoryboard, validateStoryboard };
+export { SCENES, CAPTION_STYLES, compileStoryboard, validateStoryboard, validateInfographic };
 export type { Storyboard };
 
 /** Voice lines are cached by (text, voice, speed): editing visuals never re-synthesizes speech. */
@@ -159,6 +160,26 @@ export function createRenderService() {
         const posterAt = firstScene ? firstScene.start + Math.min(firstScene.duration * 0.8, firstScene.duration - 0.1) : 1;
         const out = await finishProject({ project, dir, name, quality, fps: compiled.preset.fps ?? 30, preset: compiled.preset.id, posterAt, progress: ctx.progress });
         return { ...out, duration: compiled.duration, scenes: compiled.scenes };
+      },
+
+      validateInfographic: async ({ spec }) => ({ errors: validateInfographic(spec) }),
+
+      /** Animated framework infographic → looping MP4, GIF for LinkedIn, PNG still. */
+      infographic: async ({ spec, outDir, brandDir, name = 'infographic' }, ctx) => {
+        const dir = assertInHome(outDir, 'outDir');
+        const project = join(dir, 'project');
+        ctx.progress(0.05, 'laying out');
+        const c = await compileInfographic(spec, { dir: project, brandDir: brandDir ? assertInHome(brandDir, 'brandDir') : undefined });
+        const out = await finishProject({ project, dir, name, quality: 'final', fps: 30, preset: c.height === 1350 ? 'linkedin-video' : 'square-video', posterAt: Math.max(0.1, c.duration - 0.15), progress: (f, m) => ctx.progress(0.1 + f * 0.75, m) });
+        ctx.progress(0.9, 'making the GIF');
+        const gif = join(dir, `${name}.gif`);
+        const pal = join(dir, 'palette.png');
+        await run('ffmpeg', ['-y', '-v', 'error', '-i', out.file, '-vf', 'fps=15,scale=1080:-1:flags=lanczos,palettegen=max_colors=128:stats_mode=diff', pal]);
+        await run('ffmpeg', ['-y', '-v', 'error', '-i', out.file, '-i', pal, '-lavfi', 'fps=15,scale=1080:-1:flags=lanczos[x];[x][1:v]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle', '-loop', '0', gif]);
+        await run('rm', ['-f', pal]);
+        const png = join(dir, `${name}.png`);
+        await run('ffmpeg', ['-y', '-v', 'error', '-ss', '0.85', '-i', out.file, '-frames:v', '1', png]);
+        return { ...out, gif, png, duration: c.duration };
       },
 
       /** Your footage + word-timed captions (+ optional hook title), mastered and checked. */

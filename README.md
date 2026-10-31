@@ -38,12 +38,18 @@ Shipcast makes all of it from one URL, on your own machine.
   hooks. Every deliverable builds from it, so the set looks like one campaign.
 - **Free, local media stack.** Video renders in headless Chrome + FFmpeg,
   voiceover with Kokoro, captions with whisper.cpp. Nothing is uploaded.
+- **Save-worthy infographic posts.** The animated framework format that does well
+  on LinkedIn: stages, what people think, where they go (with real platform
+  logos), what they do. Claude researches the journey; you get a looping GIF,
+  an MP4 and the post text.
 - **Real UI, not stock filler.** Formats reuse your product's actual screens,
   components, copy and brand.
 - **Revise like you'd brief a designer.** "Make the hook punchier, slow down
   scene 3" — Shipcast resumes the same session so nothing is lost.
 - **Formats are folders.** Each deliverable type is a `pack.json` + `prompt.md`.
   Add one without touching code.
+
+<p align="center"><img src="docs/assets/infographic.gif" alt="An animated developer-journey infographic made by Shipcast" width="440" /></p>
 
 ## Quick start
 

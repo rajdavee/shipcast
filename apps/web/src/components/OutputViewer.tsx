@@ -68,7 +68,7 @@ export function OutputViewer({ campaign, step, events }: { campaign: Campaign; s
 }
 
 function MediaStage({ files, url }: { files: string[]; url: (f: string) => string }) {
-  const ordered = useMemo(() => [...files.filter(isVideo), ...files.filter(isImage).filter((f) => !/(video|captioned)\.jpg$/.test(f))], [files]);
+  const ordered = useMemo(() => [...files.filter((f) => f.endsWith('.gif')), ...files.filter(isVideo), ...files.filter(isImage).filter((f) => !f.endsWith('.gif')).filter((f) => !/(video|captioned)\.jpg$/.test(f))], [files]);
   const [cur, setCur] = useState(ordered[0]);
   const active = ordered.includes(cur) ? cur : ordered[0];
   return (

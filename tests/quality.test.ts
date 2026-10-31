@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { contrastRatio, ensureContrast, normalizeBrand, brandCss, PRESETS, getPreset, VERTICAL_SAFE } from '@shipcast/engine';
 import { makeMusic, MOODS, toWav, addSfx } from '@shipcast/media';
-import { CAPTION_STYLES, SCENES } from '@shipcast/render';
+import { CAPTION_STYLES, SCENES, validateInfographic } from '@shipcast/render';
 
 test('brand tokens always meet contrast on their ground', () => {
   for (const [primary, bg] of [['#6965db', '#121212'], ['#ffd400', '#ffffff'], ['#1a1a1a', '#0b0d12'], ['#2b3bff', '#eceff3']]) {
@@ -72,4 +72,13 @@ test('preset lookup never crosses kinds', async () => {
   assert.equal(presetForSize(1280, 720, 'video'), undefined);
   assert.equal(presetForSize(1280, 720, 'image')?.id, 'youtube-thumbnail');
   assert.equal(presetForSize(1080, 1920, 'video')?.id, 'vertical');
+});
+
+test('infographic specs are validated before rendering', () => {
+  const columns = [{ label: 'Stage', kind: 'stage' }, { label: 'Think', kind: 'note' }, { label: 'Go', kind: 'chips' }] as const;
+  const row = (s: string) => [s, '“Is there a better way?”', ['Google', 'Reddit']];
+  const ok = { title: 'Where buyers go *before they buy*', columns: [...columns], rows: [row('Aware'), row('Consider'), row('Decide')] };
+  assert.deepEqual(validateInfographic(ok as any), []);
+  assert.ok(validateInfographic({ ...ok, rows: [row('Only one')] } as any).some((e) => /rows/.test(e)));
+  assert.ok(validateInfographic({ ...ok, rows: [...ok.rows, ['Short row', 'x']] } as any).length > 0, 'cell count must match columns');
 });

@@ -100,7 +100,7 @@ export interface Pack {
   /** Pipeline formats run entirely in the services — no Claude turn. */
   pipeline?: 'captions';
   /** Spec formats: Claude writes this JSON spec and a service renders it. */
-  spec?: 'deck' | 'graphics' | 'storyboard';
+  spec?: 'deck' | 'graphics' | 'storyboard' | 'infographic';
   /** The workflow dispatches sub-agents (HyperFrames does, per frame). */
   subagents?: boolean;
   /** Sort order in the UI (lower first). */

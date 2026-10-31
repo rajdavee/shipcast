@@ -8,7 +8,7 @@ type Tab = 'preview' | 'edit' | 'checks' | 'activity';
 
 /** The one file someone most likely wants to download. */
 function mainFile(step: Step): string | undefined {
-  return step.outputs.find((o) => /(video|captioned|carousel)\.mp4$/.test(o)) ?? step.outputs.find((o) => o.endsWith('carousel.pdf')) ?? step.outputs.find((o) => o.endsWith('.mp4')) ?? step.outputs.find((o) => /copy\.md$/.test(o));
+  return step.outputs.find((o) => /(video|captioned|carousel)\.mp4$/.test(o)) ?? step.outputs.find((o) => o.endsWith('infographic.gif')) ?? step.outputs.find((o) => o.endsWith('carousel.pdf')) ?? step.outputs.find((o) => o.endsWith('.mp4')) ?? step.outputs.find((o) => /copy\.md$/.test(o));
 }
 
 export function ResultDrawer({ campaign, step, pack, events, onClose, onChange }: { campaign: Campaign; step: Step; pack?: Pack; events: CampaignEvent[]; onClose: () => void; onChange: (c: Campaign) => void }) {
@@ -37,7 +37,7 @@ export function ResultDrawer({ campaign, step, pack, events, onClose, onChange }
   };
 
   const busy = step.status === 'running' || step.status === 'queued';
-  const tabs: [Tab, string][] = [['preview', 'Preview'], ...(pack?.spec && step.outputs.length ? [['edit', pack.spec === 'deck' ? 'Edit slides' : pack.spec === 'graphics' ? 'Edit graphics' : 'Edit scenes'] as [Tab, string]] : []), ...(hasQa ? [['checks', 'Quality checks'] as [Tab, string]] : []), ['activity', 'Activity']];
+  const tabs: [Tab, string][] = [['preview', 'Preview'], ...(pack?.spec && pack.spec !== 'infographic' && step.outputs.length ? [['edit', pack.spec === 'deck' ? 'Edit slides' : pack.spec === 'graphics' ? 'Edit graphics' : 'Edit scenes'] as [Tab, string]] : []), ...(hasQa ? [['checks', 'Quality checks'] as [Tab, string]] : []), ['activity', 'Activity']];
 
   return (
     <>
@@ -106,7 +106,7 @@ export function ResultDrawer({ campaign, step, pack, events, onClose, onChange }
             </>
           )}
 
-          {tab === 'edit' && pack?.spec && <SpecEditor campaign={campaign} step={step} kind={pack.spec} images={images} onSaved={(c) => { onChange(c); setTab('preview'); }} />}
+          {tab === 'edit' && pack?.spec && pack.spec !== 'infographic' && <SpecEditor campaign={campaign} step={step} kind={pack.spec} images={images} onSaved={(c) => { onChange(c); setTab('preview'); }} />}
 
           {tab === 'checks' && <QualityReport campaign={campaign} step={step} />}
 

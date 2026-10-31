@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { callService } from './service.ts';
 import { run } from './exec.ts';
 import { PLUGIN_DIR } from './paths.ts';
+import { KNOWN_ICONS } from './icons.ts';
 
 /**
  * Spec formats: Claude writes a JSON spec, a capability service renders it.
@@ -12,9 +13,9 @@ import { PLUGIN_DIR } from './paths.ts';
  * actionable feedback.
  */
 
-export type SpecKind = 'deck' | 'graphics' | 'storyboard';
+export type SpecKind = 'deck' | 'graphics' | 'storyboard' | 'infographic';
 
-export const SPEC_FILE: Record<SpecKind, string> = { deck: 'deck.json', graphics: 'graphics.json', storyboard: 'storyboard.json' };
+export const SPEC_FILE: Record<SpecKind, string> = { deck: 'deck.json', graphics: 'graphics.json', storyboard: 'storyboard.json', infographic: 'infographic.json' };
 
 type FieldDoc = { id: string; type: string; label: string; optional?: boolean; max?: number; help?: string; choices?: string[] };
 const fieldLine = (f: FieldDoc) =>
@@ -22,6 +23,15 @@ const fieldLine = (f: FieldDoc) =>
 
 /** Markdown reference of what a spec may contain, generated from the live services. */
 export async function catalogMarkdown(kind: SpecKind): Promise<string> {
+  if (kind === 'infographic') {
+    return [
+      '# Infographic catalog',
+      '',
+      'Column kinds: `stage` (dark numbered pill, 1–3 words), `note` (sticky note, ≤ 70 chars; tones yellow|green|blue|pink), `chips` (list of platform/tool names rendered with their real logos), `text` (plain line).',
+      'Sizes: `1080x1350` (default, LinkedIn/Instagram portrait) or `1080x1080`. Themes: `board` (light dotted canvas, default) or `night`.',
+      `Chip names with known logos: ${KNOWN_ICONS.join(', ')}. Any other well-known product name usually resolves too (e.g. "Notion", "Figma", "Stripe"); unknown names get a tidy monogram.`,
+    ].join('\n');
+  }
   if (kind === 'storyboard') {
     const c = await callService('render', 'catalog', {});
     return [
@@ -124,6 +134,14 @@ export async function renderSpec(kind: SpecKind, cwd: string, briefDir: string, 
         ...g.audit.unsafe.slice(0, 2).map((x: string) => `${g.file.split('/').pop()}: ${x} sits inside the ${g.preset} safe margin — platform UI may cover it.`),
       ]);
       return { ok: !fb.length, feedback: fb, summary: `${r.items.length} graphics` };
+    }
+    if (kind === 'infographic') {
+      const v = await callService('render', 'validateInfographic', { spec });
+      if (v.errors.length) return { ok: false, feedback: v.errors, summary: 'invalid infographic' };
+      const r = await callService('render', 'infographic', { spec, outDir: out, brandDir: briefDir, name: 'infographic' });
+      await writeFile(join(out, 'qa.json'), JSON.stringify(r.qa, null, 2));
+      const fb = (r.qa?.issues ?? []).filter((i: any) => i.severity === 'error').map((i: any) => `${i.message}${i.fix ? ` Fix: ${i.fix}` : ''}`);
+      return { ok: !fb.length, feedback: fb, summary: `animated infographic (${r.duration.toFixed(1)}s loop, GIF + MP4 + PNG)` };
     }
     const v = await callService('render', 'validate', { storyboard: spec });
     if (v.errors.length) return { ok: false, feedback: v.errors, summary: 'invalid storyboard' };

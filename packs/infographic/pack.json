@@ -1,0 +1,19 @@
+{
+  "id": "infographic",
+  "name": "Animated Infographic",
+  "tagline": "A save-worthy framework post — stages, sticky notes, real platform logos on a dotted board, looping animation. GIF + MP4 + post text.",
+  "category": "design",
+  "order": 5,
+  "estimate": "3–5 min",
+  "accent": "#1f4d35",
+  "spec": "infographic",
+  "options": [
+    { "key": "topic", "label": "Topic", "type": "text", "default": "", "placeholder": "Blank = a framework your audience will save, tied to what you do" },
+    { "key": "size", "label": "Size", "type": "select", "choices": ["1080x1350", "1080x1080"], "default": "1080x1350" },
+    { "key": "theme", "label": "Look", "type": "select", "choices": ["board", "night"], "default": "board" },
+    { "key": "author", "label": "Your name (footer + cursor)", "type": "text", "default": "", "placeholder": "e.g. Raj Dave" }
+  ],
+  "outputs": ["infographic.gif", "infographic.mp4", "infographic.png", "post.txt", "infographic.json", "qa.json", "*.md"],
+  "skills": [],
+  "tools": ["ffmpeg", "chrome"]
+}
