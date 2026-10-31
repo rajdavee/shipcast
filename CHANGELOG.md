@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0 — 2026-10-31
+
+- **Music**: procedural, licence-free beds in 6 moods (uplifting, tech, chill, energetic, cinematic, playful); scene cuts snap to the beat; whoosh/impact/pop sound design on transitions and stats.
+- **Director's review**: after a video passes QA, Claude reviews the rendered frames once and revises the storyboard if a human editor would (toggle in Settings).
+- **Captions** studio format: upload a clip → transcription, word-timed captions (bold, pop, karaoke, boxed, clean, typewriter), optional hook title, mastered audio, QA — no Claude turn.
+- **Live-site capture**: desktop, @2x phone and full-page screenshots with cookie-banner cleanup; phone-framed product scenes for vertical video.
+- **Scene previews** in the editor (one frame per scene in ~20 s) and a music-mood picker.
+- **Copy QA**: LinkedIn fold, X 280, YouTube title length, AI-cliché ban list, emoji cap — fixed in-session.
+- **Reliability**: streamed PDF export, reusable self-healing Chrome tab, supervisor watchdog, contrast-solved accent tokens, readable captions on light footage.
+
 ## 0.2.0 — 2026-10-31
 
 Rebuilt on a spec-and-services engine, grounded in [industry research](docs/research/landscape-2026.md).

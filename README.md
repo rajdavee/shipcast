@@ -94,6 +94,7 @@ re-render without another Claude run.
 | **Launch Film** | 20–40s film for YouTube, LinkedIn, X or your site: hook, the real product in motion, proof, CTA |
 | **Feature Spotlight** | 8–15s silent motion graphic for the feed |
 | **Explainer** | 45–75s narrated explainer — teach first, sell last |
+| **Captions** | Upload a talking-head clip → word-timed captions (6 styles), hook title, mastered audio. No Claude turn, about a minute |
 | **LinkedIn Carousel** | 6–10 slides in 4 themes × 9 layouts, upload-ready PDF, post caption |
 | **Thumbnails & Cards** | 3 YouTube thumbnails for Test & Compare, OG / GitHub cards, X & LinkedIn images, stories, banners |
 | **Launch Copy Kit** | LinkedIn posts, X thread, YouTube metadata, Product Hunt, Show HN, newsletter, ads |
@@ -107,6 +108,8 @@ Discovery Journey, changelog video from a pull request, talking-head captions.
 Third-party skills are **not bundled**; Shipcast installs them from their own
 repositories on first use, under their own licenses.
 
+Every video gets an **original music bed** (6 moods, cuts snapped to its beat, whooshes on transitions), a **Kokoro voiceover** aligned word-by-word to the script, and a **director's review**: after the automated checks pass, Claude looks at the rendered frames once and fixes what a human editor would.
+
 ### What "quality" means here
 
 Every video is checked before you see it ([research](docs/research/landscape-2026.md)):
@@ -114,7 +117,9 @@ platform canvas and codec, **-14 LUFS / -1 dBTP** loudness, no black or frozen
 stretches, captions inside the platform safe zone at a readable pace, no text
 overlapping or clipping, WCAG contrast, a real first frame for the feed
 thumbnail. Stills are audited for overflow, safe margins and minimum type size.
-Problems go back to Claude with the fix hint; you see what passed.
+Copy is checked against platform limits (LinkedIn's "see more" fold, X's 280,
+YouTube's 60-character titles) and a list of AI clichés. Problems go back to
+Claude with the fix hint; you see what passed.
 
 ## How it works
 
