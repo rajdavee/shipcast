@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.0 — 2026-11-01
+
+Shipcast talks with you first, and videos get a voice and a face.
+
+- **Brainstorm before a campaign** — when you give little to go on, Shipcast asks the 2–4 questions that change the work (audience, the one differentiator, what viewers should do next, tone), each with tappable answers tailored to your product, then offers three distinct creative directions. The chosen one and your answers steer the research and every deliverable. Skippable at every step; ~6 s per turn.
+- **Animated presenter** — an original brand-coloured mascot for character-driven explainers: blinks, gestures (explain, wave, point, think, celebrate), mouth synced to the voiceover, speech bubble that lights up word by word.
+- **Chatterbox voice (optional, local, MIT)** — a more natural free voice next to Kokoro and ElevenLabs, installed from Setup into its own environment; one warm worker serves every line; Kokoro is the fallback.
+- **Variety guard** — a new storyboard that copies a recent video's structure gets one rewrite before it renders, so channels don't drift into the templated look platforms demonetise.
+
 ## 0.6.0 — 2026-11-01
 
 Any length, edited like a creator, in your own voice if you want.
