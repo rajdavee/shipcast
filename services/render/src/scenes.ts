@@ -189,14 +189,14 @@ ${S} mark .hl{position:absolute;left:0;top:0;right:0;bottom:0;padding:0 .08em;ba
       { id: 'context', type: 'text', label: 'Source / context', optional: true, max: 90 },
     ],
     build: (f, c) => {
-      const { u, S } = frame(c);
+      const { u, pad, S } = frame(c);
       const b = bg(c, 'brand');
       const m = String(f.value ?? '').match(/^([^\d]*)([\d.,]+)(.*)$/);
       const [pre, num, post] = m ? [m[1], m[2], m[3]] : ['', '', String(f.value ?? '')];
       const target = Number(num.replace(/,/g, '')) || 0;
       const decimals = num.includes('.') ? num.split('.')[1].length : 0;
       return {
-        markup: b.markup + stage(c, `<div class="num" style="font-size:${Math.round((String(f.value).length > 5 ? 230 : 300) * u)}px">${esc(pre)}<span class="n">${esc(num || '')}</span>${esc(post)}</div><h2 style="font-size:${Math.round(64 * u)}px;margin-top:${Math.round(20 * u)}px">${words(f.label)}</h2>${f.context ? `<p class="sub" style="font-size:${Math.round(32 * u)}px;margin-top:${Math.round(24 * u)}px">${esc(f.context)}</p>` : ''}`),
+        markup: b.markup + stage(c, `<div class="num" style="font-size:${Math.round(Math.min((String(f.value).length > 5 ? 230 : 300) * u, (c.width - pad.l - pad.r) / (Math.max(2, String(f.value).length) * 0.64)))}px">${esc(pre)}<span class="n">${esc(num || '')}</span>${esc(post)}</div><h2 style="font-size:${Math.round(64 * u)}px;margin-top:${Math.round(20 * u)}px">${words(f.label)}</h2>${f.context ? `<p class="sub" style="font-size:${Math.round(32 * u)}px;margin-top:${Math.round(24 * u)}px">${esc(f.context)}</p>` : ''}`),
         css: b.css + headCss(S) + `${S} .num{font-family:var(--font-display);font-weight:900;letter-spacing:-.06em;line-height:.9;font-variant-numeric:tabular-nums}`,
         js:
           b.js +
