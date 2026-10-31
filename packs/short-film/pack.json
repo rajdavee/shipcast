@@ -82,5 +82,9 @@
   "tools": [
     "ffmpeg",
     "chrome"
+  ],
+  "roles": [
+    "copy",
+    "humanize"
   ]
 }

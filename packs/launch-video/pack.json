@@ -58,5 +58,11 @@
   "tools": [
     "ffmpeg",
     "chrome"
+  ],
+  "roles": [
+    "gsap",
+    "motion-doctrine",
+    "transitions",
+    "motion-review"
   ]
 }

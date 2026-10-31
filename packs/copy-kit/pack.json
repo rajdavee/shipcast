@@ -40,5 +40,11 @@
     "*.md"
   ],
   "skills": [],
-  "tools": []
+  "tools": [],
+  "roles": [
+    "copy",
+    "social",
+    "positioning",
+    "humanize"
+  ]
 }

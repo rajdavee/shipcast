@@ -76,5 +76,11 @@
   "skills": [],
   "tools": [
     "chrome"
+  ],
+  "roles": [
+    "design-taste",
+    "copy",
+    "social",
+    "humanize"
   ]
 }

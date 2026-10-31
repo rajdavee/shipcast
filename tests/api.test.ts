@@ -9,6 +9,7 @@ import type { AddressInfo } from 'node:net';
 const home = mkdtempSync(join(tmpdir(), 'shipcast-test-'));
 const log = join(home, 'claude-calls.ndjson');
 process.env.SHIPCAST_HOME = home;
+process.env.SHIPCAST_SKILLHUB = 'off';
 process.env.SHIPCAST_CLAUDE_BIN = join(import.meta.dirname, 'fake-claude.mjs');
 process.env.FAKE_CLAUDE_LOG = log;
 

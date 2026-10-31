@@ -74,6 +74,382 @@
       ],
       "stars": 19770,
       "default": true
+    },
+    {
+      "id": "gsap",
+      "name": "GSAP official skills",
+      "repo": "greensock/gsap-skills",
+      "ref": "aed9cfd3277740755f6bfc1155c7aa645403b760",
+      "paths": [
+        "skills/gsap-core",
+        "skills/gsap-timeline",
+        "skills/gsap-plugins",
+        "skills/gsap-utils",
+        "skills/gsap-performance"
+      ],
+      "licence": "MIT",
+      "area": "motion",
+      "roles": {
+        "gsap": "gsap-core",
+        "timeline": "gsap-timeline",
+        "gsap-plugins": "gsap-plugins"
+      },
+      "summary": "GreenSock's own API knowledge: eases, timeline position parameters, SplitText, MorphSVG, DrawSVG and performance. Every Shipcast animation runs on GSAP.",
+      "verdict": 5,
+      "stars": 17639,
+      "default": true
+    },
+    {
+      "id": "hyperframes-craft",
+      "name": "HyperFrames craft rules",
+      "repo": "heygen-com/hyperframes",
+      "ref": "bb3c3b211840b08ff8889e021320ba5962f0f6e6",
+      "paths": [
+        ".claude/skills/motion-doctrine",
+        ".claude/skills/seam-craft",
+        ".claude/skills/captions-overlay"
+      ],
+      "licence": "Apache-2.0",
+      "area": "motion",
+      "roles": {
+        "motion-doctrine": "motion-doctrine",
+        "transitions": "seam-craft",
+        "caption-overlay": "captions-overlay"
+      },
+      "summary": "The HyperFrames team\u2019s own motion doctrine (one continuous camera), seam fixes for clean cuts with no white flashes, and captions as an overlay layer.",
+      "verdict": 5,
+      "stars": 76534,
+      "default": true
+    },
+    {
+      "id": "emil-motion",
+      "name": "Emil Kowalski \u2014 motion & UI polish",
+      "repo": "emilkowalski/skills",
+      "ref": "a81dbca07f2217b7103e510c0f13f8d5b017afc9",
+      "paths": [
+        "skills/emil-design-eng",
+        "skills/animation-vocabulary",
+        "skills/improve-animations",
+        "skills/find-animation-opportunities"
+      ],
+      "licence": "MIT",
+      "area": "motion",
+      "roles": {
+        "motion-review": "improve-animations",
+        "motion-polish": "emil-design-eng"
+      },
+      "summary": "Restraint and polish for motion from a leading design engineer: a shared vocabulary to critique animation, and passes that make movement feel intentional.",
+      "verdict": 4,
+      "stars": 52407,
+      "default": true
+    },
+    {
+      "id": "product-launch-motion",
+      "name": "Product launch motion (Dribbble style)",
+      "repo": "AbubakrChan/product-launch-motion",
+      "ref": "edbfb105382f21507bad895d8b5f6e0faa67487c",
+      "paths": [
+        "."
+      ],
+      "names": {
+        ".": "product-launch-motion"
+      },
+      "licence": "MIT",
+      "area": "motion",
+      "roles": {
+        "launch-video": "product-launch-motion"
+      },
+      "summary": "Dribbble-style launch-film direction: one shape that never cuts, springs, logo slams, motion blur. Uses its own Playwright pipeline rather than HyperFrames.",
+      "verdict": 4,
+      "needs": [
+        "playwright",
+        "ffmpeg",
+        "python3"
+      ],
+      "stars": 404,
+      "default": false
+    },
+    {
+      "id": "ffmpeg",
+      "name": "ffmpeg-skill \u2014 local post-production",
+      "repo": "kajisho5/ffmpeg-skill",
+      "ref": "f90f6392a8af50b98e137322b6b97fc32ab2bc45",
+      "paths": [
+        "."
+      ],
+      "names": {
+        ".": "ffmpeg-skill"
+      },
+      "licence": "MIT",
+      "area": "editing",
+      "roles": {
+        "post": "ffmpeg-skill",
+        "silence-cut": "ffmpeg-skill",
+        "color-grade": "ffmpeg-skill"
+      },
+      "summary": "42 ffmpeg tools in a probe \u2192 edit \u2192 verify loop: cuts, silence and filler removal, ASS/karaoke captions, ducking, loudness, LUTs, platform exports. Local, no API keys.",
+      "verdict": 5,
+      "needs": [
+        "python3",
+        "ffmpeg"
+      ],
+      "stars": 4186,
+      "default": true
+    },
+    {
+      "id": "video-use",
+      "name": "video-use \u2014 talking-head editing",
+      "repo": "browser-use/video-use",
+      "ref": "43cfc566833548093455c9d4a46bd69913b7e552",
+      "paths": [
+        ".",
+        "skills/manim-video"
+      ],
+      "names": {
+        ".": "video-use"
+      },
+      "licence": "MIT",
+      "area": "editing",
+      "roles": {
+        "talking-head-edit": "video-use",
+        "math-explainer": "manim-video"
+      },
+      "summary": "Edit talking-head footage by conversation: word-boundary cuts, filler removal, grading, audio fades. Includes a Manim pipeline for 3Blue1Brown-style explainers.",
+      "verdict": 4,
+      "needs": [
+        "ElevenLabs key",
+        "ffmpeg",
+        "python3",
+        "manim (for math)"
+      ],
+      "stars": 30274,
+      "default": false
+    },
+    {
+      "id": "taste",
+      "name": "taste-skill \u2014 art direction",
+      "repo": "Leonxlnx/taste-skill",
+      "ref": "12af471f627f866411b4bd785b19646d3672784c",
+      "paths": [
+        "skills/taste-skill"
+      ],
+      "names": {
+        "skills/taste-skill": "design-taste-frontend"
+      },
+      "licence": "MIT",
+      "area": "design",
+      "roles": {
+        "design-taste": "design-taste-frontend"
+      },
+      "summary": "Art direction distilled from 247 curated gallery sites: layout, typography, palette and section blueprints that steer away from generic AI looks.",
+      "verdict": 5,
+      "stars": 106980,
+      "default": true
+    },
+    {
+      "id": "anthropic-creative",
+      "name": "Anthropic creative skills",
+      "repo": "anthropics/skills",
+      "ref": "ca45fc496a3436251f191354091d557da31c15b5",
+      "paths": [
+        "skills/canvas-design",
+        "skills/theme-factory",
+        "skills/algorithmic-art",
+        "skills/frontend-design"
+      ],
+      "licence": "Apache-2.0",
+      "area": "design",
+      "roles": {
+        "poster": "canvas-design",
+        "theme": "theme-factory",
+        "generative-art": "algorithmic-art",
+        "web-design": "frontend-design"
+      },
+      "summary": "Anthropic\u2019s design skills: posters from a design philosophy, ten preset themes, p5.js generative art and distinctive frontend design. Each ships its own Apache-2.0 licence.",
+      "verdict": 4,
+      "stars": 185834,
+      "default": true
+    },
+    {
+      "id": "impeccable",
+      "name": "impeccable \u2014 design critique & polish",
+      "repo": "pbakaus/impeccable",
+      "ref": "4f956490f0056ae1ff5ea80372cf56e83c001d3c",
+      "paths": [
+        ".claude/skills/impeccable"
+      ],
+      "licence": "Apache-2.0",
+      "area": "design",
+      "roles": {
+        "design-critique": "impeccable"
+      },
+      "summary": "Audit, critique and polish passes (\"quieter\", \"bolder\") and DESIGN.md token capture. Downloads a helper binary the first time it runs.",
+      "verdict": 5,
+      "needs": [
+        "downloads a binary on first run"
+      ],
+      "stars": 98182,
+      "default": false
+    },
+    {
+      "id": "color-expert",
+      "name": "color-expert \u2014 palette science",
+      "repo": "meodai/skill.color-expert",
+      "ref": "5bf7c7704d56bccc6aeea38c36bcf449abe56a6c",
+      "paths": [
+        "."
+      ],
+      "names": {
+        ".": "color-expert"
+      },
+      "licence": "CC-BY-4.0",
+      "area": "design",
+      "roles": {
+        "color": "color-expert"
+      },
+      "summary": "OKLCH palette science and contrast checks backed by a large reference library. CC-BY: credit required.",
+      "verdict": 3,
+      "stars": 630,
+      "default": false
+    },
+    {
+      "id": "diagram-design",
+      "name": "diagram-design \u2014 editorial diagrams",
+      "repo": "cathrynlavery/diagram-design",
+      "ref": "0cf73c3fcc56667ad91a9a04c439ac6ccfabc9d1",
+      "paths": [
+        "skills/diagram-design"
+      ],
+      "licence": "MIT",
+      "area": "diagram",
+      "roles": {
+        "diagram": "diagram-design"
+      },
+      "summary": "Editorial, on-brand diagrams and charts in 30+ types (flywheel, marimekko, axonometric\u2026) \u2014 great for explainer scenes and infographic ideas.",
+      "verdict": 5,
+      "stars": 63464,
+      "default": true
+    },
+    {
+      "id": "excalidraw",
+      "name": "Excalidraw diagrams that argue",
+      "repo": "coleam00/excalidraw-diagram-skill",
+      "ref": "8646fcc9f74f38539c6cdb4c969723336a96ddcd",
+      "paths": [
+        "."
+      ],
+      "names": {
+        ".": "excalidraw-diagram"
+      },
+      "licence": "none",
+      "area": "diagram",
+      "roles": {
+        "sketch-diagram": "excalidraw-diagram"
+      },
+      "summary": "Excalidraw diagrams that make a visual argument. The repo has no licence, so it installs only with your consent.",
+      "verdict": 4,
+      "needs": [
+        "playwright"
+      ],
+      "stars": 5147,
+      "default": false
+    },
+    {
+      "id": "marketing",
+      "name": "marketingskills \u2014 positioning, launch, copy",
+      "repo": "coreyhaines31/marketingskills",
+      "ref": "88c79f6528a9347420e57ceb1fff9a60de651768",
+      "paths": [
+        "skills/product-marketing",
+        "skills/launch",
+        "skills/copywriting",
+        "skills/social",
+        "skills/video",
+        "skills/customer-research",
+        "skills/competitor-profiling"
+      ],
+      "licence": "MIT",
+      "area": "brand",
+      "roles": {
+        "positioning": "product-marketing",
+        "launch-plan": "launch",
+        "copy": "copywriting",
+        "social": "social",
+        "video-strategy": "video",
+        "audience": "customer-research",
+        "competitors": "competitor-profiling"
+      },
+      "summary": "The de-facto standard marketing skill set: positioning and ICP, launch plans, conversion copy, social calendars, video strategy, customer and competitor research.",
+      "verdict": 5,
+      "stars": 57669,
+      "default": true
+    },
+    {
+      "id": "humanizer",
+      "name": "humanizer \u2014 de-AI the writing",
+      "repo": "blader/humanizer",
+      "ref": "0ef9fe5bc3572734fd3ae6c448fe00a30cd5dcf0",
+      "paths": [
+        "."
+      ],
+      "names": {
+        ".": "humanizer"
+      },
+      "licence": "MIT",
+      "area": "social",
+      "roles": {
+        "humanize": "humanizer"
+      },
+      "summary": "A final pass that strips the tells of AI writing from scripts and posts, so copy reads like a person wrote it.",
+      "verdict": 4,
+      "stars": 62968,
+      "default": true
+    },
+    {
+      "id": "social-kit",
+      "name": "Social media skills \u2014 hooks & scoring",
+      "repo": "charlie947/social-media-skills",
+      "ref": "10ca79c0ec0be0f7654d19cd4f0c86b6fa6ed23b",
+      "paths": [
+        "skills/hook-generator",
+        "skills/post-scorer",
+        "skills/post-writer",
+        "skills/content-matrix"
+      ],
+      "licence": "MIT",
+      "area": "social",
+      "roles": {
+        "hooks": "hook-generator",
+        "post-score": "post-scorer"
+      },
+      "summary": "LinkedIn hook formulas, a post scorer and a content matrix \u2014 a second opinion on hooks and posts.",
+      "verdict": 3,
+      "stars": 4484,
+      "default": false
+    },
+    {
+      "id": "elevenlabs",
+      "name": "ElevenLabs \u2014 music & sound design",
+      "repo": "elevenlabs/skills",
+      "ref": "503d4e9fda0190ab9357142f44e51de626f97f90",
+      "paths": [
+        "music",
+        "sound-effects",
+        "text-to-speech"
+      ],
+      "licence": "MIT",
+      "area": "audio",
+      "roles": {
+        "music-gen": "music",
+        "sfx-gen": "sound-effects"
+      },
+      "summary": "Generated music beds and sound effects with ElevenLabs. Uses your own (paid) ElevenLabs key.",
+      "verdict": 4,
+      "needs": [
+        "ElevenLabs key"
+      ],
+      "stars": 526,
+      "default": false
     }
   ]
 }

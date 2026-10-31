@@ -66,5 +66,10 @@
   "tools": [
     "ffmpeg",
     "chrome"
+  ],
+  "roles": [
+    "video-strategy",
+    "copy",
+    "humanize"
   ]
 }

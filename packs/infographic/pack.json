@@ -73,5 +73,11 @@
   "tools": [
     "ffmpeg",
     "chrome"
+  ],
+  "roles": [
+    "design-taste",
+    "diagram",
+    "copy",
+    "humanize"
   ]
 }

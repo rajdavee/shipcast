@@ -26,7 +26,7 @@ test('skill hub registry entries are pinned, licensed and self-consistent', asyn
     assert.match(p.ref, /^[0-9a-f]{40}$/, `${p.id} must pin a full commit SHA`);
     assert.ok(p.licence, `${p.id} needs a licence (or "none")`);
     assert.ok(p.paths.length > 0);
-    const names = p.paths.map((x: string) => x.split('/').pop());
+    const names = p.paths.map((x: string) => p.names?.[x] ?? (x === '.' ? p.id : x.split('/').pop()));
     for (const [role, skill] of Object.entries(p.roles)) assert.ok(names.includes(skill), `${p.id}: role ${role} points at ${skill}, which isn't in paths`);
     assert.ok(p.verdict >= 1 && p.verdict <= 5);
   }

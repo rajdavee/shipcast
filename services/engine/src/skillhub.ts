@@ -23,8 +23,10 @@ export interface HubPackage {
   name: string;
   repo: string;
   ref: string;
-  /** Skill folders inside the repo (each contains SKILL.md). */
+  /** Skill folders inside the repo (each contains SKILL.md); "." = the repo root is the skill. */
   paths: string[];
+  /** path → the skill's frontmatter name, when it differs from the folder name (always for "."). */
+  names?: Record<string, string>;
   licence: string;
   area: 'motion' | 'editing' | 'design' | 'diagram' | 'social' | 'brand' | 'story' | 'audio' | 'core';
   /** Roles this package can fill, with the skill to call for each. */
@@ -47,6 +49,9 @@ export interface HubState {
   /** package id → true once the user accepted a non-permissive licence. */
   accepted: Record<string, boolean>;
 }
+
+/** The folder (and skill) name a path installs as. */
+export const skillName = (p: HubPackage, path: string) => p.names?.[path] ?? (path === '.' ? p.id : path.split('/').pop()!);
 
 const SAFE = new Set(['MIT', 'Apache-2.0', 'BSD-2-Clause', 'BSD-3-Clause', 'ISC', 'CC0-1.0', 'Unlicense', '0BSD']);
 export const isPermissive = (licence: string) => SAFE.has(licence);
@@ -100,12 +105,13 @@ export async function installPackage(id: string, opts: { acceptLicence?: boolean
     await mkdir(storeDir(id), { recursive: true });
     const missing: string[] = [];
     for (const p of pkg.paths) {
-      const src = join(tmp, p);
+      const src = p === '.' ? tmp : join(tmp, p);
       if (!existsSync(join(src, 'SKILL.md'))) {
         missing.push(p);
         continue;
       }
-      await cp(src, join(storeDir(id), p.split('/').pop()!), { recursive: true });
+      // A root-level skill is the whole repo (minus git metadata and the download itself).
+      await cp(src, join(storeDir(id), skillName(pkg, p)), { recursive: true, filter: (f) => !/[\\/]\.git([\\/]|$)|src\.tgz$/.test(f) });
     }
     if (missing.length === pkg.paths.length) return { ok: false, log: `no SKILL.md found at ${missing.join(', ')}` };
     state.installed[id] = { ref: pkg.ref, at: new Date().toISOString() };
@@ -147,7 +153,7 @@ export async function buildHubPlugin(): Promise<string[]> {
   for (const p of reg) {
     if (!isEnabled(p, s) || !isInstalled(p, s)) continue;
     for (const path of p.paths) {
-      const name = path.split('/').pop()!;
+      const name = skillName(p, path);
       if (!existsSync(join(storeDir(p.id), name)) || names.includes(name)) continue;
       await cp(join(storeDir(p.id), name), join(dir, 'skills', name), { recursive: true });
       names.push(name);
@@ -171,6 +177,8 @@ export async function assignRoles(roles: string[]): Promise<{ role: string; pkg:
 /** Make sure the packages a job needs are installed (permissive or accepted only). */
 export async function ensureForRoles(roles: string[], packages: string[] = []): Promise<{ assigned: Awaited<ReturnType<typeof assignRoles>>; log: string[] }> {
   const log: string[] = [];
+  // Tests and air-gapped machines can switch the hub off entirely.
+  if (process.env.SHIPCAST_SKILLHUB === 'off') return { assigned: [], log };
   const s = await hubState();
   const reg = await loadRegistry();
   const assigned = await assignRoles(roles);

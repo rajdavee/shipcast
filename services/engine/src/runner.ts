@@ -197,7 +197,10 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
 
     if (step.kind === 'brief') {
       cwd = join(dir, 'brief');
-      prompt = briefPrompt(campaign);
+      // Research gets the positioning, audience and competitor specialists from the Skill Hub.
+      const { assigned, log: hubLog } = await ensureForRoles(['positioning', 'audience', 'competitors']).catch(() => ({ assigned: [], log: [] as string[] }));
+      for (const l of hubLog) await log({ step: step.id, type: 'log', text: `Skill Hub: ${l}` });
+      prompt = briefPrompt(campaign) + rolesPrompt(assigned);
       outputs = ['brief.md', 'brand.json', 'assets/**'];
     } else {
       const pack = await getPack(step.pack!);
