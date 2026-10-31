@@ -96,7 +96,7 @@ export function validateStoryboard(s: Storyboard): string[] {
   return errs;
 }
 
-function subcomp(id: string, width: number, height: number, part: { markup: string; css: string; js: string }): string {
+function subcomp(id: string, width: number, height: number, part: { markup: string; css: string; js: string }, punches: number[] = []): string {
   return `<!doctype html><html><head><meta charset="UTF-8"></head><body><template>
 <style>${part.css}</style>
 <div id="${id}" data-composition-id="${id}" data-width="${width}" data-height="${height}">${part.markup}</div>
@@ -109,6 +109,7 @@ if(window.ResizeObserver)new ResizeObserver(()=>fit()).observe(root);
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(fit);
 const tl=gsap.timeline({paused:true});
 ${part.js}
+${punches.map((t) => `tl.to(root,{scale:1.055,duration:.16,ease:"power2.out",transformOrigin:"50% 45%"},${t.toFixed(2)});tl.to(root,{scale:1,duration:.55,ease:"power2.inOut"},${(t + 0.85).toFixed(2)});`).join('\n')}
 window.__timelines["${id}"]=tl;})();</script>
 </template></body></html>`;
 }
@@ -163,6 +164,29 @@ export async function compileStoryboard(story: Storyboard, opts: { dir: string; 
   });
   const total = Math.round(t * 100) / 100;
 
+  // Edit rhythm: punch in on the words that carry the line (numbers, *accented* words, the strongest
+  // word of a long line) — at most two per scene, never on scenes with their own camera or slam.
+  const NO_PUNCH = new Set(['product', 'scroll', 'kinetic', 'logos', 'stack3d', 'chapter', 'outro', 'logo-sting']);
+  const punchesFor = (e: (typeof timeline)[number]): number[] => {
+    const v = voiced[e.i];
+    if (!v?.words.length || !e.sc.scene || NO_PUNCH.has(e.sc.scene)) return [];
+    const accented = new Set(
+      JSON.stringify(e.sc.fields ?? {})
+        .match(/\*([^*]+)\*/g)
+        ?.flatMap((m) => m.replace(/\*/g, '').toLowerCase().split(/\s+/)) ?? [],
+    );
+    const clean = (t: string) => t.toLowerCase().replace(/[^\p{L}\p{N}%$]/gu, '');
+    const picks = v.words.filter((w) => /\d/.test(w.text) || accented.has(clean(w.text)));
+    if (!picks.length && v.words.length >= 8) picks.push([...v.words].sort((a, b) => clean(b.text).length - clean(a.text).length)[0]);
+    const out: number[] = [];
+    for (const w of picks) {
+      const at = +(w.start + VO_LEAD).toFixed(2);
+      if (at > 0.6 && at < e.duration - 0.9 && out.every((x) => Math.abs(x - at) > 1.4)) out.push(at);
+      if (out.length >= 2) break;
+    }
+    return out;
+  };
+
   // 3. Words on the global timeline, and one voice track.
   const words: Word[] = [];
   let audio: string | undefined;
@@ -188,6 +212,10 @@ export async function compileStoryboard(story: Storyboard, opts: { dir: string; 
       if (kind === 'flash') sfx.push({ kind: 'impact', at: e.start, gain: 0.4 });
     }
     for (const e of timeline) if (e.sc.scene === 'stat') sfx.push({ kind: 'pop', at: e.start + 0.12, gain: 0.3 });
+    // A riser into reveals (it starts ~1 s before the cut), so the payoff lands on the beat.
+    for (const e of timeline.slice(1)) if (e.sc.scene === 'stat' || e.sc.scene === 'kinetic') sfx.push({ kind: 'riser', at: e.start, gain: 0.22 });
+    // A soft hit under every punch-in, so the zoom is felt as well as seen.
+    for (const e of timeline) for (const p of punchesFor(e)) sfx.push({ kind: 'pop', at: +(e.start + p).toFixed(2), gain: 0.16 });
     const bed = await opts.deps.music(mood, total, sfx, join(dir, 'assets', 'bed.wav'));
     music = bed.file;
   }
@@ -224,7 +252,7 @@ export async function compileStoryboard(story: Storyboard, opts: { dir: string; 
     const sctx: SceneCtx = { id: e.id, width, height, duration: e.duration, safe: preset.safe, brand: fallbackBrand, assetsDir: opts.brandDir, asset, icons, captionBand: e.sc.scene === 'product' || e.sc.scene === 'scroll' ? 0 : captionBand };
     if (e.sc.scene) {
       const part = getScene(e.sc.scene).build((e.sc.fields ?? {}) as Record<string, any>, sctx);
-      await writeFile(join(dir, 'compositions', `${e.id}.html`), subcomp(e.id, width, height, part));
+      await writeFile(join(dir, 'compositions', `${e.id}.html`), subcomp(e.id, width, height, part, punchesFor(e)));
       hosts.push(`<div id="host-${e.id}" data-composition-id="${e.id}" data-composition-src="compositions/${e.id}.html" data-start="${e.start}" data-duration="${e.duration}" data-track-index="1" data-width="${width}" data-height="${height}"></div>`);
     } else if (e.sc.block) {
       const r = await run('npx', ['-y', 'hyperframes', 'add', e.sc.block, '--no-clipboard'], { cwd: dir, timeoutMs: 180_000 });

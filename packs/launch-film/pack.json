@@ -26,9 +26,11 @@
       "label": "Length",
       "type": "select",
       "choices": [
+        "15s",
         "20s",
         "30s",
-        "40s"
+        "40s",
+        "60s"
       ],
       "default": "30s"
     },
@@ -53,9 +55,11 @@
       "type": "select",
       "choices": [
         "clean",
+        "highlight",
         "karaoke",
         "boxed",
         "bold",
+        "emoji",
         "none"
       ],
       "default": "clean"

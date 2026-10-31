@@ -171,14 +171,16 @@ code { font-size: 0.92em; background: var(--bg-2); padding: 1px 6px; border-radi
 .pick-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 14px; }
 .pick-head h2 { font: 700 20px/1.2 var(--display); letter-spacing: -0.02em; }
 .note-box { margin-bottom: 16px; min-height: 70px; }
-.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 14px; }
+.lengths { display: flex; flex-wrap: wrap; gap: 10px 28px; margin: 0 0 16px; }
+.len-row { display: flex; align-items: center; gap: 12px; font-size: 13.5px; color: var(--text-2); font-weight: 600; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 12px; }
 .tile {
   position: relative; display: grid; grid-template-rows: auto auto; gap: 10px; padding: 10px 10px 12px; text-align: left; cursor: pointer;
   background: var(--surface); border: 0; border-radius: var(--r-3); box-shadow: var(--print); color: inherit;
   transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease);
 }
 .tile:hover { transform: translateY(-2px); box-shadow: var(--lift); }
-.tile-art { height: 132px; border-radius: 10px; background: var(--bg-2); display: grid; place-items: center; overflow: hidden; }
+.tile-art { height: 120px; border-radius: 10px; background: var(--bg-2); display: grid; place-items: center; overflow: hidden; }
 .tile-art img { max-height: 116px; max-width: 92%; border-radius: 5px; box-shadow: 0 6px 16px -8px rgba(0, 0, 0, 0.45); filter: saturate(0.55) brightness(0.98); opacity: 0.7; transition: filter 0.2s, opacity 0.2s; }
 .tile-text b { display: block; font-size: 14px; font-weight: 650; }
 .tile-text small { display: block; color: var(--muted); font-size: 12.5px; line-height: 1.35; margin-top: 2px; }

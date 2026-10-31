@@ -61,6 +61,7 @@
       "type": "select",
       "choices": [
         "clean",
+        "highlight",
         "karaoke",
         "pop",
         "bold",

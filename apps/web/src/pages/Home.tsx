@@ -36,6 +36,8 @@ export function Home({ status, services, campaigns }: { status: Status | null; s
   const [picks, setPicks] = useState<string[]>(loadPicks);
   const [noteOpen, setNoteOpen] = useState(false);
   const [notes, setNotes] = useState('');
+  const [shortLen, setShortLen] = useState<'15s' | '30s' | '60s'>('30s');
+  const [longLen, setLongLen] = useState<'3 min' | '5 min' | '8 min' | '10 min'>('5 min');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const ta = useRef<HTMLTextAreaElement>(null);
@@ -62,12 +64,17 @@ export function Home({ status, services, campaigns }: { status: Status | null; s
     savePicks(next);
   };
 
+  const SHORT = ['reel', 'launch-film'];
+  const hasShort = chosen.some((id) => SHORT.includes(id));
+  const hasLong = chosen.includes('youtube-video');
+  const optionsFor = (id: string): Record<string, string> => (SHORT.includes(id) ? { length: shortLen } : id === 'youtube-video' ? { length: longLen } : {});
+
   async function make() {
     if (!canGo || !source) return;
     setBusy(true);
     setError(null);
     try {
-      const c = await api.createCampaign({ source, notes, deliverables: chosen.map((id) => ({ pack: id, options: {} })) });
+      const c = await api.createCampaign({ source, notes, deliverables: chosen.map((id) => ({ pack: id, options: optionsFor(id) })) });
       go(`/c/${c.id}`);
     } catch (e) {
       setError(String((e as Error).message));
@@ -75,7 +82,7 @@ export function Home({ status, services, campaigns }: { status: Status | null; s
     }
   }
 
-  const minutes = Math.max(5, chosen.length * 3);
+  const minutes = Math.max(5, chosen.length * 3) + (hasLong ? Number(longLen.split(' ')[0]) * 3 : 0);
 
   return (
     <main className="page home">
@@ -133,6 +140,26 @@ export function Home({ status, services, campaigns }: { status: Status | null; s
         </div>
         {noteOpen && (
           <textarea className="textarea note-box" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Who it's for, what to highlight, what to avoid. E.g. “For CTOs. Show the new dashboard. Don't mention pricing.”" />
+        )}
+        {(hasShort || hasLong) && (
+          <div className="lengths">
+            {hasShort && (
+              <div className="len-row">
+                <span>Short video length</span>
+                <div className="seg" role="group" aria-label="Short video length">
+                  {(['15s', '30s', '60s'] as const).map((l) => <button key={l} aria-pressed={shortLen === l} onClick={() => setShortLen(l)}>{l.replace('s', ' s')}</button>)}
+                </div>
+              </div>
+            )}
+            {hasLong && (
+              <div className="len-row">
+                <span>YouTube video length</span>
+                <div className="seg" role="group" aria-label="YouTube video length">
+                  {(['3 min', '5 min', '8 min', '10 min'] as const).map((l) => <button key={l} aria-pressed={longLen === l} onClick={() => setLongLen(l)}>{l}</button>)}
+                </div>
+              </div>
+            )}
+          </div>
         )}
         <div className="tiles" role="group" aria-label="Formats">
           {formats.map((f) => {
