@@ -320,9 +320,9 @@ tl.fromTo("${S} li b",{scale:.4,rotate:-20},{scale:1,rotate:0,duration:.6,ease:"
     build: (f, c) => {
       const { u, S } = frame(c);
       const b = bg(c, 'dark');
-      const size = fit(f.quote, u, [[60, 72], [110, 60], [160, 50]], 46);
+      const size = fit(f.quote, u, [[60, 96], [110, 80], [160, 66]], 60);
       return {
-        markup: b.markup + stage(c, `<div class="card"><div class="qm" style="font-size:${Math.round(200 * u)}px">“</div><p style="font-size:${size}px">${esc(f.quote)}</p><div class="who" style="font-size:${Math.round(32 * u)}px"><b>${esc(f.name)}</b>${f.role ? ` <span>· ${esc(f.role)}</span>` : ''}</div></div>`),
+        markup: b.markup + stage(c, `<div class="card"><div class="qm" style="font-size:${Math.round(200 * u)}px">“</div><p style="font-size:${size}px">${esc(f.quote)}</p><div class="who" style="font-size:${Math.round(38 * u)}px"><b>${esc(f.name)}</b>${f.role ? ` <span>· ${esc(f.role)}</span>` : ''}</div></div>`),
         css:
           b.css +
           `${S} .card{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:${Math.round(36 * u)}px;padding:${Math.round(64 * u)}px}
