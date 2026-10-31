@@ -16,6 +16,7 @@ export const DEFAULT_FORMATS = ['infographic', 'carousel', 'copy-kit'];
 /** Friendly one-liners (falls back to the pack's tagline). */
 export const PLAIN: Record<string, string> = Object.fromEntries(FORMATS.map((f) => [f.id, f.line]));
 PLAIN['feature-spotlight'] = 'A short silent clip that loops in the feed';
+PLAIN['short-film'] = 'A 45–120 s story shot like a film';
 PLAIN['shorts'] = 'Vertical Shorts cut from your long video';
 PLAIN['caption-video'] = 'Styled captions on a clip you upload';
 

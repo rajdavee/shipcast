@@ -655,6 +655,44 @@ for(let s=1;s<n;s++){const t=.4+s*${slot.toFixed(2)};
     },
   },
   {
+    id: 'cinema',
+    label: 'Cinematic shot',
+    use: 'Short-film moment: letterboxed frame, slow camera drift over a real image (or a moody gradient), film grain, one narrative line fading in. For stories, origin tales, "imagine…" openings. Line ≤ 90 chars.',
+    minSeconds: 3,
+    fields: [
+      { id: 'line', type: 'text', label: 'Narrative line', max: 90 },
+      { id: 'kicker', type: 'text', label: 'Place / time', optional: true, max: 40, help: 'e.g. "Tuesday, 11:42 pm"' },
+      { id: 'image', type: 'image', label: 'Image', optional: true },
+    ],
+    build: (f, c) => {
+      const { u, vertical, S } = frame(c);
+      const bar = Math.round(vertical ? c.height * 0.09 : c.height * 0.11);
+      const src = f.image ? img(f.image, c) : '';
+      const size = fit(f.line, u, vertical ? [[40, 80], [70, 68], [90, 60]] : [[40, 84], [70, 72], [90, 64]], 56);
+      const grad = `radial-gradient(70% 60% at 30% 35%, color-mix(in srgb,var(--brand-primary) 38%,transparent), transparent 70%),radial-gradient(60% 60% at 80% 80%, color-mix(in srgb,var(--brand-secondary) 30%,transparent), transparent 70%),#07080b`;
+      return {
+        markup: `<div class="shot">${src ? `<img src="${src}" alt="">` : '<i class="gr"></i>'}</div><i class="vig"></i><i class="grain"></i><i class="lb t"></i><i class="lb b"></i>
+<div class="txt" style="bottom:${bar + Math.round(56 * u)}px">${f.kicker ? `<span class="k">${esc(f.kicker)}</span>` : ''}<p style="font-size:${size}px">${words(f.line)}</p></div>`,
+        css: `${S}{position:absolute;left:0;top:0;width:${c.width}px;height:${c.height}px;overflow:hidden;background:#07080b;color:#f4f1ea;font-family:var(--font-body)}
+${S} .shot,${S} .shot img,${S} .shot .gr{position:absolute;inset:0;width:100%;height:100%}
+${S} .shot img{object-fit:cover;filter:saturate(.8) contrast(1.05) brightness(.7)}
+${S} .shot .gr{background:${grad}}
+${S} .vig{position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 45%,rgba(0,0,0,.75) 100%)}
+${S} .grain{position:absolute;inset:-20%;opacity:.13;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>")}
+${S} .lb{position:absolute;left:0;right:0;height:${bar}px;background:#000;z-index:3}${S} .lb.t{top:0}${S} .lb.b{bottom:0}
+${S} .txt{position:absolute;left:${Math.round(110 * u)}px;right:${Math.round(110 * u)}px;z-index:4;text-align:${vertical ? 'center' : 'left'}}
+${S} .txt .k{display:block;font:600 ${Math.round(26 * u)}px/1 var(--font-mono, ui-monospace);letter-spacing:.18em;text-transform:uppercase;opacity:.7;margin-bottom:${Math.round(18 * u)}px}
+${S} .txt p{margin:0;font-family:var(--font-display);font-weight:600;letter-spacing:-.015em;line-height:1.18;max-width:24ch;${vertical ? 'margin:0 auto;' : ''}text-shadow:0 2px 24px rgba(0,0,0,.6)}
+${S} .w-m{display:inline-block}${S} .w{display:inline-block}`,
+        js: `tl.fromTo("${S} .shot",{scale:1.12,xPercent:-2},{scale:1.02,xPercent:2,duration:${c.duration},ease:"none"},0);
+tl.fromTo("${S} .grain",{x:0},{x:${Math.round(-40 * u)},duration:${c.duration},ease:"steps(${Math.max(8, Math.round(c.duration * 12))})"},0);
+tl.fromTo("${S} .lb.t",{yPercent:-100},{yPercent:0,duration:.7,ease:"power3.out"},0);tl.fromTo("${S} .lb.b",{yPercent:100},{yPercent:0,duration:.7,ease:"power3.out"},0);` +
+          has(`${S} .k`, `tl.fromTo("${S} .k",{opacity:0,y:${10 * u}},{opacity:.7,y:0,duration:.8,ease:"power2.out"},.4);`) +
+          `tl.fromTo("${S} .txt .w",{opacity:0,filter:"blur(8px)"},{opacity:1,filter:"blur(0px)",duration:.7,ease:"power2.out",stagger:.09},.6);`,
+      };
+    },
+  },
+  {
     id: 'chapter',
     label: 'Chapter card',
     use: 'Opens a chapter in a long video: big chapter number, the chapter title, and progress through the video. Added automatically for chapters; use directly only for a manual section break.',

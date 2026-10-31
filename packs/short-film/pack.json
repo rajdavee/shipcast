@@ -1,0 +1,85 @@
+{
+  "id": "short-film",
+  "name": "Short film",
+  "tagline": "A 45\u2013120 s narrated story with a real arc \u2014 a person, a problem, a turn, a resolution \u2014 shot like a film: letterbox, slow camera, grain, a cinematic score.",
+  "category": "video",
+  "order": 4,
+  "estimate": "8\u201315 min",
+  "accent": "#c9a227",
+  "spec": "storyboard",
+  "options": [
+    {
+      "key": "length",
+      "label": "Length",
+      "type": "select",
+      "choices": [
+        "45s",
+        "60s",
+        "90s",
+        "120s"
+      ],
+      "default": "60s"
+    },
+    {
+      "key": "preset",
+      "label": "Format",
+      "type": "select",
+      "choices": [
+        "youtube",
+        "vertical",
+        "linkedin-video"
+      ],
+      "default": "youtube"
+    },
+    {
+      "key": "story",
+      "label": "Story",
+      "type": "select",
+      "choices": [
+        "the customer's day",
+        "origin story",
+        "a day without it",
+        "a letter to the user",
+        "the turning point"
+      ],
+      "default": "the customer's day"
+    },
+    {
+      "key": "voice",
+      "label": "Voice",
+      "type": "select",
+      "choices": [
+        "bm_george",
+        "af_heart",
+        "am_michael",
+        "bf_emma",
+        "af_nova"
+      ],
+      "default": "bm_george"
+    },
+    {
+      "key": "captions",
+      "label": "Captions",
+      "type": "select",
+      "choices": [
+        "clean",
+        "none",
+        "karaoke"
+      ],
+      "default": "clean"
+    }
+  ],
+  "outputs": [
+    "video.mp4",
+    "video.jpg",
+    "video.srt",
+    "storyboard.json",
+    "qa.json",
+    "*.md"
+  ],
+  "skills": [],
+  "tools": [
+    "ffmpeg",
+    "chrome"
+  ]
+}
