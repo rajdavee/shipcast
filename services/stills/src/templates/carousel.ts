@@ -28,7 +28,7 @@ body{background:var(--bg);color:var(--fg);background-image:linear-gradient(to ri
 em{font-style:normal;color:var(--accent)}
 mark{background:var(--accent);color:var(--bg);padding:0 .1em}
 .title,.big{letter-spacing:-.045em}
-.bar{background:rgba(14,16,20,.12)}`,
+.bottom .bar{background:rgba(14,16,20,.12)}`,
   },
   bold: {
     label: 'Bold — full-bleed brand color, chunky blocks',
