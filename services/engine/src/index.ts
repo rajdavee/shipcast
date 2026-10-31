@@ -14,3 +14,4 @@ export * from './service.ts';
 export * from './presets.ts';
 export * from './brand.ts';
 export * from './ffmpeg.ts';
+export * from './chrome.ts';
