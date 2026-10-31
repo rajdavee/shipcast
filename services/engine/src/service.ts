@@ -147,6 +147,7 @@ export function createService(opts: ServiceOptions) {
     } catch (e) {
       job.status = 'failed';
       job.error = e instanceof Error ? e.message : String(e);
+      console.error(`[${opts.name}] ${job.kind} ${job.id} failed:`, process.env.SHIPCAST_DEBUG && e instanceof Error ? e.stack : job.error);
     }
     job.endedAt = new Date().toISOString();
     await persist(job);

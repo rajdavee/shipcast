@@ -1,7 +1,7 @@
-import { mkdir, writeFile, readFile } from 'node:fs/promises';
+import { mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { assertInHome, browser, createService, FIT_SCRIPT, getPreset, layoutAuditScript, loadBrand, normalizeBrand, presetForSize, SERVICE_PORTS, type BrandKit, type LayoutAudit } from '@shipcast/engine';
+import { assertInHome, browser, createService, FIT_SCRIPT, run, getPreset, layoutAuditScript, loadBrand, normalizeBrand, presetForSize, SERVICE_PORTS, type BrandKit, type LayoutAudit } from '@shipcast/engine';
 import { CAROUSEL_LAYOUTS, renderCarouselSlide, THEMES } from './templates/carousel.ts';
 import type { RenderCtx } from './templates/common.ts';
 import { CARD_LAYOUTS, renderCard, renderThumbnail, THUMBNAIL_LAYOUTS } from './templates/graphics.ts';
@@ -51,8 +51,18 @@ function size(preset?: string): { width: number; height: number; safe: { top: nu
   throw new Error(`unknown preset ${preset}`);
 }
 
-/** Render an HTML document to PNG/JPG and audit its layout in the same pass. */
+/** Render an HTML document to PNG/JPG and audit it; one retry on a fresh browser if Chrome dies mid-capture. */
 async function capture(html: string, file: string, width: number, height: number, safe: { top: number; right: number; bottom: number; left: number }) {
+  try {
+    return await captureOnce(html, file, width, height, safe);
+  } catch (e) {
+    if (!/DevTools|timed out|closed|Target/i.test(String((e as Error).message))) throw e;
+    await browser().restart();
+    return captureOnce(html, file, width, height, safe);
+  }
+}
+
+async function captureOnce(html: string, file: string, width: number, height: number, safe: { top: number; right: number; bottom: number; left: number }) {
   await mkdir(dirname(file), { recursive: true });
   const htmlFile = file.replace(/\.(png|jpe?g)$/, '.html');
   await writeFile(htmlFile, html);
@@ -69,7 +79,24 @@ async function capture(html: string, file: string, width: number, height: number
 }
 
 /** Combine PNG pages into one PDF, each page exactly the slide size. */
-async function pdfFromImages(images: string[], out: string, width: number, height: number) {
+async function pdfFromImages(images: string[], out: string, width: number, height: number): Promise<string> {
+  try {
+    return await pdfOnce(images, out, width, height);
+  } catch (e) {
+    if (!/DevTools|timed out|closed|Target/i.test(String((e as Error).message))) throw e;
+    await browser().restart();
+    return pdfOnce(images, out, width, height);
+  }
+}
+
+async function pdfOnce(pngs: string[], out: string, width: number, height: number) {
+  // High-quality JPEG pages keep the PDF a fraction of the size (LinkedIn caps uploads at 100 MB).
+  const images: string[] = [];
+  for (const p of pngs) {
+    const jpg = p.replace(/\.png$/, '.pdf.jpg');
+    const r = await run('ffmpeg', ['-y', '-v', 'error', '-i', p, '-q:v', '2', jpg]);
+    images.push(r.code === 0 ? jpg : p);
+  }
   const html = `<!doctype html><html><head><style>@page{size:${width}px ${height}px;margin:0}html,body{margin:0}img{display:block;width:${width}px;height:${height}px;page-break-after:always}</style></head><body>${images.map((i) => `<img src="${pathToFileURL(i).href}">`).join('')}</body></html>`;
   const htmlFile = out.replace(/\.pdf$/, '.pdf.html');
   await writeFile(htmlFile, html);
@@ -78,6 +105,7 @@ async function pdfFromImages(images: string[], out: string, width: number, heigh
     await writeFile(out, await page.pdf());
   } finally {
     await page.close();
+    for (const i of images) if (i.endsWith('.pdf.jpg')) await rm(i, { force: true });
   }
   return out;
 }

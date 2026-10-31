@@ -8,7 +8,7 @@ import { THEMES } from './carousel.ts';
  */
 
 const THUMB_CSS = `
-:root{--bg:var(--brand-bg);--fg:var(--brand-text);--accent:var(--brand-primary);--accent2:var(--brand-secondary)}
+:root{--bg:var(--brand-bg);--fg:var(--brand-text);--accent:var(--accent-on-bg);--accent2:var(--brand-secondary)}
 body{background:radial-gradient(1200px 800px at 80% 50%,color-mix(in srgb,var(--accent) 38%,var(--bg)),var(--bg) 70%);color:var(--fg);position:relative}
 .t{position:absolute;inset:0;padding:56px 64px}
 .hl{font-family:var(--font-display);font-weight:900;line-height:.9;letter-spacing:-.045em;text-transform:uppercase;text-wrap:balance;

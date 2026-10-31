@@ -50,6 +50,19 @@ export function contrastRatio(a: string, b: string): number {
   return (hi + 0.05) / (lo + 0.05);
 }
 
+/** Move `fg` toward white (dark grounds) or black (light grounds) until it reaches `min` contrast on `bg`. */
+export function ensureContrast(fg: string, bg: string, min = 4.5): string {
+  if (contrastRatio(fg, bg) >= min) return fg;
+  const target = luminance(bg) < 0.4 ? 255 : 0;
+  const [r, g, b] = hexToRgb(fg);
+  for (let t = 0.05; t <= 1; t += 0.05) {
+    const c = [r, g, b].map((v) => Math.round(v + (target - v) * t));
+    const hex = '#' + c.map((v) => v.toString(16).padStart(2, '0')).join('');
+    if (contrastRatio(hex, bg) >= min) return hex;
+  }
+  return target ? '#ffffff' : '#000000';
+}
+
 /** Black or white, whichever reads better on `bg`. */
 export function onColor(bg: string): string {
   return contrastRatio(bg, '#000000') >= contrastRatio(bg, '#ffffff') ? '#000000' : '#ffffff';
@@ -97,6 +110,10 @@ export function brandCss(b: BrandKit): string {
   --brand-bg:${b.colors.background};--brand-surface:${b.colors.surface};--brand-text:${b.colors.text};
   --brand-muted:${b.colors.muted};--brand-primary:${b.colors.primary};--brand-secondary:${b.colors.secondary};
   --brand-on-primary:${onColor(b.colors.primary)};
+  --accent-on-bg:${ensureContrast(b.colors.primary, b.colors.background)};
+  --accent-on-dark:${ensureContrast(b.colors.primary, '#0b0d12')};
+  --accent2-on-dark:${ensureContrast(b.colors.secondary, '#0b0d12')};
+  --accent-on-light:${ensureContrast(b.colors.primary, '#f6f7f9')};
   --font-display:${q(b.fonts.display)},${b.fonts.fallback},sans-serif;
   --font-body:${q(b.fonts.body)},${b.fonts.fallback},sans-serif;
   --font-mono:${q(b.fonts.mono)},ui-monospace,monospace;

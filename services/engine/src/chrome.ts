@@ -30,6 +30,7 @@ class Session {
       const p = msg.id && this.pending.get(msg.id);
       if (!p) return;
       this.pending.delete(msg.id);
+      if (process.env.SHIPCAST_DEBUG) process.stderr.write(`[cdp] ← ${msg.id}${msg.error ? ' ERR ' + msg.error.message : ''}\n`);
       if (msg.error) p.reject(new Error(`${msg.error.message}`));
       else p.resolve(msg.result);
     };
@@ -42,6 +43,8 @@ class Session {
   async send<T = any>(method: string, params: Record<string, unknown> = {}, sessionId?: string): Promise<T> {
     await this.ready;
     const id = ++this.id;
+    const t0 = Date.now();
+    if (process.env.SHIPCAST_DEBUG) process.stderr.write(`[cdp] → ${id} ${method}\n`);
     this.ws.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }));
     return new Promise((resolve, reject) => {
       this.pending.set(id, { resolve, reject });
@@ -74,12 +77,15 @@ export class Browser {
   private session?: Session;
   private profile?: string;
   private starting?: Promise<void>;
+  private pages = 0;
+  /** Pages per browser before a preventive restart (long runs accumulate renderer state). */
+  recycleAfter = 12;
 
   private async start() {
     const bin = process.env.CHROME_PATH ?? findChrome();
     if (!bin) throw new Error('No Chrome found. Run `npx hyperframes browser ensure` or install Google Chrome.');
     this.profile = await mkdtemp(join(tmpdir(), 'shipcast-chrome-'));
-    const proc = spawn(bin, ['--headless', '--remote-debugging-port=0', `--user-data-dir=${this.profile}`, '--no-first-run', '--no-default-browser-check', '--hide-scrollbars', '--force-color-profile=srgb', '--font-render-hinting=none', '--disable-gpu', '--no-sandbox', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
+    const proc = spawn(bin, ['--headless', '--remote-debugging-port=0', `--user-data-dir=${this.profile}`, '--no-first-run', '--no-default-browser-check', '--hide-scrollbars', '--force-color-profile=srgb', '--font-render-hinting=none', '--disable-gpu', '--disable-dev-shm-usage', '--no-sandbox', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
     this.proc = proc;
     const wsUrl = await new Promise<string>((resolve, reject) => {
       let buf = '';
@@ -94,6 +100,10 @@ export class Browser {
       });
       proc.on('exit', () => reject(new Error(`Chrome exited: ${buf.slice(-300)}`)));
     });
+    if (process.env.SHIPCAST_DEBUG) {
+      proc.stderr!.on('data', (d) => process.stderr.write(`[chrome] ${d}`));
+      proc.on('exit', (code, sig) => process.stderr.write(`[chrome] exited code=${code} signal=${sig}\n`));
+    }
     this.session = new Session(wsUrl);
     proc.on('exit', () => {
       this.session = undefined;
@@ -113,6 +123,7 @@ export class Browser {
 
   /** Kill a wedged browser so the next call starts a fresh one. */
   async restart() {
+    this.tab = undefined;
     this.session?.close();
     this.proc?.kill('SIGKILL');
     this.session = undefined;
@@ -132,12 +143,24 @@ export class Browser {
     }
   }
 
+  /** One persistent tab, reused for every capture (target churn is what wedges headless Chrome). */
+  private tab?: { targetId: string; sessionId: string };
+  private lock: Promise<unknown> = Promise.resolve();
+
   private async openOnce(url: string, opts: CaptureOptions): Promise<PageHandle> {
+    if (++this.pages > this.recycleAfter * 4) {
+      this.pages = 1;
+      await this.restart();
+    }
     const s = await this.ensure();
-    const { targetId } = await s.send('Target.createTarget', { url: 'about:blank' });
-    const { sessionId } = await s.send('Target.attachToTarget', { targetId, flatten: true });
+    if (!this.tab) {
+      const { targetId } = await s.send('Target.createTarget', { url: 'about:blank' });
+      const { sessionId } = await s.send('Target.attachToTarget', { targetId, flatten: true });
+      this.tab = { targetId, sessionId };
+      await s.send('Page.enable', {}, sessionId);
+    }
+    const { sessionId } = this.tab;
     const send = (m: string, p: Record<string, unknown> = {}) => s.send(m, p, sessionId);
-    await send('Page.enable');
     await send('Emulation.setDeviceMetricsOverride', { width: opts.width, height: opts.height, deviceScaleFactor: 1, mobile: false });
     await send('Emulation.setDefaultBackgroundColorOverride', { color: { r: 0, g: 0, b: 0, a: 0 } });
     await send('Page.navigate', { url });
@@ -146,8 +169,8 @@ export class Browser {
       if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description ?? r.exceptionDetails.text);
       return r.result.value as T;
     };
-    // Wait for load, fonts and every <img>, then let one more frame paint.
-    await evalIn(`new Promise(r => { const go = () => r(true); if (document.readyState === 'complete') go(); else addEventListener('load', go, { once: true }); setTimeout(go, 15000); })`);
+    // Wait for the new document, fonts and every <img>, then let one more frame paint.
+    await evalIn(`new Promise(r => { const href = ${JSON.stringify(url)}; const go = () => r(true); const ok = () => location.href === href && document.readyState === 'complete'; if (ok()) go(); else { const t = setInterval(() => { if (ok()) { clearInterval(t); go(); } }, 25); setTimeout(() => { clearInterval(t); go(); }, 15000); } })`);
     await evalIn(`Promise.race([Promise.all([document.fonts.ready, ...[...document.images].map(i => i.complete ? 0 : new Promise(r => { i.onload = i.onerror = r; }))]), new Promise(r => setTimeout(r, 10000))]).then(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))))`);
     if (opts.settleMs) await new Promise((r) => setTimeout(r, opts.settleMs));
     return {
@@ -157,16 +180,27 @@ export class Browser {
         return Buffer.from(r.data, 'base64');
       },
       pdf: async () => {
-        const r = await send('Page.printToPDF', { printBackground: true, preferCSSPageSize: true, paperWidth: opts.width / 96, paperHeight: opts.height / 96, marginTop: 0, marginBottom: 0, marginLeft: 0, marginRight: 0 });
-        return Buffer.from(r.data, 'base64');
+        // Stream the PDF back in chunks: a multi-page deck can exceed a single WebSocket message.
+        const r = await send('Page.printToPDF', { printBackground: true, preferCSSPageSize: true, paperWidth: opts.width / 96, paperHeight: opts.height / 96, marginTop: 0, marginBottom: 0, marginLeft: 0, marginRight: 0, transferMode: 'ReturnAsStream' });
+        if (r.data) return Buffer.from(r.data, 'base64');
+        const parts: Buffer[] = [];
+        for (;;) {
+          const c = await send('IO.read', { handle: r.stream, size: 4 * 1024 * 1024 });
+          parts.push(Buffer.from(c.data, c.base64Encoded ? 'base64' : 'utf8'));
+          if (c.eof) break;
+        }
+        await send('IO.close', { handle: r.stream }).catch(() => {});
+        return Buffer.concat(parts);
       },
+      // The tab is reused; "closing" just blanks it so the next page starts clean.
       close: async () => {
-        await s.send('Target.closeTarget', { targetId }).catch(() => {});
+        await send('Page.navigate', { url: 'about:blank' }).catch(() => {});
       },
     };
   }
 
   async close() {
+    this.tab = undefined;
     this.session?.close();
     this.proc?.kill('SIGTERM');
     if (this.profile) await rm(this.profile, { recursive: true, force: true }).catch(() => {});

@@ -12,21 +12,21 @@ export const THEMES: Record<string, { label: string; css: string }> = {
   editorial: {
     label: 'Editorial — huge type on your brand background',
     css: `
-:root{--bg:var(--brand-bg);--fg:var(--brand-text);--muted:var(--brand-muted);--accent:var(--brand-primary);--card:var(--brand-surface);--rule:color-mix(in srgb,var(--fg) 14%,transparent)}
+:root{--bg:var(--brand-bg);--fg:var(--brand-text);--muted:var(--brand-muted);--accent:var(--accent-on-bg);--card:var(--brand-surface);--rule:color-mix(in srgb,var(--fg) 14%,transparent)}
 body{background:var(--bg);color:var(--fg)}
 body::after{content:"";position:fixed;inset:0;background:${GRAIN};opacity:.18;mix-blend-mode:overlay;pointer-events:none}
 .ghost{color:color-mix(in srgb,var(--fg) 6%,transparent)}
 em{font-style:normal;color:var(--accent)}
-mark{background:var(--accent);color:var(--brand-on-primary);padding:0 .12em;border-radius:.08em;box-decoration-break:clone;-webkit-box-decoration-break:clone}`,
+mark{background:var(--accent);color:var(--bg);padding:0 .12em;border-radius:.08em;box-decoration-break:clone;-webkit-box-decoration-break:clone}`,
   },
   swiss: {
     label: 'Swiss — light grid, rules and big numerals',
     css: `
-:root{--bg:#f6f7f9;--fg:#0e1014;--muted:#5d6370;--accent:var(--brand-primary);--card:#ffffff;--rule:#0e1014}
+:root{--bg:#f6f7f9;--fg:#0e1014;--muted:#5d6370;--accent:var(--accent-on-light);--card:#ffffff;--rule:#0e1014}
 body{background:var(--bg);color:var(--fg);background-image:linear-gradient(to right,rgba(14,16,20,.05) 1px,transparent 1px);background-size:calc((100% - 192px)/12) 100%;background-position:96px 0}
 .ghost{color:rgba(14,16,20,.06)}
 em{font-style:normal;color:var(--accent)}
-mark{background:var(--accent);color:var(--brand-on-primary);padding:0 .1em}
+mark{background:var(--accent);color:var(--bg);padding:0 .1em}
 .title,.big{letter-spacing:-.045em}
 .bar{background:rgba(14,16,20,.12)}`,
   },
@@ -44,12 +44,12 @@ img.logo{background:var(--fg);border-radius:12px;padding:6px 10px;height:52px}`,
   midnight: {
     label: 'Midnight — dark glass with a brand-colored glow',
     css: `
-:root{--bg:#0b0d12;--fg:#f2f4f8;--muted:#9aa2b2;--accent:var(--brand-primary);--card:rgba(255,255,255,.05);--rule:rgba(255,255,255,.12)}
+:root{--bg:#0b0d12;--fg:#f2f4f8;--muted:#9aa2b2;--accent:var(--accent-on-dark);--card:rgba(255,255,255,.05);--rule:rgba(255,255,255,.12)}
 body{background:radial-gradient(900px 700px at 85% -10%,color-mix(in srgb,var(--brand-primary) 55%,transparent),transparent 70%),radial-gradient(800px 600px at -10% 110%,color-mix(in srgb,var(--brand-secondary) 40%,transparent),transparent 70%),var(--bg);color:var(--fg)}
 body::after{content:"";position:fixed;inset:0;background:${GRAIN};opacity:.12;mix-blend-mode:overlay;pointer-events:none}
 .ghost{color:rgba(255,255,255,.05)}
-em{font-style:normal;background:linear-gradient(90deg,var(--brand-primary),var(--brand-secondary));-webkit-background-clip:text;background-clip:text;color:transparent}
-mark{background:var(--accent);color:var(--brand-on-primary);padding:0 .12em;border-radius:.1em}
+em{font-style:normal;background:linear-gradient(90deg,var(--accent-on-dark),var(--accent2-on-dark));-webkit-background-clip:text;background-clip:text;color:transparent}
+mark{background:var(--accent);color:var(--bg);padding:0 .12em;border-radius:.1em}
 .card,.shot{backdrop-filter:blur(8px);border:1px solid var(--rule)}`,
   },
 };
@@ -97,7 +97,7 @@ const BASE = `
 .shot .chrome i{width:13px;height:13px;border-radius:50%;background:color-mix(in srgb,var(--fg) 22%,transparent)}
 .shot img{width:100%;height:auto;max-height:620px;object-fit:cover;object-position:top}
 .caption{font:500 30px/1.35 var(--font-body);color:var(--muted);margin-top:28px}
-.cta-btn{display:inline-flex;align-items:center;gap:14px;margin-top:48px;padding:28px 44px;border-radius:999px;background:var(--accent);color:var(--brand-on-primary);font:800 36px/1 var(--font-body);letter-spacing:-.01em;align-self:flex-start}
+.cta-btn{display:inline-flex;align-items:center;gap:14px;margin-top:48px;padding:28px 44px;border-radius:999px;background:var(--accent);color:var(--bg);font:800 36px/1 var(--font-body);letter-spacing:-.01em;align-self:flex-start}
 .url{font:600 32px/1.2 var(--font-mono);color:var(--muted);margin-top:28px}
 .nudges{display:flex;gap:16px;margin-top:56px;flex-wrap:wrap}
 .nudges span{border:2px solid var(--rule);border-radius:999px;padding:16px 26px;font:700 26px/1 var(--font-body)}
