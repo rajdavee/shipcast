@@ -28,6 +28,11 @@ if (process.env.FAKE_CLAUDE_MODE === 'fail') {
 if (process.env.FAKE_CLAUDE_MODE === 'hang') {
   setInterval(() => {}, 1000);
 } else {
+  if (prompt.includes('[shipcast-brainstorm-board]')) {
+    const beats = [{ scene: 'kinetic', title: 'Hook', line: 'Your standup could be a voice note.', note: 'open strong', seconds: 3 }, { scene: 'product', title: 'The app', line: 'Record thirty seconds.', note: '', seconds: 4 }, { scene: 'outro', title: 'Try it', line: 'Start free today.', note: '', seconds: 3 }];
+    emit({ type: 'result', subtype: 'success', is_error: false, result: JSON.stringify(beats), session_id: session });
+    process.exit(0);
+  }
   if (prompt.includes('[shipcast-brainstorm]')) {
     const answered = prompt.includes('Their answers:');
     const reply = answered

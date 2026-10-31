@@ -5,7 +5,8 @@ export interface HubPackage { id: string; name: string; repo: string; ref: strin
 export interface SkillsView { packages: (HubPackage & { installed: boolean; enabled: boolean; permissive: boolean; accepted: boolean })[]; roles: Record<string, { candidates: { id: string; skill: string; name: string }[]; chosen?: string; effective?: string }> }
 export interface BrainQuestion { id: string; question: string; why?: string; options: string[] }
 export interface BrainDirection { id: string; title: string; hook: string; angle: string; tone: string }
-export interface BrainTurn { understood: string; questions: BrainQuestion[]; directions: BrainDirection[] }
+export interface BrainTurn { understood: string; questions: BrainQuestion[]; directions: BrainDirection[]; formats?: string[] }
+export interface BoardBeat { scene: string; title: string; line: string; note: string; seconds: number }
 export type StepStatus = 'queued' | 'running' | 'done' | 'failed' | 'canceled' | 'blocked';
 
 export interface Step {
@@ -134,7 +135,8 @@ export const api = {
   packs: () => call<Pack[]>('GET', '/api/packs'),
   installPack: (id: string) => call<{ pack: Pack; results: { skill: string; ok: boolean; log: string }[] }>('POST', `/api/packs/${id}/install`),
   settings: () => call<Settings>('GET', '/api/settings'),
-  brainstorm: (b: { source: Source; formats: string[]; notes?: string; asked?: BrainQuestion[]; answers?: Record<string, string> }) => call<BrainTurn>('POST', '/api/brainstorm', b),
+  brainstorm: (b: { source: Source; formats: string[]; notes?: string; asked?: BrainQuestion[]; answers?: Record<string, string>; reply?: string }) => call<BrainTurn>('POST', '/api/brainstorm', b),
+  board: (b: { source: Source; formats: string[]; notes?: string; direction?: BrainDirection; length?: string }) => call<{ beats: BoardBeat[] }>('POST', '/api/brainstorm/board', b),
   skills: () => call<SkillsView>('GET', '/api/skills'),
   installSkill: (id: string, acceptLicence = false) => call<SkillsView>('POST', `/api/skills/${id}/install`, { acceptLicence }),
   setSkill: (id: string, enabled: boolean) => call<SkillsView>('PUT', `/api/skills/${id}`, { enabled }),

@@ -41,6 +41,7 @@ import {
   type Source,
   type Step,
   elevenVoices,
+  boardFor,
   loadRegistry,
   hubState,
   installPackage,
@@ -276,7 +277,9 @@ router.post('/api/brainstorm', async (req) => {
   const asked = Array.isArray(b.asked) ? b.asked.slice(0, 4) : undefined;
   const s = await readSettings();
   try {
-    return await brainstorm({ source, formats, notes: typeof b.notes === 'string' ? b.notes.slice(0, 2000) : '', answers, asked, model: undefined });
+    const catalogue = (await loadPacks()).filter((p) => p.spec || p.pipeline === 'shorts' || p.category === 'copy').map((p) => p.id);
+    const turn = await brainstorm({ source, formats, notes: typeof b.notes === 'string' ? b.notes.slice(0, 2000) : '', answers, asked, reply: typeof b.reply === 'string' ? b.reply.slice(0, 600) : undefined, catalogue, model: undefined });
+    return { ...turn, formats: (turn.formats ?? []).filter((f) => catalogue.includes(f)) };
   } catch (e) {
     throw new HttpError(502, (e as Error).message);
   }
@@ -314,6 +317,16 @@ router.put('/api/skills/:id', async (req, _r, p) => {
   const b = await readJson(req);
   await setPackage(p.id, { enabled: typeof b.enabled === 'boolean' ? b.enabled : undefined });
   return skillsView();
+});
+
+router.post('/api/brainstorm/board', async (req) => {
+  const b = await readJson(req);
+  const source = validateSource(b.source);
+  try {
+    return { beats: await boardFor({ source, formats: Array.isArray(b.formats) ? b.formats.map(String).slice(0, 12) : [], notes: typeof b.notes === 'string' ? b.notes.slice(0, 3000) : '', direction: b.direction && typeof b.direction === 'object' ? b.direction : undefined, length: typeof b.length === 'string' ? b.length.slice(0, 20) : undefined }) };
+  } catch (e) {
+    throw new HttpError(502, (e as Error).message);
+  }
 });
 
 // ── campaigns ──────────────────────────────────────────────────────────

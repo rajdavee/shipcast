@@ -147,7 +147,7 @@ export function Home({ status, services, campaigns }: { status: Status | null; s
         Brainstorm with me first — a few quick questions and three directions to pick from
       </label>
 
-      {brain && source && <Brainstorm source={source} formats={chosen} notes={notes} onDone={create} onCancel={() => setBrain(false)} />}
+      {brain && source && <Brainstorm source={source} formats={chosen} notes={notes} length={hasLong ? longLen : hasShort ? shortLen : undefined} onDone={create} onCancel={() => setBrain(false)} onFormats={(ids) => { setPicks(ids); savePicks(ids); }} />}
 
       {!text && (
         <div className="examples">

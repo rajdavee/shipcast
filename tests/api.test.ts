@@ -185,3 +185,9 @@ test('brainstorm asks first, then offers directions', async () => {
   assert.equal(second.body.directions[0].title, 'The 30-second standup');
   assert.deepEqual(second.body.questions, []);
 });
+
+test('drawing board turns a direction into sketchable beats', async () => {
+  const r = await api('/api/brainstorm/board', { method: 'POST', json: { source: { type: 'text', value: 'Voice standups' }, formats: ['reel'], direction: { id: 'd1', title: 'T', hook: 'H', angle: 'A', tone: 'warm' } } });
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.body.beats.map((b: any) => b.scene), ['kinetic', 'product', 'outro']);
+});
