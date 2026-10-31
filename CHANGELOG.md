@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.1 — 2026-10-31
+
+- New scenes: typing **terminal** (command + streamed output) and animated **bar chart** for real benchmarks — the director picks them on its own for dev tools.
+- **Animated carousels**: an MP4 version of every deck (push-ins, slide transitions, original bed, -14 LUFS), toggled in the format options or the slide editor.
+- Format options the user picks are enforced on the spec, not left to the model.
+- Transition overlay classes are namespaced so scene CSS can't collide with them.
+
 ## 0.3.0 — 2026-10-31
 
 - **Music**: procedural, licence-free beds in 6 moods (uplifting, tech, chill, energetic, cinematic, playful); scene cuts snap to the beat; whoosh/impact/pop sound design on transitions and stats.
