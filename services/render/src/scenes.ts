@@ -35,6 +35,8 @@ export interface SceneCtx {
   captionBand?: number;
   /** Platform/tool logos resolved before build (name → data URI, null = monogram). */
   icons?: Record<string, string | null>;
+  /** Spoken word times in this scene (seconds from scene start), for lip-sync and reveals. */
+  talk?: { text: string; start: number; end: number }[];
 }
 
 export interface SceneDef {
@@ -676,6 +678,81 @@ ${S} .txt .k{display:block;font:700 ${Math.round(26 * u)}px/1 var(--font-body);l
 ${S} .txt p{margin:0;font-family:var(--font-display);font-weight:750;letter-spacing:-.02em;line-height:1.12;max-width:22ch;${vertical ? 'margin:0 auto;' : ''}text-shadow:0 2px 30px rgba(0,0,0,.65)}
 ${S} .w-m{display:inline-block;overflow:hidden;vertical-align:top}${S} .w{display:inline-block}`,
         js: wordIn(S, '.txt p', 0.35) + has(`${S} .k`, `tl.fromTo("${S} .k",{opacity:0},{opacity:.8,duration:.6},.2);`),
+      };
+    },
+  },
+  {
+    id: 'character',
+    label: 'Animated presenter',
+    use: 'A friendly brand-coloured mascot explains one point in a speech bubble; its mouth moves with the voiceover and it gestures. For character-driven explainers, tutorials and stories. Poses: explain, wave, point, think, celebrate. Keep the bubble ≤ 90 chars and let the voice line say the same idea.',
+    minSeconds: 3,
+    fields: [
+      { id: 'line', type: 'text', label: 'Speech bubble', max: 90 },
+      { id: 'pose', type: 'text', label: 'Pose', optional: true, help: 'explain | wave | point | think | celebrate' },
+      { id: 'side', type: 'text', label: 'Side', optional: true, help: 'left | right' },
+    ],
+    build: (f, c) => {
+      const { u, vertical, pad, S } = frame(c);
+      const b = bg(c, 'light');
+      const pose = ['wave', 'point', 'think', 'celebrate', 'explain'].includes(String(f.pose)) ? String(f.pose) : 'explain';
+      const right = String(f.side) === 'right';
+      const body = c.brand.colors.primary;
+      const dark = luminance(body) < 0.4;
+      const ch = Math.round((vertical ? 860 : 720) * u);
+      const cw = Math.round(ch * 0.7);
+      const cx = vertical ? (c.width - cw) / 2 : right ? c.width - pad.r - cw : pad.l;
+      const cy = vertical ? c.height - pad.b - ch + 40 * u : (c.height - ch) / 2 + 60 * u;
+      const bw = vertical ? c.width - pad.l - pad.r : c.width - pad.l - pad.r - cw - 80 * u;
+      const bx = vertical ? pad.l : right ? pad.l : pad.l + cw + 80 * u;
+      const by = vertical ? pad.t + 40 * u : c.height * 0.2;
+      const size = fit(f.line, u, vertical ? [[40, 84], [70, 72], [90, 64]] : [[40, 80], [70, 68], [90, 60]], 54);
+      const eye = dark ? '#fff' : '#14161c';
+      // Mascot: rounded body in the brand colour, face, two arms; drawn on a 140×200 grid.
+      const svg = `<svg class="mascot" viewBox="0 0 140 200" width="${cw}" height="${ch}" style="left:${cx}px;top:${cy}px">
+<ellipse cx="70" cy="194" rx="46" ry="6" fill="rgba(0,0,0,.14)"/>
+<g class="bodyg">
+<g class="armL"><path d="M30 108 Q14 124 20 144" stroke="${body}" stroke-width="13" stroke-linecap="round" fill="none"/></g>
+<g class="armR"><path d="M110 108 Q126 124 120 144" stroke="${body}" stroke-width="13" stroke-linecap="round" fill="none"/></g>
+<rect x="22" y="40" width="96" height="148" rx="48" fill="${body}"/>
+<ellipse cx="70" cy="58" rx="30" ry="12" fill="#fff" opacity=".18"/>
+<g class="face"><g class="eyes"><ellipse class="eye" cx="54" cy="92" rx="6.5" ry="8" fill="${eye}"/><ellipse class="eye" cx="86" cy="92" rx="6.5" ry="8" fill="${eye}"/></g>
+<ellipse class="mouth" cx="70" cy="118" rx="10" ry="3" fill="${eye}"/>
+<circle cx="45" cy="110" r="6" fill="#ff7a9a" opacity=".35"/><circle cx="95" cy="110" r="6" fill="#ff7a9a" opacity=".35"/></g>
+${pose === 'think' ? '<g class="prop"><circle cx="122" cy="30" r="5" fill="#bbb"/><circle cx="132" cy="14" r="8" fill="#ccc"/></g>' : ''}
+${pose === 'celebrate' ? '<g class="prop"><path d="M14 30 l6 -12 l6 12 z" fill="#FFD84D"/><path d="M118 22 l6 -12 l6 12 z" fill="#5BD6A0"/><circle cx="30" cy="16" r="4" fill="#ff7a9a"/><circle cx="110" cy="40" r="4" fill="#7aa7ff"/></g>' : ''}
+</g></svg>`;
+      const armJs: Record<string, string> = {
+        explain: `tl.to("${S} .armR",{rotation:-28,duration:.45,ease:"power2.out",svgOrigin:"110 108",yoyo:true,repeat:${Math.max(1, Math.floor(c.duration / 0.9))}},.3);`,
+        wave: `tl.to("${S} .armR",{rotation:-150,duration:.3,ease:"power2.out",svgOrigin:"110 108"},.2);tl.to("${S} .armR",{rotation:-115,duration:.22,ease:"sine.inOut",svgOrigin:"110 108",yoyo:true,repeat:${Math.max(3, Math.floor(c.duration / 0.45))}},.5);`,
+        point: `tl.to("${S} ${right ? '.armL' : '.armR'}",{rotation:${right ? 100 : -100},duration:.35,ease:"back.out(2)",svgOrigin:"${right ? '30 108' : '110 108'}"},.25);`,
+        think: `tl.to("${S} .armL",{rotation:150,duration:.4,ease:"power2.out",svgOrigin:"30 108"},.2);tl.fromTo("${S} .prop circle",{scale:0,transformOrigin:"50% 50%"},{scale:1,duration:.3,stagger:.15,ease:"back.out(2)"},.5);`,
+        celebrate: `tl.to(["${S} .armL","${S} .armR"],{rotation:(i)=>i?-150:150,duration:.3,ease:"back.out(2)",svgOrigin:(i)=>i?"110 108":"30 108"},.2);tl.fromTo("${S} .prop > *",{y:20,opacity:0},{y:0,opacity:1,duration:.4,stagger:.06,ease:"back.out(2)"},.3);tl.to("${S} .bodyg",{y:-14,duration:.25,yoyo:true,repeat:3,ease:"power1.inOut"},.3);`,
+      };
+      // Lip-sync: open the mouth for every spoken word, close between them.
+      const talk = (c.talk ?? []).filter((w) => w.start < c.duration);
+      const mouth = talk.length
+        ? talk.map((w) => `tl.to("${S} .mouth",{attr:{ry:${(6 + (w.text.length % 3) * 2).toFixed(0)}},duration:.07},${w.start.toFixed(2)});tl.to("${S} .mouth",{attr:{ry:3},duration:.07},${Math.max(w.start + 0.08, w.end - 0.04).toFixed(2)});`).join('')
+        : `tl.to("${S} .mouth",{attr:{ry:7},duration:.12,yoyo:true,repeat:${Math.max(3, Math.floor(c.duration / 0.25))}},.3);`;
+      const reveal = talk.length ? `const ws=document.querySelectorAll("${S} .bub .w");const tt=${JSON.stringify(talk.map((w) => +w.start.toFixed(2)))};ws.forEach((w,i)=>tl.fromTo(w,{opacity:.15},{opacity:1,duration:.15},tt[Math.min(i,tt.length-1)]??(.4+i*.08)));` : `tl.fromTo("${S} .bub .w",{opacity:.15},{opacity:1,duration:.2,stagger:.07},.4);`;
+      return {
+        markup: b.markup + svg + `<div class="bub ${right && !vertical ? 'r' : ''}" style="left:${bx}px;top:${by}px;width:${bw}px"><p class="nofit" style="font-size:${size}px">${words(f.line)}</p></div>`,
+        css:
+          b.css +
+          `${S} .mascot{position:absolute;overflow:visible;filter:drop-shadow(0 ${Math.round(20 * u)}px ${Math.round(30 * u)}px rgba(0,0,0,.18))}
+${S} .bub{position:absolute;box-sizing:border-box;background:#fff;color:#14161c;border-radius:${Math.round(36 * u)}px;padding:${Math.round(40 * u)}px ${Math.round(48 * u)}px;box-shadow:0 ${Math.round(24 * u)}px ${Math.round(60 * u)}px -${Math.round(24 * u)}px rgba(0,0,0,.35)}
+${S} .bub::after{content:"";position:absolute;${vertical ? `left:50%;bottom:-${Math.round(26 * u)}px;margin-left:-${Math.round(20 * u)}px;border-top:${Math.round(28 * u)}px solid #fff;border-left:${Math.round(20 * u)}px solid transparent;border-right:${Math.round(20 * u)}px solid transparent` : `top:${Math.round(70 * u)}px;${right ? 'right' : 'left'}:-${Math.round(26 * u)}px;border-${right ? 'left' : 'right'}:${Math.round(30 * u)}px solid #fff;border-top:${Math.round(18 * u)}px solid transparent;border-bottom:${Math.round(18 * u)}px solid transparent`}}
+${S} .bub p{margin:0;font-family:var(--font-display);font-weight:750;letter-spacing:-.02em;line-height:1.15}
+${S} .w-m{display:inline-block}${S} .w{display:inline-block}`,
+        js:
+          b.js +
+          `tl.fromTo("${S} .mascot",{y:${Math.round(120 * u)},opacity:0},{y:0,opacity:1,duration:.6,ease:"back.out(1.6)"},0);
+tl.fromTo("${S} .bub",{scale:.6,opacity:0,transformOrigin:"${vertical ? '50% 100%' : right ? '100% 30%' : '0% 30%'}"},{scale:1,opacity:1,duration:.45,ease:"back.out(1.8)"},.25);
+tl.to("${S} .bodyg",{y:-6,duration:.9,yoyo:true,repeat:${Math.max(1, Math.floor(c.duration / 0.9))},ease:"sine.inOut"},.6);
+tl.to("${S} .eye",{attr:{ry:1},duration:.06,yoyo:true,repeat:1,transformOrigin:"50% 50%"},${Math.min(1.6, c.duration * 0.4).toFixed(2)});
+tl.to("${S} .eye",{attr:{ry:1},duration:.06,yoyo:true,repeat:1},${Math.max(0.5, c.duration - 1.2).toFixed(2)});` +
+          (armJs[pose] ?? '') +
+          mouth +
+          reveal,
       };
     },
   },

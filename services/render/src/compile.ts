@@ -107,7 +107,7 @@ function subcomp(id: string, width: number, height: number, part: { markup: stri
 <script>(()=>{const root=document.getElementById("${id}")||document.querySelector('[data-composition-id="${id}"]');
 // Shrink a headline only if it truly overflows. Wait for real layout first: before the scene is
 // mounted its box is 0 wide and every line would look too long. Always fit from the authored size.
-const fit=()=>{const c=root.getBoundingClientRect();if(c.width<${Math.round(width / 2)})return false;for(const el of root.querySelectorAll("h1,h2,.num,p")){const cs=getComputedStyle(el);if(cs.display==="inline"||!el.clientWidth)continue;if(!el.dataset.fs0)el.dataset.fs0=parseFloat(cs.fontSize);let s=+el.dataset.fs0;el.style.fontSize=s+"px";const min=Math.max(s*.6,28);const room=()=>{const p=el.parentElement.getBoundingClientRect(),r=el.getBoundingClientRect();return Math.min(el.clientWidth,p.right-r.left,c.right-r.left);};for(let i=0;i<30&&s>min&&el.scrollWidth>room()+Math.max(6,s*.08);i++){s*=.95;el.style.fontSize=s+"px";}}return true;};
+const fit=()=>{const c=root.getBoundingClientRect();if(c.width<${Math.round(width / 2)})return false;for(const el of root.querySelectorAll("h1,h2,.num,p:not(.nofit)")){const cs=getComputedStyle(el);if(cs.display==="inline"||!el.clientWidth)continue;if(!el.dataset.fs0)el.dataset.fs0=parseFloat(cs.fontSize);let s=+el.dataset.fs0;el.style.fontSize=s+"px";const min=Math.max(s*.6,28);const room=()=>{const p=el.parentElement.getBoundingClientRect(),r=el.getBoundingClientRect();return Math.min(el.clientWidth,p.right-r.left,c.right-r.left);};for(let i=0;i<30&&s>min&&el.scrollWidth>room()+Math.max(6,s*.08);i++){s*=.95;el.style.fontSize=s+"px";}}return true;};
 let tries=0;const tryFit=()=>{if(!fit()&&tries++<120)requestAnimationFrame(tryFit);};tryFit();
 if(window.ResizeObserver)new ResizeObserver(()=>fit()).observe(root);
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(fit);
@@ -268,7 +268,7 @@ export async function compileStoryboard(story: Storyboard, opts: { dir: string; 
     credits.push(`${clip.credit} — ${clip.url}`);
   }
   for (const e of timeline) {
-    const sctx: SceneCtx = { id: e.id, width, height, duration: e.duration, safe: preset.safe, brand: fallbackBrand, assetsDir: opts.brandDir, asset, icons, captionBand: e.sc.scene === 'product' || e.sc.scene === 'scroll' ? 0 : captionBand };
+    const sctx: SceneCtx = { id: e.id, width, height, duration: e.duration, safe: preset.safe, brand: fallbackBrand, assetsDir: opts.brandDir, asset, icons, talk: voiced[e.i]?.words.map((w) => ({ text: w.text, start: +(w.start + VO_LEAD).toFixed(3), end: +(w.end + VO_LEAD).toFixed(3) })), captionBand: e.sc.scene === 'product' || e.sc.scene === 'scroll' ? 0 : captionBand };
     if (e.sc.scene) {
       const part = getScene(e.sc.scene).build((e.sc.fields ?? {}) as Record<string, any>, sctx);
       await writeFile(join(dir, 'compositions', `${e.id}.html`), subcomp(e.id, width, height, part, punchesFor(e)));
@@ -289,7 +289,7 @@ export async function compileStoryboard(story: Storyboard, opts: { dir: string; 
   let captionsFile: string | undefined;
   if (words.length && style !== 'none') {
     // Cinematic and B-roll scenes carry their own subtitle line; captions would duplicate it.
-    const ownText = timeline.filter((e) => e.sc.scene === 'cinema' || e.sc.scene === 'broll').map((e) => [e.start, e.start + e.duration]);
+    const ownText = timeline.filter((e) => e.sc.scene === 'cinema' || e.sc.scene === 'broll' || e.sc.scene === 'character').map((e) => [e.start, e.start + e.duration]);
     const captionWords = words.filter((w) => !ownText.some(([a, b]) => w.start >= a && w.start < b));
     const part = buildCaptions(captionWords, style, { id: 'captions', width, height, safe: preset.safe, brand: fallbackBrand });
     captionsFile = join(dir, 'compositions', 'captions.html');
