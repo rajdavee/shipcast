@@ -1,0 +1,18 @@
+{
+  "id": "shorts",
+  "name": "Shorts from a video",
+  "tagline": "Re-directs the strongest chapters of a long video natively for 9:16 — hook, trimmed to ~45 s, highlight captions. No Claude turn.",
+  "category": "video",
+  "order": 6,
+  "estimate": "3–8 min",
+  "accent": "#ff3d7f",
+  "pipeline": "shorts",
+  "options": [
+    { "key": "count", "label": "How many", "type": "select", "choices": ["1", "2", "3", "4", "5"], "default": "3" },
+    { "key": "captions", "label": "Captions", "type": "select", "choices": ["highlight", "emoji", "bold", "pop", "karaoke"], "default": "highlight" },
+    { "key": "source", "label": "From", "type": "text", "default": "", "placeholder": "Blank = your newest YouTube video" }
+  ],
+  "outputs": ["short-*.mp4", "short-*.jpg", "short-*.json"],
+  "skills": [],
+  "tools": ["ffmpeg", "chrome"]
+}

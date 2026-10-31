@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { contrastRatio, ensureContrast, normalizeBrand, brandCss, PRESETS, getPreset, VERTICAL_SAFE } from '@shipcast/engine';
+import { contrastRatio, ensureContrast, normalizeBrand, brandCss, PRESETS, getPreset, VERTICAL_SAFE, shortsFromStoryboard } from '@shipcast/engine';
 import { makeMusic, MOODS, toWav, addSfx } from '@shipcast/media';
 import { CAPTION_STYLES, SCENES, validateInfographic, validateStoryboard } from '@shipcast/render';
 
@@ -90,4 +90,26 @@ test('long-form storyboards validate per chapter', () => {
   assert.ok(validateStoryboard({ ...ok, chapters: [ok.chapters[0]] } as any).some((e) => /2–16/.test(e)), 'needs at least two chapters');
   assert.ok(validateStoryboard({ ...ok, chapters: [...ok.chapters, { title: 'Bad', scenes: [{ scene: 'title', fields: {} }] }] } as any).some((e) => /chapter 3/.test(e)));
   assert.ok(SCENES.some((s) => s.id === 'chapter'), 'chapter card scene exists');
+});
+
+test('shorts pick the strongest chapters and stay short', () => {
+  const sc = (scene: string, vo = 'eight words of narration for this one scene here') => ({ scene, fields: { title: 'x' }, vo });
+  const board = {
+    title: 'Five jobs',
+    preset: 'youtube',
+    chapters: [
+      { title: 'Cold open', card: false, scenes: [sc('kinetic'), sc('statement')] },
+      { title: 'Calm part', scenes: [sc('features'), sc('features')] },
+      { title: 'The peak', scenes: Array.from({ length: 20 }, () => sc('stat')) },
+      { title: 'Wrap', scenes: [sc('statement'), sc('outro')] },
+    ],
+  };
+  const shorts = shortsFromStoryboard(board, 2);
+  assert.equal(shorts.length, 2);
+  assert.deepEqual(shorts.map((s) => s.title), ['Five jobs — Cold open', 'Five jobs — The peak']);
+  for (const s of shorts) {
+    assert.equal(s.preset, 'vertical');
+    assert.equal(s.scenes!.at(-1)!.scene, 'outro', 'every short ends on the outro');
+    assert.ok(s.scenes!.length < 15, 'trimmed to about 45 s');
+  }
 });

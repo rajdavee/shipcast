@@ -19,3 +19,4 @@ export * from './fonts.ts';
 export * from './specs.ts';
 export * from './icons.ts';
 export * from './voices.ts';
+export * from './shorts.ts';

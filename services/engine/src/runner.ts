@@ -1,6 +1,7 @@
 import { mkdir, writeFile, rm } from 'node:fs/promises';
 import { catalogMarkdown, checkCopy, renderSpec, SPEC_FILE } from './specs.ts';
-import { readFile, readdir, stat } from 'node:fs/promises';
+import { readFile, readdir, rename, stat } from 'node:fs/promises';
+import { shortsFromStoryboard } from './shorts.ts';
 import { callService } from './service.ts';
 import { existsSync } from 'node:fs';
 import { hostname } from 'node:os';
@@ -283,6 +284,7 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
     let why = '';
     let resultText = '';
     if (step.kind === 'brief') await phase('Researching your product');
+    else if (pack?.pipeline === 'shorts') await phase('Cutting Shorts from your video');
     else if (pack?.pipeline) await phase('Transcribing and captioning');
     else if (!renderOnly) await phase(specKind === 'storyboard' ? 'Writing the script' : specKind === 'infographic' ? 'Researching the framework' : specKind === 'deck' ? 'Writing the slides' : specKind === 'graphics' ? 'Designing the graphics' : pack?.id === 'copy-kit' ? 'Writing the posts' : 'Making it');
     if (pack?.pipeline === 'captions') {
@@ -300,6 +302,37 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
           const r = await callService('render', 'captions', { video: join(uploads, pick), outDir: join(cwd, 'out'), brandDir: join(dir, 'brief'), style: step.options.style || 'bold', hook: step.options.hook || undefined });
           await writeFile(join(cwd, 'out', 'qa.json'), JSON.stringify(r.qa, null, 2));
           await log({ step: step.id, type: 'log', text: `Rendered: ${r.duration.toFixed(1)}s, ${r.words} words, QA ${r.qa?.pass ? 'passed' : 'flagged issues'}` });
+        } catch (e) {
+          ok = false;
+          why = (e as Error).message;
+        }
+      }
+    } else if (pack?.pipeline === 'shorts') {
+      // No Claude: re-direct the strongest chapters of a long video natively for 9:16.
+      const done = campaign.steps.filter((s) => s.kind === 'pack' && s.status === 'done' && s.id !== step.id && s.outputs.some((o) => o.endsWith('storyboard.json')));
+      const wanted = String(step.options.source ?? '').trim();
+      const src = (wanted ? done.find((s) => s.id === wanted) : undefined) ?? [...done].reverse().find((s) => s.pack === 'youtube-video') ?? [...done].reverse()[0];
+      if (!src) {
+        ok = false;
+        why = 'Make a video first (a YouTube video works best), then cut Shorts from it.';
+      } else {
+        try {
+          const rel = src.outputs.find((o) => o.endsWith('storyboard.json'))!;
+          const board = JSON.parse(await readFile(join(dir, 'deliverables', src.id, rel), 'utf8'));
+          const shorts = shortsFromStoryboard(board, Math.min(5, Math.max(1, Number(step.options.count) || 3)), { captions: String(step.options.captions || 'highlight') });
+          const out = join(cwd, 'out');
+          await mkdir(out, { recursive: true });
+          for (const [k, sb] of shorts.entries()) {
+            await phase(`Rendering Short ${k + 1} of ${shorts.length}`);
+            await log({ step: step.id, type: 'log', text: `Short ${k + 1}: ${sb.title} (${sb.scenes?.length} scenes)` });
+            const d = join(out, `short-${k + 1}`);
+            const r = await callService('render', 'render', { storyboard: sb, outDir: d, brandDir: join(dir, 'brief'), name: 'short' });
+            await rename(r.file, join(out, `short-${k + 1}.mp4`));
+            await rename(r.poster, join(out, `short-${k + 1}.jpg`));
+            await writeFile(join(out, `short-${k + 1}.json`), JSON.stringify(sb, null, 2));
+            await rm(d, { recursive: true, force: true });
+          }
+          await log({ step: step.id, type: 'log', text: `Made ${shorts.length} Shorts from "${board.title ?? src.pack}"` });
         } catch (e) {
           ok = false;
           why = (e as Error).message;

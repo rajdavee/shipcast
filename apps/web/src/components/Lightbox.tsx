@@ -130,6 +130,7 @@ export function Lightbox({ campaign, step, pack, events, onClose, onChange, onPr
             <div className="lb-actions">
               {main && <a className="btn primary" href={url(prefix + main) + '&download'} download>Download {label(main)}</a>}
               {postText && <button className="btn" onClick={() => navigator.clipboard.writeText(postText).then(() => toast('Post text copied'))}>Copy post text</button>}
+              {step.pack === 'youtube-video' && <button className="btn" onClick={() => act(() => api.addStep(campaign.id, 'shorts', { source: step.id }), 'Cutting 3 Shorts from this video')}>Cut 3 Shorts</button>}
             </div>
           )}
 
