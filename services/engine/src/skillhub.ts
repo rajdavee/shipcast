@@ -39,6 +39,8 @@ export interface HubPackage {
   stars?: number;
   /** Enabled out of the box (permissive licence, proven useful). */
   default?: boolean;
+  /** Added by the user from a URL (not in the curated registry). */
+  custom?: boolean;
 }
 
 export interface HubState {
@@ -62,12 +64,80 @@ const stateFile = () => join(hubDir(), 'state.json');
 /** The generated plugin Claude loads (--plugin-dir). */
 export const hubPluginDir = () => join(hubDir(), 'plugin');
 
-export async function loadRegistry(): Promise<HubPackage[]> {
+const customFile = () => join(hubDir(), 'custom.json');
+
+async function loadCustom(): Promise<HubPackage[]> {
   try {
-    return JSON.parse(await readFile(join(ROOT, 'skills', 'registry.json'), 'utf8')).packages;
+    return JSON.parse(await readFile(customFile(), 'utf8'));
   } catch {
     return [];
   }
+}
+
+export async function loadRegistry(): Promise<HubPackage[]> {
+  let curated: HubPackage[] = [];
+  try {
+    curated = JSON.parse(await readFile(join(ROOT, 'skills', 'registry.json'), 'utf8')).packages;
+  } catch {}
+  return [...curated, ...(await loadCustom()).map((p) => ({ ...p, custom: true }) as HubPackage)];
+}
+
+/**
+ * Add any GitHub skill repo (or a folder inside one) as a custom package,
+ * pinned to its current commit. Finds every SKILL.md under the path.
+ */
+export async function addCustomPackage(url: string): Promise<HubPackage> {
+  const m = url.trim().match(/^https?:\/\/github\.com\/([\w.-]+)\/([\w.-]+?)(?:\.git)?(?:\/tree\/([^/]+)(?:\/(.+?))?)?\/?$/);
+  if (!m) throw new Error('Paste a GitHub link like https://github.com/owner/repo or …/tree/main/skills');
+  const [, owner, repo, branch, sub] = m;
+  const gh = async (p: string) => {
+    const r = await fetch(`https://api.github.com/${p}`, { headers: { accept: 'application/vnd.github+json', 'user-agent': 'shipcast' }, signal: AbortSignal.timeout(20_000) });
+    if (r.status === 404) throw new Error('That repository or path was not found (private repos are not supported)');
+    if (!r.ok) throw new Error(`GitHub said ${r.status}${r.status === 403 ? ' (rate limit — try again in a few minutes)' : ''}`);
+    return r.json() as Promise<any>;
+  };
+  const info = await gh(`repos/${owner}/${repo}`);
+  const sha = (await gh(`repos/${owner}/${repo}/commits/${encodeURIComponent(branch ?? info.default_branch)}`)).sha as string;
+  const tree = (await gh(`repos/${owner}/${repo}/git/trees/${sha}?recursive=1`)).tree as { path: string }[];
+  const prefix = sub ? `${sub.replace(/\/$/, '')}/` : '';
+  const skip = /(^|\/)\.(agents|cursor|codex|gemini|opencode|kiro|windsurf|trae|github)\//;
+  const dirs = tree
+    .map((t) => t.path)
+    .filter((p) => /(^|\/)SKILL\.md$/.test(p) && (prefix ? p.startsWith(prefix) || p === `${sub}/SKILL.md` : true) && !skip.test(p))
+    .map((p) => (p === 'SKILL.md' ? '.' : p.replace(/\/SKILL\.md$/, '')))
+    .slice(0, 40);
+  if (!dirs.length) throw new Error('No SKILL.md found there');
+  const id = `custom-${owner}-${repo}${sub ? `-${sub.split('/').pop()}` : ''}`.toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 60);
+  const names: Record<string, string> = {};
+  if (dirs.includes('.')) names['.'] = repo.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  const pkg: HubPackage = {
+    id,
+    name: `${repo}${sub ? ` · ${sub.split('/').pop()}` : ''}`,
+    repo: `${owner}/${repo}`,
+    ref: sha,
+    paths: dirs,
+    ...(Object.keys(names).length ? { names } : {}),
+    licence: info.license?.spdx_id && info.license.spdx_id !== 'NOASSERTION' ? info.license.spdx_id : 'none',
+    area: 'core',
+    roles: {},
+    summary: info.description || `Skills from ${owner}/${repo}`,
+    verdict: 3,
+    stars: info.stargazers_count,
+  };
+  const all = (await loadCustom()).filter((p) => p.id !== id);
+  await mkdir(hubDir(), { recursive: true });
+  await writeFile(customFile(), JSON.stringify([...all, pkg], null, 2));
+  return pkg;
+}
+
+export async function removeCustomPackage(id: string): Promise<void> {
+  await writeFile(customFile(), JSON.stringify((await loadCustom()).filter((p) => p.id !== id), null, 2));
+  await rm(storeDir(id), { recursive: true, force: true });
+  const s = await hubState();
+  delete s.installed[id];
+  delete s.enabled[id];
+  await saveState(s);
+  await buildHubPlugin();
 }
 
 export async function hubState(): Promise<HubState> {

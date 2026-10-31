@@ -45,6 +45,8 @@ import {
   loadRegistry,
   hubState,
   installPackage,
+  addCustomPackage,
+  removeCustomPackage,
   setPackage,
   setRole,
   isEnabled,
@@ -306,6 +308,19 @@ router.post('/api/skills/:id/install', async (req, _r, p) => {
   const r = await installPackage(p.id, { acceptLicence: b?.acceptLicence === true });
   if (!r.ok) throw new HttpError(400, r.log);
   return { ...(await skillsView()), log: r.log };
+});
+router.post('/api/skills/custom', async (req) => {
+  const b = await readJson(req);
+  try {
+    const pkg = await addCustomPackage(String(b.url ?? ''));
+    return { ...(await skillsView()), added: pkg.id };
+  } catch (e) {
+    throw new HttpError(400, (e as Error).message);
+  }
+});
+router.delete('/api/skills/custom/:id', async (_q, _r, p) => {
+  await removeCustomPackage(p.id);
+  return skillsView();
 });
 router.put('/api/skills/roles', async (req) => {
   const b = await readJson(req);

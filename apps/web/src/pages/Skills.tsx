@@ -11,7 +11,7 @@ const AREAS: [string, string][] = [
   ['brand', 'Brand & research'],
   ['story', 'Story & scripts'],
   ['audio', 'Voice & audio'],
-  ['core', 'Foundations'],
+  ['core', 'Added by you'],
 ];
 
 const ROLE_LABEL = (r: string) => r.replace(/-/g, ' ');
@@ -27,19 +27,21 @@ export function Skills() {
   const [data, setData] = useState<SkillsView | null>(null);
   const view = data ?? v.data;
 
-  const act = async (id: string, fn: () => Promise<SkillsView>, msg: string) => {
+  const act = async (id: string, fn: () => Promise<SkillsView>, msg: string): Promise<void> => {
     setBusy(id);
     try {
       setData(await fn());
       toast(msg);
     } catch (e) {
       toast(String((e as Error).message));
+      throw e;
     } finally {
       setBusy(null);
     }
   };
 
   if (!view) return <main className="page"><p className="muted">Loading…</p></main>;
+  const [url, setUrl] = useState('');
   const byArea = AREAS.map(([a, label]) => ({ a, label, items: view.packages.filter((p) => p.area === a) })).filter((g) => g.items.length);
 
   return (
@@ -51,6 +53,21 @@ export function Skills() {
         </div>
       </div>
 
+
+      <form
+        className="add-skill"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (url.trim()) act('add', () => api.addSkillUrl(url.trim()), 'Skill added — install it below').then(() => setUrl('')).catch(() => {});
+        }}
+      >
+        <div>
+          <b>Add any skill from GitHub</b>
+          <span>Paste a repo or folder link. Shipcast pins it to today's commit and checks its licence. Only add skills you trust — they run with Claude's tools.</span>
+        </div>
+        <input className="input" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://github.com/owner/repo  or  …/tree/main/skills/my-skill" aria-label="GitHub link to a skill" />
+        <button className="btn primary" disabled={!url.trim() || busy === 'add'}>{busy === 'add' ? 'Checking…' : 'Add'}</button>
+      </form>
 
       {byArea.map((g) => (
         <section key={g.a} className="setup-section">
@@ -70,7 +87,7 @@ export function Skills() {
             .map(([role, r]) => (
               <label key={role} className="field role-pick">
                 <span>{ROLE_LABEL(role)}</span>
-                <select className="select" value={r.chosen ?? ''} onChange={(e) => act(role, () => api.setSkillRole(role, e.target.value || null), `${ROLE_LABEL(role)}: updated`)}>
+                <select className="select" value={r.chosen ?? ''} onChange={(e) => act(role, () => api.setSkillRole(role, e.target.value || null), `${ROLE_LABEL(role)}: updated`).catch(() => {})}>
                   <option value="">Best available{r.effective && !r.chosen ? ` (${r.effective})` : ''}</option>
                   {r.candidates.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
@@ -82,7 +99,7 @@ export function Skills() {
   );
 }
 
-function SkillCard({ p, busy, act }: { p: HubPackage & { installed: boolean; enabled: boolean; permissive: boolean; accepted: boolean }; busy: boolean; act: (id: string, fn: () => Promise<SkillsView>, msg: string) => void }) {
+function SkillCard({ p, busy, act }: { p: HubPackage & { installed: boolean; enabled: boolean; permissive: boolean; accepted: boolean }; busy: boolean; act: (id: string, fn: () => Promise<SkillsView>, msg: string) => Promise<void> }) {
   const [consent, setConsent] = useState(false);
   return (
     <article className={`skill-card ${p.installed && p.enabled ? 'on' : ''}`}>
@@ -98,7 +115,10 @@ function SkillCard({ p, busy, act }: { p: HubPackage & { installed: boolean; ena
         {(p.needs ?? []).map((n) => <span key={n} className="tag need">needs {n}</span>)}
       </div>
       <footer>
-        <span className="muted">{p.paths.length} skill{p.paths.length > 1 ? 's' : ''}</span>
+        <span className="muted">
+          {p.paths.length} skill{p.paths.length > 1 ? 's' : ''}
+          {p.custom && <button className="linkish danger" style={{ marginLeft: 10, fontSize: 12.5 }} onClick={() => act(p.id, () => api.removeSkill(p.id), 'Removed').catch(() => {})}>Remove</button>}
+        </span>
         {!p.installed ? (
           <>
             {!p.permissive && !p.accepted && (
@@ -106,13 +126,13 @@ function SkillCard({ p, busy, act }: { p: HubPackage & { installed: boolean; ena
                 <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} /> I accept its licence
               </label>
             )}
-            <button className="btn sm primary" disabled={busy || (!p.permissive && !p.accepted && !consent)} onClick={() => act(p.id, () => api.installSkill(p.id, consent), `${p.name} installed`)}>
+            <button className="btn sm primary" disabled={busy || (!p.permissive && !p.accepted && !consent)} onClick={() => act(p.id, () => api.installSkill(p.id, consent), `${p.name} installed`).catch(() => {})}>
               {busy ? 'Installing…' : 'Install'}
             </button>
           </>
         ) : (
           <label className="switch">
-            <input type="checkbox" checked={p.enabled} disabled={busy} onChange={(e) => act(p.id, () => api.setSkill(p.id, e.target.checked), e.target.checked ? `${p.name} on` : `${p.name} off`)} />
+            <input type="checkbox" checked={p.enabled} disabled={busy} onChange={(e) => act(p.id, () => api.setSkill(p.id, e.target.checked), e.target.checked ? `${p.name} on` : `${p.name} off`).catch(() => {})} />
             {p.enabled ? 'On' : 'Off'}
           </label>
         )}

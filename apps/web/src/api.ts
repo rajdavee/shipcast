@@ -1,7 +1,7 @@
 // Types mirror services/engine/src/types.ts; the web app talks to it only over HTTP.
 export type SourceType = 'url' | 'github' | 'local' | 'text';
 export type Source = { type: SourceType; value: string };
-export interface HubPackage { id: string; name: string; repo: string; ref: string; paths: string[]; licence: string; area: string; roles: Record<string, string>; summary: string; verdict: number; needs?: string[]; stars?: number }
+export interface HubPackage { id: string; name: string; repo: string; ref: string; paths: string[]; licence: string; area: string; roles: Record<string, string>; summary: string; verdict: number; needs?: string[]; stars?: number; custom?: boolean }
 export interface SkillsView { packages: (HubPackage & { installed: boolean; enabled: boolean; permissive: boolean; accepted: boolean })[]; roles: Record<string, { candidates: { id: string; skill: string; name: string }[]; chosen?: string; effective?: string }> }
 export interface BrainQuestion { id: string; question: string; why?: string; options: string[] }
 export interface BrainDirection { id: string; title: string; hook: string; angle: string; tone: string }
@@ -139,6 +139,8 @@ export const api = {
   board: (b: { source: Source; formats: string[]; notes?: string; direction?: BrainDirection; length?: string }) => call<{ beats: BoardBeat[] }>('POST', '/api/brainstorm/board', b),
   skills: () => call<SkillsView>('GET', '/api/skills'),
   installSkill: (id: string, acceptLicence = false) => call<SkillsView>('POST', `/api/skills/${id}/install`, { acceptLicence }),
+  addSkillUrl: (url: string) => call<SkillsView & { added: string }>('POST', '/api/skills/custom', { url }),
+  removeSkill: (id: string) => call<SkillsView>('DELETE', `/api/skills/custom/${id}`),
   setSkill: (id: string, enabled: boolean) => call<SkillsView>('PUT', `/api/skills/${id}`, { enabled }),
   setSkillRole: (role: string, id: string | null) => call<SkillsView>('PUT', '/api/skills/roles', { role, id }),
   voice: () => call<VoiceState>('GET', '/api/voice'),
