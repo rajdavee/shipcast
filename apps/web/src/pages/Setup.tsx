@@ -240,7 +240,7 @@ function VoiceSection() {
           <i className={`dot ${d?.provider === 'chatterbox' ? 'ok' : ''}`} />
           <div>
             <h3>Chatterbox (free, local, more natural)</h3>
-            <p>{d?.chatterbox ? (d.provider === 'chatterbox' ? 'In use for every voiceover.' : 'Installed, not in use.') : 'Open-source (MIT) voice that runs on this computer. Installs PyTorch (~2 GB, a few minutes).'}</p>
+            <p>{d?.chatterbox ? (d.provider === 'chatterbox' ? 'In use for every voiceover.' : 'Installed, not in use.') : 'Open-source (MIT) voice that runs on this computer. Installs PyTorch (~2 GB); the first voiceover also downloads the voice model (~1 GB).'}</p>
           </div>
           {d?.chatterbox ? (
             d.provider !== 'chatterbox' && <button className="btn primary" disabled={busy} onClick={() => save({ provider: 'chatterbox' }, 'Using Chatterbox')}>Use it</button>
