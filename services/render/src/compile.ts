@@ -234,16 +234,16 @@ export async function compileStoryboard(story: Storyboard, opts: { dir: string; 
     // Every overlay starts hidden at t=0 and uses explicit from→to pairs, so
     // any seek order (preview scrubbing, chunked renders) lands on the same frame.
     if (kind === 'flash') {
-      tx.push(`<div class="tx flash" id="${id}"></div>`);
+      tx.push(`<div class="sc-tx flash" id="${id}"></div>`);
       txJs.push(`tl.set("#${id}",{opacity:0},0);tl.fromTo("#${id}",{opacity:0},{opacity:.85,duration:.06,ease:"none"},${f(at - 0.06)});tl.fromTo("#${id}",{opacity:.85},{opacity:0,duration:.22,ease:"power2.out",immediateRender:false},${f(at)});`);
     } else if (kind === 'wipe') {
-      tx.push(`<div class="tx wipe" id="${id}"></div>`);
+      tx.push(`<div class="sc-tx wipe" id="${id}"></div>`);
       txJs.push(`tl.set("#${id}",{xPercent:-101},0);tl.fromTo("#${id}",{xPercent:-101},{xPercent:0,duration:.28,ease:"power3.in",immediateRender:false},${f(at - 0.28)});tl.fromTo("#${id}",{xPercent:0},{xPercent:101,duration:.32,ease:"power3.out",immediateRender:false},${f(at)});`);
     } else if (kind === 'fade') {
-      tx.push(`<div class="tx dip" id="${id}"></div>`);
+      tx.push(`<div class="sc-tx dip" id="${id}"></div>`);
       txJs.push(`tl.set("#${id}",{opacity:0},0);tl.fromTo("#${id}",{opacity:0},{opacity:1,duration:.22,ease:"power1.in",immediateRender:false},${f(at - 0.22)});tl.fromTo("#${id}",{opacity:1},{opacity:0,duration:.3,ease:"power1.out",immediateRender:false},${f(at)});`);
     } else if (kind === 'zoom') {
-      tx.push(`<div class="tx zoom" id="${id}"></div>`);
+      tx.push(`<div class="sc-tx zoom" id="${id}"></div>`);
       txJs.push(`tl.set("#${id}",{scale:0,opacity:1},0);tl.fromTo("#${id}",{scale:0,opacity:1},{scale:3,duration:.36,ease:"power3.in",immediateRender:false},${f(at - 0.3)});tl.fromTo("#${id}",{opacity:1},{opacity:0,duration:.2,immediateRender:false},${f(at + 0.06)});tl.set("#${id}",{scale:0},${f(at + 0.3)});`);
     }
   }
@@ -261,11 +261,11 @@ ${fonts.css}
 ${brandCss(fallbackBrand)}
 html,body{margin:0;background:#000}
 #main{position:relative;width:100%;height:100%;overflow:hidden;font-family:var(--font-body)}
-.tx{position:absolute;inset:0;z-index:50;pointer-events:none}
-.tx.flash{background:#fff;opacity:0}
-.tx.wipe{background:var(--brand-primary)}
-.tx.dip{background:#05060a;opacity:0}
-.tx.zoom{left:50%;top:50%;width:${Math.max(width, height)}px;height:${Math.max(width, height)}px;margin:-${Math.max(width, height) / 2}px 0 0 -${Math.max(width, height) / 2}px;border-radius:50%;background:var(--brand-primary)}
+.sc-tx{position:absolute;inset:0;z-index:50;pointer-events:none}
+.sc-tx.flash{background:#fff;opacity:0}
+.sc-tx.wipe{background:var(--brand-primary)}
+.sc-tx.dip{background:#05060a;opacity:0}
+.sc-tx.zoom{left:50%;top:50%;width:${Math.max(width, height)}px;height:${Math.max(width, height)}px;margin:-${Math.max(width, height) / 2}px 0 0 -${Math.max(width, height) / 2}px;border-radius:50%;background:var(--brand-primary)}
 </style></head>
 <body>
 <div id="main" data-composition-id="main" data-start="0" data-width="${width}" data-height="${height}" data-duration="${total}">

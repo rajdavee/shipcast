@@ -392,6 +392,107 @@ ${S} .dev img{display:block;width:100%;height:auto}`,
     },
   },
   {
+    id: 'terminal',
+    label: 'Terminal',
+    use: 'A command typed into a terminal and its output streaming back — for CLIs, SDKs and dev tools. Real commands from the README only.',
+    minSeconds: 3.6,
+    fields: [
+      { id: 'title', type: 'text', label: 'Caption title', optional: true, max: 60 },
+      { id: 'command', type: 'text', label: 'Command', max: 70 },
+      { id: 'output', type: 'list', label: 'Output lines', max: 6, help: 'Prefix a line with ✓ or ✗ for a coloured status' },
+    ],
+    build: (f, c) => {
+      const { u, vertical, pad, S } = frame(c);
+      const b = bg(c, 'dark');
+      const lines = list(f.output).slice(0, 6);
+      const titleH = f.title ? Math.round((vertical ? 150 : 120) * u) : 0;
+      const fs = Math.round((vertical ? 32 : 38) * u);
+      const cmd = String(f.command ?? '');
+      const typeDur = Math.min(1.4, 0.035 * cmd.length + 0.3);
+      return {
+        markup:
+          b.markup +
+          `${f.title ? `<h2 class="cap" style="position:absolute;left:${pad.l}px;right:${pad.r}px;top:${pad.t}px;font-size:${Math.round((vertical ? 68 : 60) * u)}px">${words(f.title)}</h2>` : ''}
+<div class="term" style="left:${pad.l}px;right:${pad.r}px;top:${pad.t + titleH}px;font-size:${fs}px"><div class="tb"><i></i><i></i><i></i></div><div class="tt"><div class="ln cmd"><span class="pr">$</span> <span class="ty">${esc(cmd)}</span><span class="caret"></span></div>${lines
+            .map((l) => `<div class="ln out${/^✓/.test(l) ? ' ok' : /^✗/.test(l) ? ' bad' : ''}">${esc(l)}</div>`)
+            .join('')}</div></div>`,
+        css:
+          b.css +
+          headCss(S) +
+          `${S} .term{position:absolute;border-radius:${Math.round(18 * u)}px;overflow:hidden;background:#0d0f14;border:1px solid rgba(255,255,255,.1);box-shadow:0 ${40 * u}px ${100 * u}px -${30 * u}px rgba(0,0,0,.75);font-family:var(--font-mono)}
+${S} .tb{height:${Math.round(40 * u)}px;display:flex;align-items:center;gap:${Math.round(9 * u)}px;padding:0 ${Math.round(16 * u)}px;background:#181b23}
+${S} .tb i{width:${Math.round(12 * u)}px;height:${Math.round(12 * u)}px;border-radius:50%;background:#3a3e4a}
+${S} .tt{padding:${Math.round(28 * u)}px ${Math.round(32 * u)}px ${Math.round(34 * u)}px;line-height:1.55;color:#e7e9ee}
+${S} .ln{white-space:pre-wrap;overflow-wrap:anywhere}
+${S} .pr{color:${readableOnDark(c.brand.colors.primary, '#0d0f14')}}
+${S} .ty{display:inline-block;overflow:hidden;white-space:pre;vertical-align:bottom;max-width:0}
+${S} .caret{display:inline-block;width:.55em;height:1.1em;vertical-align:-.15em;background:#e7e9ee;margin-left:.08em}
+${S} .out{color:#a5acbb;opacity:0}${S} .out.ok{color:#5ee08f}${S} .out.bad{color:#ff7a7a}`,
+        js:
+          b.js +
+          wordIn(S, '.cap', 0.05) +
+          `tl.fromTo("${S} .term",{y:${50 * u},opacity:0},{y:0,opacity:1,duration:.8,ease:"expo.out"},.1);
+const ty=document.querySelector("${S} .ty");const full=ty.scrollWidth;
+tl.fromTo(ty,{maxWidth:0},{maxWidth:full+2,duration:${typeDur.toFixed(2)},ease:"steps(${Math.max(cmd.length, 1)})"},.55);
+tl.fromTo("${S} .caret",{opacity:1},{opacity:0,duration:.01,repeat:${Math.max(2, Math.floor(c.duration * 2))},yoyo:true,repeatDelay:.5},0);
+tl.fromTo("${S} .out",{opacity:0,y:${8 * u}},{opacity:1,y:0,duration:.18,ease:"power2.out",stagger:${Math.max(0.12, Math.min(0.32, (c.duration - typeDur - 1.4) / Math.max(lines.length, 1))).toFixed(2)}},${(0.75 + typeDur).toFixed(2)});`,
+      };
+    },
+  },
+  {
+    id: 'chart',
+    label: 'Animated bar chart',
+    use: 'Compare 2–5 real numbers (benchmarks, before/after, pricing). Bars grow in; the hero bar is highlighted. Values must come from the brief.',
+    minSeconds: 3.6,
+    fields: [
+      { id: 'title', type: 'text', label: 'Title', max: 60 },
+      { id: 'items', type: 'list', label: 'Bars ("Label — 42")', max: 5, help: 'One per line: label, a dash, the number (units after the number are kept, e.g. "Bun — 0.21s")' },
+      { id: 'highlight', type: 'text', label: 'Highlight label', optional: true, help: 'Which bar is yours' },
+      { id: 'note', type: 'text', label: 'Source / note', optional: true, max: 90 },
+    ],
+    build: (f, c) => {
+      const { u, vertical, S } = frame(c);
+      const b = bg(c, 'dark');
+      const rows = list(f.items)
+        .slice(0, 5)
+        .map((l) => {
+          const [label, val] = l.split(/\s+[—–-]\s+/);
+          const m = String(val ?? '').match(/([\d.,]+)/);
+          return { label: (label ?? '').trim(), text: (val ?? '').trim(), n: m ? Number(m[1].replace(/,/g, '')) : 0 };
+        });
+      const max = Math.max(...rows.map((r) => r.n), 1);
+      const hi = String(f.highlight ?? '').toLowerCase();
+      const accent = readableOnDark(c.brand.colors.primary);
+      return {
+        markup:
+          b.markup +
+          stage(
+            c,
+            `<h2 style="font-size:${Math.round((vertical ? 76 : 68) * u)}px;margin-bottom:${Math.round(44 * u)}px">${words(f.title)}</h2><div class="bars">${rows
+              .map((r, i) => `<div class="row${r.label.toLowerCase() === hi || (!hi && i === 0) ? ' hi' : ''}"><span class="lb">${esc(r.label)}</span><span class="track"><i class="bar" style="width:${Math.max(2, (r.n / max) * 100).toFixed(1)}%"></i></span><span class="val">${esc(r.text)}</span></div>`)
+              .join('')}</div>${f.note ? `<p class="sub" style="font-size:${Math.round(28 * u)}px;margin-top:${Math.round(30 * u)}px">${esc(f.note)}</p>` : ''}`,
+          ),
+        css:
+          b.css +
+          headCss(S) +
+          `${S} .bars{display:grid;gap:${Math.round(22 * u)}px;width:100%}
+${S} .row{display:grid;grid-template-columns:${Math.round((vertical ? 210 : 260) * u)}px 1fr ${Math.round(170 * u)}px;align-items:center;gap:${Math.round(20 * u)}px;font-family:var(--font-display);font-size:${Math.round(34 * u)}px;font-weight:700}
+${S} .lb{opacity:.75;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+${S} .track{height:${Math.round(42 * u)}px;border-radius:${Math.round(10 * u)}px;background:rgba(255,255,255,.06);overflow:hidden}
+${S} .bar{display:block;height:100%;border-radius:${Math.round(10 * u)}px;background:rgba(255,255,255,.28);transform-origin:0 50%}
+${S} .row.hi .bar{background:${accent}}${S} .row.hi .lb,${S} .row.hi .val{opacity:1;color:${accent}}
+${S} .val{font-variant-numeric:tabular-nums;text-align:right;opacity:.85}`,
+        js:
+          b.js +
+          wordIn(S, 'h2', 0.05) +
+          `tl.fromTo("${S} .row",{opacity:0,x:${-30 * u}},{opacity:1,x:0,duration:.5,ease:"expo.out",stagger:.1},.35);
+tl.fromTo("${S} .bar",{scaleX:0},{scaleX:1,duration:1.1,ease:"expo.out",stagger:.12},.55);
+tl.fromTo("${S} .row.hi .track",{boxShadow:"0 0 0 0 rgba(255,255,255,0)"},{boxShadow:"0 0 0 ${Math.max(2, Math.round(3 * u))}px ${accent}",duration:.4,ease:"power2.out"},1.7);` +
+          has(`${S} .sub`, `tl.fromTo("${S} .sub",{opacity:0},{opacity:.72,duration:.5},1.6);`),
+      };
+    },
+  },
+  {
     id: 'outro',
     label: 'Logo + CTA outro',
     use: 'Last scene. Logo, closing line, a button and the URL. Hold ≥ 2.5 s.',
