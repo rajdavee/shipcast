@@ -228,7 +228,9 @@ ${S} mark .hl{position:absolute;left:0;top:0;right:0;bottom:0;padding:0 .08em;ba
       const titleH = f.title ? Math.round((vertical ? 150 : 120) * u) : 0;
       const phone = f.device === 'phone';
       const availW = c.width - pad.l - pad.r;
-      const h = c.height - pad.t - pad.b - titleH;
+      // Imagery may run under the platform's bottom UI (only text must stay clear of it).
+      const bottom = vertical ? Math.round(c.height * 0.14) : pad.b;
+      const h = c.height - pad.t - bottom - titleH;
       // Phones keep a 9:19.5 body inside the available box; browsers fill it.
       const w = phone ? Math.min(availW, Math.round(h / 2.05)) : availW;
       const left = phone ? Math.round(pad.l + (availW - w) / 2) : pad.l;
