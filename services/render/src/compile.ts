@@ -288,7 +288,10 @@ export async function compileStoryboard(story: Storyboard, opts: { dir: string; 
   const style = story.captions ?? (words.length ? 'karaoke' : 'none');
   let captionsFile: string | undefined;
   if (words.length && style !== 'none') {
-    const part = buildCaptions(words, style, { id: 'captions', width, height, safe: preset.safe, brand: fallbackBrand });
+    // Cinematic and B-roll scenes carry their own subtitle line; captions would duplicate it.
+    const ownText = timeline.filter((e) => e.sc.scene === 'cinema' || e.sc.scene === 'broll').map((e) => [e.start, e.start + e.duration]);
+    const captionWords = words.filter((w) => !ownText.some(([a, b]) => w.start >= a && w.start < b));
+    const part = buildCaptions(captionWords, style, { id: 'captions', width, height, safe: preset.safe, brand: fallbackBrand });
     captionsFile = join(dir, 'compositions', 'captions.html');
     await writeFile(captionsFile, subcomp('captions', width, height, part));
     hosts.push(`<div id="host-captions" data-composition-id="captions" data-composition-src="compositions/captions.html" data-start="0" data-duration="${total}" data-track-index="5" data-track-kind="captions" data-width="${width}" data-height="${height}"></div>`);

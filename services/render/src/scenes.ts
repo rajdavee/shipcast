@@ -696,12 +696,13 @@ ${S} .w-m{display:inline-block;overflow:hidden;vertical-align:top}${S} .w{displa
       const size = fit(f.line, u, vertical ? [[40, 80], [70, 68], [90, 60]] : [[40, 84], [70, 72], [90, 64]], 56);
       const grad = `radial-gradient(70% 60% at 30% 35%, color-mix(in srgb,var(--brand-primary) 38%,transparent), transparent 70%),radial-gradient(60% 60% at 80% 80%, color-mix(in srgb,var(--brand-secondary) 30%,transparent), transparent 70%),#07080b`;
       return {
-        markup: `<div class="shot">${src ? `<img src="${src}" alt="">` : '<i class="gr"></i>'}</div><i class="vig"></i><i class="grain"></i><i class="lb t"></i><i class="lb b"></i>
+        markup: `<div class="shot">${src ? `<img src="${src}" alt="">` : `<i class="gr"></i>${Array.from({ length: 9 }, (_, k) => `<b class="bk" style="left:${(k * 37 + 11) % 92}%;top:${(k * 53 + 17) % 78}%;width:${Math.round((60 + ((k * 29) % 110)) * u)}px;height:${Math.round((60 + ((k * 29) % 110)) * u)}px;opacity:${(0.12 + ((k * 7) % 5) * 0.05).toFixed(2)}"></b>`).join('')}`}</div><i class="vig"></i><i class="grain"></i><i class="lb t"></i><i class="lb b"></i>
 <div class="txt" style="bottom:${bar + Math.round(56 * u)}px">${f.kicker ? `<span class="k">${esc(f.kicker)}</span>` : ''}<p style="font-size:${size}px">${words(f.line)}</p></div>`,
         css: `${S}{position:absolute;left:0;top:0;width:${c.width}px;height:${c.height}px;overflow:hidden;background:#07080b;color:#f4f1ea;font-family:var(--font-body)}
 ${S} .shot,${S} .shot img,${S} .shot .gr{position:absolute;inset:0;width:100%;height:100%}
 ${S} .shot img{object-fit:cover;filter:saturate(.8) contrast(1.05) brightness(.7)}
 ${S} .shot .gr{background:${grad}}
+${S} .bk{position:absolute;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--brand-primary) 70%,#fff) 0%,transparent 70%);filter:blur(${Math.round(6 * u)}px)}
 ${S} .vig{position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 45%,rgba(0,0,0,.75) 100%)}
 ${S} .grain{position:absolute;inset:-20%;opacity:.13;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>")}
 ${S} .lb{position:absolute;left:0;right:0;height:${bar}px;background:#000;z-index:3}${S} .lb.t{top:0}${S} .lb.b{bottom:0}
@@ -710,6 +711,7 @@ ${S} .txt .k{display:block;font:600 ${Math.round(26 * u)}px/1 var(--font-mono, u
 ${S} .txt p{margin:0;font-family:var(--font-display);font-weight:600;letter-spacing:-.015em;line-height:1.18;max-width:24ch;${vertical ? 'margin:0 auto;' : ''}text-shadow:0 2px 24px rgba(0,0,0,.6)}
 ${S} .w-m{display:inline-block}${S} .w{display:inline-block}`,
         js: `tl.fromTo("${S} .shot",{scale:1.12,xPercent:-2},{scale:1.02,xPercent:2,duration:${c.duration},ease:"none"},0);
+` + has(`${S} .bk`, `tl.fromTo("${S} .bk",{x:0,y:0},{x:(i)=>((i%3)-1)*${Math.round(70 * u)},y:(i)=>-${Math.round(30 * u)}-(i%4)*${Math.round(12 * u)},duration:${c.duration},ease:"none"},0);`) + `
 tl.fromTo("${S} .grain",{x:0},{x:${Math.round(-40 * u)},duration:${c.duration},ease:"steps(${Math.max(8, Math.round(c.duration * 12))})"},0);
 tl.fromTo("${S} .lb.t",{yPercent:-100},{yPercent:0,duration:.7,ease:"power3.out"},0);tl.fromTo("${S} .lb.b",{yPercent:100},{yPercent:0,duration:.7,ease:"power3.out"},0);` +
           has(`${S} .k`, `tl.fromTo("${S} .k",{opacity:0,y:${10 * u}},{opacity:.7,y:0,duration:.8,ease:"power2.out"},.4);`) +
