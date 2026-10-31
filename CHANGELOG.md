@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.6.0 — 2026-11-01
+
+Any length, edited like a creator, in your own voice if you want.
+
+- **YouTube videos, 3–10 minutes** — chaptered storyboards: each chapter renders on its own (cached, so an edit re-renders one chapter), chapters join without re-encoding, one music bed and one master pass go over the whole video. Chapter cards, YouTube timestamps filled into the description, full SRT/VTT. New `youtube-video` skill: cold open, re-hooks every 60–90 s, peak at 50–70 %, varied visuals.
+- **Shorts from a long video** — "Cut 3 Shorts" re-directs the strongest chapters natively for 9:16 (no crop, no Claude turn).
+- **Short films** — `cinema` scene (letterbox, slow camera, grain, bokeh, a line that blurs into focus) and a `short-film` format with a real story arc.
+- **Bring your own ElevenLabs** — connect your key in Setup → Voiceover; word timings come from ElevenLabs' alignment; Kokoro stays the free default and fallback.
+- **Stock B-roll** — optional free Pexels key; `broll` scenes play real footage under a line, with credits.txt; without a key they become cinematic shots.
+- **Editing** — punch-in zooms on the words that carry a line, soft hits and risers, alternating light scenes on dark brands, highlight and emoji caption styles.
+- **Length control** on Home — 15/30/60 s for short videos, 3/5/8/10 min for YouTube.
+- Renders that time out under load retry with a single worker.
+
 ## 0.5.0 — 2026-11-01
 
 Save-worthy posts, videos with real energy, and a studio with fewer decisions.
