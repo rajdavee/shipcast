@@ -39,8 +39,9 @@ Pick one angle (the prompt may set it): `problem-solution`, `how-it-works`, `lis
 
 - **6–10 slides.** Slide 1 `cover`; last slide `cta`.
 - **Cover** = a specific promise, number or tension. Never "Introducing X".
-- **Slide 2** = stakes (`statement`) — why this matters now.
-- **Middle** = the framework: `points`, `step` (with a real screenshot from `assets/` when it helps), `compare`, `stat` (real numbers only), `quote` (real people only), `image`.
+- **Slide 2** = stakes — a `statement`, or a `note` (a hand-written sticky with what your customer is really thinking) for a human pattern break.
+- **Make it visual, not a wall of text.** At least two slides should carry something other than type: `platforms` (real logos of the tools/places your audience uses, grouped), `journey` (3–4 stage pills with real logos), a `step`/`image` with a real screenshot, or a `stat`.
+- **Middle** = the framework: `journey`, `platforms`, `points`, `step` (with a real screenshot from `assets/` when it helps), `compare`, `stat` (real numbers only), `quote` (real people only), `image`.
 - **N-1** = recap or the single most useful takeaway.
 - Each slide's headline ≤ 8 words; wrap the one word that matters in `*stars*`.
 - Pick the theme that fits the brand: `editorial` (brand background), `swiss` (light, analytical), `bold` (loud, brand color), `midnight` (dark, premium).

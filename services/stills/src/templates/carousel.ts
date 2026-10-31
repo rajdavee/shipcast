@@ -117,6 +117,39 @@ function frame(inner: string, ctx: RenderCtx, { ghost = '', bare = false } = {})
 </div>`;
 }
 
+
+/** "Label: A, B, C" or "A, B, C" → chips. */
+const splitNames = (v: string) => v.split(/\s*,\s*/).map((x) => x.trim()).filter(Boolean);
+const chip = (name: string, ctx: RenderCtx) => {
+  const icon = ctx.icons?.[name];
+  return `<span class="lchip">${icon ? `<i style="background-image:url('${icon}')"></i>` : `<b class="mono">${esc(name[0] ?? '•')}</b>`}${esc(name)}</span>`;
+};
+/** Every logo name a slide will show, so the service can resolve them first. */
+export function carouselIconNames(layout: string, f: Record<string, any>): string[] {
+  if (layout === 'platforms') return list(f.groups).flatMap((g) => splitNames(g.includes(':') ? g.split(':').slice(1).join(':') : g));
+  if (layout === 'journey') return list(f.steps).flatMap((s) => (s.includes('|') ? splitNames(s.split('|')[1]) : []));
+  return [];
+}
+const VISUAL_CSS = `
+.lchip{display:inline-flex;align-items:center;gap:14px;padding:12px 24px 12px 12px;border-radius:999px;background:var(--card);border:2px solid var(--rule);font:700 30px/1 var(--font-body);white-space:nowrap}
+.lchip i,.lchip .mono{width:48px;height:48px;flex:none;border-radius:50%;background:#fff center/68% no-repeat;box-shadow:0 0 0 1px rgba(0,0,0,.06)}
+.lchip .mono{display:grid;place-items:center;background:var(--accent);color:var(--bg);font:800 24px/1 var(--font-body)}
+.groups{display:grid;gap:28px;margin-top:48px}
+.group{display:grid;gap:16px}
+.group h5{margin:0;font:800 24px/1 var(--font-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:14px}
+.sticky{position:relative;background:#fde58a;color:#22200f;padding:44px 48px 48px;font:700 60px/1.12 'Kalam','Comic Sans MS',cursive;transform:rotate(-2.2deg);box-shadow:0 30px 50px -28px rgba(0,0,0,.55);max-width:820px}
+.sticky::before{content:"";position:absolute;top:-22px;left:50%;width:150px;height:42px;margin-left:-75px;background:rgba(255,255,255,.55);transform:rotate(3deg);box-shadow:0 2px 6px rgba(0,0,0,.12)}
+.sticky.sm{font-size:40px;padding:28px 34px;max-width:600px;align-self:flex-end;margin-top:36px;transform:rotate(2deg)}
+.jrow{display:grid;grid-template-columns:340px 1fr;gap:36px;align-items:center}
+.jpill{display:flex;align-items:center;gap:18px;padding:34px 28px;border-radius:24px;background:var(--fg);color:var(--bg);font:800 40px/1.08 var(--font-display);letter-spacing:-.02em}
+.jpill b{flex:none;display:grid;place-items:center;width:54px;height:54px;border-radius:50%;background:var(--accent);color:var(--bg);font:800 22px/1 var(--font-body)}
+.jdet p{margin:0 0 16px;font:500 36px/1.28 var(--font-body);color:var(--fg)}
+.jdet .chips{gap:10px}.jdet .lchip{font-size:24px;padding:8px 18px 8px 8px}.jdet .lchip i,.jdet .lchip .mono{width:38px;height:38px}
+.jdown{width:340px;display:grid;place-items:center;height:64px;color:var(--muted)}
+.jdown svg{width:30px;height:30px;transform:rotate(90deg)}
+`;
+
 export const CAROUSEL_LAYOUTS: Layout[] = [
   {
     id: 'cover',
@@ -249,6 +282,63 @@ export const CAROUSEL_LAYOUTS: Layout[] = [
       ),
   },
   {
+    id: 'platforms',
+    label: 'Where it happens (logos)',
+    use: 'Show the real places/tools your audience uses, grouped, with real logos. For "where buyers research", "your stack", "where to post". 2–4 groups of 2–6 names. Optional sticky-note thought.',
+    fields: [
+      { id: 'title', type: 'text', label: 'Heading', max: 60 },
+      { id: 'groups', type: 'list', label: 'Groups (one per line, "Label: A, B, C")', max: 4 },
+      { id: 'note', type: 'text', label: 'Sticky-note thought', max: 60, optional: true },
+    ],
+    html: (f, ctx) => {
+      const groups = list(f.groups).slice(0, 4).map((g) => (g.includes(':') ? { label: g.split(':')[0].trim(), names: splitNames(g.split(':').slice(1).join(':')) } : { label: '', names: splitNames(g) }));
+      return frame(
+        `<h2 class="title" style="font-size:${fit(f.title, [[24, 84], [40, 72], [60, 62]], 56)}px">${rich(f.title)}</h2><div class="groups">${groups
+          .map((g) => `<div class="group">${g.label ? `<h5>${esc(g.label)}</h5>` : ''}<div class="chips">${g.names.slice(0, 6).map((n) => chip(n, ctx)).join('')}</div></div>`)
+          .join('')}</div>${f.note ? `<div class="sticky sm">“${esc(String(f.note).replace(/^[“"]|[”"]$/g, ''))}”</div>` : ''}`,
+        ctx,
+      );
+    },
+  },
+  {
+    id: 'journey',
+    label: 'Mini journey (stages + logos)',
+    use: 'A 3–4 stage journey on one slide: each stage pill, what happens, and the real platforms. Lines like "Discover — they ask AI and Reddit | ChatGPT, Reddit, YouTube".',
+    fields: [
+      { id: 'title', type: 'text', label: 'Heading', max: 60 },
+      { id: 'steps', type: 'list', label: 'Stages ("Stage — what happens | A, B, C")', max: 4 },
+    ],
+    html: (f, ctx) => {
+      const steps = list(f.steps).slice(0, 4).map((l) => {
+        const [main, names] = l.split('|');
+        const [stage, ...rest] = main.split(/\s+[—–-]\s+/);
+        return { stage: stage.trim(), what: rest.join(' — ').trim(), names: names ? splitNames(names) : [] };
+      });
+      const down = `<div class="jdown">${ARROW}</div>`;
+      return frame(
+        `<h2 class="title" style="font-size:${fit(f.title, [[24, 80], [40, 68], [60, 58]], 52)}px;margin-bottom:40px">${rich(f.title)}</h2>${steps
+          .map((st, i) => `${i ? down : ''}<div class="jrow"><div class="jpill"><b>${String(i + 1).padStart(2, '0')}</b><span>${esc(st.stage)}</span></div><div class="jdet">${st.what ? `<p>${rich(st.what)}</p>` : ''}${st.names.length ? `<div class="chips">${st.names.slice(0, 4).map((n) => chip(n, ctx)).join('')}</div>` : ''}</div></div>`)
+          .join('')}`,
+        ctx,
+      );
+    },
+  },
+  {
+    id: 'note',
+    label: 'Sticky note',
+    use: 'One human thought, hand-written on a sticky note — what your customer is really thinking. Great slide 2 or a pattern break.',
+    fields: [
+      { id: 'kicker', type: 'text', label: 'Who / when', max: 40, optional: true, help: 'e.g. "What your buyer thinks at 11pm"' },
+      { id: 'thought', type: 'text', label: 'Thought', max: 90 },
+      { id: 'body', type: 'longtext', label: 'What it means', max: 160, optional: true },
+    ],
+    html: (f, ctx) =>
+      frame(
+        `${f.kicker ? `<div class="kicker">${rich(f.kicker)}</div>` : ''}<div class="sticky" style="font-size:${fit(f.thought, [[30, 76], [60, 64], [90, 54]], 50)}px;margin-top:24px">“${esc(String(f.thought).replace(/^[“"]|[”"]$/g, ''))}”</div>${f.body ? `<p class="sub" style="margin-top:72px;max-width:30ch">${rich(f.body)}</p>` : ''}`,
+        ctx,
+      ),
+  },
+  {
     id: 'cta',
     label: 'Call to action',
     use: 'Last slide. One clear action, the URL, and a save/repost nudge.',
@@ -271,5 +361,7 @@ export function renderCarouselSlide(layoutId: string, theme: string, fields: Rec
   if (!layout) throw new Error(`unknown carousel layout "${layoutId}" (have: ${CAROUSEL_LAYOUTS.map((l) => l.id).join(', ')})`);
   const t = THEMES[theme] ?? THEMES.editorial;
   const square = ctx.height <= ctx.width;
-  return page(layout.html(fields, ctx), ctx, t.css, BASE + (square ? '.slide{padding:80px}.title{zoom:.86}.sub{font-size:32px}.points{gap:20px;margin-top:32px}' : ''));
+  const html = layout.html(fields, ctx);
+  const hand = /sticky/.test(html) ? `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kalam:wght@700&display=swap">` : '';
+  return page(hand + html, ctx, t.css, BASE + VISUAL_CSS + (square ? '.slide{padding:80px}.title{zoom:.86}.sub{font-size:32px}.points{gap:20px;margin-top:32px}' : ''));
 }

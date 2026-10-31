@@ -33,6 +33,8 @@ export interface RenderCtx {
   /** Directory images are resolved against. */
   assetsDir?: string;
   handle?: string;
+  /** Platform/tool logos resolved before rendering (name → data URI, null = monogram). */
+  icons?: Record<string, string | null>;
 }
 
 export const esc = (s: unknown) =>

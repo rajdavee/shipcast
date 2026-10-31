@@ -1,8 +1,8 @@
 import { mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { assertInHome, browser, createService, FIT_SCRIPT, run, TIDY_PAGE_SCRIPT, getPreset, layoutAuditScript, loadBrand, normalizeBrand, presetForSize, SERVICE_PORTS, type BrandKit, type LayoutAudit } from '@shipcast/engine';
-import { CAROUSEL_LAYOUTS, renderCarouselSlide, THEMES } from './templates/carousel.ts';
+import { assertInHome, browser, createService, FIT_SCRIPT, run, TIDY_PAGE_SCRIPT, getPreset, layoutAuditScript, loadBrand, normalizeBrand, presetForSize, resolveIcons, SERVICE_PORTS, type BrandKit, type LayoutAudit } from '@shipcast/engine';
+import { CAROUSEL_LAYOUTS, carouselIconNames, renderCarouselSlide, THEMES } from './templates/carousel.ts';
 import type { RenderCtx } from './templates/common.ts';
 import { CARD_LAYOUTS, renderCard, renderThumbnail, THUMBNAIL_LAYOUTS } from './templates/graphics.ts';
 
@@ -135,6 +135,8 @@ export function createStillsService() {
         const { width, height, safe } = size(input.preset);
         if (!Array.isArray(input.slides) || !input.slides.length) throw new Error('slides are required');
         const results = [];
+        const iconNames = input.slides.flatMap((s) => carouselIconNames(s.layout, s.fields ?? {}));
+        const icons = iconNames.length ? await resolveIcons(iconNames) : {};
         for (let i = 0; i < input.slides.length; i++) {
           const file = join(outDir, 'slides', `slide-${String(i + 1).padStart(2, '0')}.png`);
           if (input.only && !input.only.includes(i + 1)) {
@@ -143,7 +145,7 @@ export function createStillsService() {
           }
           ctx.progress(i / input.slides.length, `slide ${i + 1}`);
           const s = input.slides[i];
-          const rctx: RenderCtx = { brand, width, height, page: i + 1, pages: input.slides.length, assetsDir, handle: input.handle };
+          const rctx: RenderCtx = { brand, width, height, page: i + 1, pages: input.slides.length, assetsDir, handle: input.handle, icons };
           results.push(await capture(renderCarouselSlide(s.layout, input.theme, s.fields ?? {}, rctx), file, width, height, safe));
         }
         const pdf = input.pdf === false ? undefined : await pdfFromImages(results.map((r) => r.file), join(outDir, 'carousel.pdf'), width, height);
