@@ -70,6 +70,8 @@ export function SpecEditor({ campaign, step, kind, images, onSaved }: Props) {
   const [sel, setSel] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [preview, setPreview] = useState<{ frames: string[]; duration: number; at: string } | null>(null);
+  const [previewing, setPreviewing] = useState(false);
 
   useEffect(() => {
     setSpec(null);
@@ -119,6 +121,18 @@ export function SpecEditor({ campaign, step, kind, images, onSaved }: Props) {
     if (kind === 'graphics') return step.outputs.find((o) => o.endsWith(`/${items[i]?.name}`) || o.endsWith(`/${items[i]?.name}.png`));
     return undefined;
   };
+
+  async function runPreview() {
+    setPreviewing(true);
+    try {
+      const r = await api.preview(campaign.id, step.id, spec);
+      setPreview({ frames: r.frames, duration: r.duration, at: String(Date.now()) });
+    } catch (e) {
+      toast(String((e as Error).message).slice(0, 160));
+    } finally {
+      setPreviewing(false);
+    }
+  }
 
   async function save() {
     setBusy(true);
@@ -242,10 +256,27 @@ export function SpecEditor({ campaign, step, kind, images, onSaved }: Props) {
         )}
       </div>
 
+      {preview && (
+        <div className="doc" style={{ padding: 14 }}>
+          <div className="copy-head" style={{ marginBottom: 10 }}>
+            <span className="hint">Preview · one frame per scene · {preview.duration.toFixed(1)} s total</span>
+            <button className="btn small ghost" onClick={() => setPreview(null)}>Close</button>
+          </div>
+          <div className="thumbs">
+            {preview.frames.map((f, i) => (
+              <button key={f} className="thumb" style={{ height: 180 }} onClick={() => setSel(i)} title={`Scene ${i + 1}`}>
+                <img src={fileUrl(campaign.id, f) + `?v=${preview.at}`} alt={`Scene ${i + 1}`} style={{ height: 180 }} />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="editor-bar">
         <span className="hint">{dirty ? 'Unsaved changes' : 'Edit any field, then re-render — no Claude run needed.'}</span>
         <div className="sheet-actions" style={{ marginTop: 0 }}>
           {dirty && <button className="btn small ghost" onClick={() => setSpec(JSON.parse(orig))}>Discard</button>}
+          {kind === 'storyboard' && <button className="btn small" disabled={previewing} onClick={runPreview}>{previewing ? 'Previewing…' : 'Preview frames'}</button>}
           <button className="btn primary" disabled={!dirty || busy || step.status === 'running'} onClick={save}>{busy ? 'Saving…' : 'Save & re-render'}</button>
         </div>
       </div>

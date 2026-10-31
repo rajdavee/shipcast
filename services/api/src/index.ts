@@ -307,6 +307,21 @@ router.put('/api/campaigns/:id/steps/:step/spec', async (req, _r, p) => {
   return c;
 });
 
+// Quick look: compile an edited storyboard and snapshot each scene (no full render).
+router.post('/api/campaigns/:id/steps/:step/preview', async (req, _r, p) => {
+  const { kind } = await specPath(p.id, p.step);
+  if (kind !== 'storyboard') throw new HttpError(400, 'previews are for video formats');
+  const body = await readJson(req);
+  const outDir = join(campaignDir(p.id), 'deliverables', p.step, 'work', 'preview');
+  try {
+    const r = await callService('render', 'preview', { storyboard: body.spec, outDir, brandDir: join(campaignDir(p.id), 'brief') }, { timeoutMs: 600_000 });
+    const root = campaignDir(p.id) + '/';
+    return { frames: (r.frames as string[]).map((f) => f.replace(root, '')), scenes: r.scenes, duration: r.duration };
+  } catch (e) {
+    throw new HttpError(502, (e as Error).message);
+  }
+});
+
 // Server-sent events: replays the log, then tails it.
 router.get('/api/campaigns/:id/events', async (req, res, p) => {
   await mustCampaign(p.id);

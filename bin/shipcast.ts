@@ -75,6 +75,34 @@ async function supervise(names: string[]) {
     children.set(n, c);
   };
   for (const n of names) launch(n);
+
+  // Watchdog: exit events can be missed (signals to process groups, wedged
+  // pipes). Every 5 s make sure each child is alive and its port answers.
+  const misses = new Map<string, number>();
+  setInterval(async () => {
+    if (stopping) return;
+    for (const n of names) {
+      const c = children.get(n);
+      const alive = !!c?.pid && c.exitCode === null && (() => { try { process.kill(c.pid!, 0); return true; } catch { return false; } })();
+      let healthy = alive;
+      if (alive && ports[n]) {
+        const path = n === 'api' ? '/api/status' : '/health';
+        healthy = await fetch(`http://127.0.0.1:${ports[n]}${path}`, { signal: AbortSignal.timeout(4000) }).then((r) => r.ok, () => false);
+      }
+      const m = healthy ? 0 : (misses.get(n) ?? 0) + 1;
+      misses.set(n, m);
+      if (!alive || m >= 3) {
+        process.stdout.write(`\x1b[${COLORS[n]}m${n.padEnd(6)}\x1b[0m │ ${alive ? 'not answering' : 'gone'} — relaunching\n`);
+        misses.set(n, 0);
+        if (c) {
+          c.removeAllListeners('exit');
+          c.kill('SIGKILL');
+        }
+        children.delete(n);
+        launch(n);
+      }
+    }
+  }, 5000).unref();
   if (names.includes('api')) console.log(`\n  ▲ Shipcast studio  →  http://localhost:${ports.api}\n`);
   const shutdown = () => {
     stopping = true;

@@ -129,6 +129,7 @@ export const api = {
   getSpec: (id: string, step: string) => call<{ kind: string; spec: any }>('GET', `/api/campaigns/${id}/steps/${step}/spec`),
   saveSpec: (id: string, step: string, spec: unknown) => call<Campaign>('PUT', `/api/campaigns/${id}/steps/${step}/spec`, { spec }),
   tree: (id: string) => call<{ brief: string[]; deliverables: string[]; uploads: string[] }>('GET', `/api/campaigns/${id}/tree`),
+  preview: (id: string, step: string, spec: unknown) => call<{ frames: string[]; scenes: { id: string; start: number; duration: number }[]; duration: number }>('POST', `/api/campaigns/${id}/steps/${step}/preview`, { spec }),
   reveal: (id: string) => call<{ ok: true }>('POST', `/api/campaigns/${id}/reveal`),
   upload: async (id: string, file: File) => {
     const res = await fetch(`/api/campaigns/${id}/uploads?name=${encodeURIComponent(file.name)}`, { method: 'POST', body: file });
