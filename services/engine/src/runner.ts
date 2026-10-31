@@ -8,8 +8,9 @@ import { existsSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { join } from 'node:path';
 import { campaignDir, PLUGIN_DIR } from './paths.ts';
-import { appendEvent, listCampaigns, readCampaign, readSettings, updateCampaign, updateStep } from './store.ts';
-import { getPack, renderTemplate } from './packs.ts';
+import { appendEvent, listCampaigns, newId, readCampaign, readSettings, updateCampaign, updateStep } from './store.ts';
+import { defaultOptions, getPack, loadPacks, renderTemplate } from './packs.ts';
+import { buildHub, notifyDesktop, stopApp } from './hub.ts';
 import { runClaude, type StreamEvent } from './claude.ts';
 import { cloneRepo, parseRepo } from './github.ts';
 import { matchOutputs } from './files.ts';
@@ -73,7 +74,55 @@ export function pickStep(c: Campaign): Step | 'busy' | null {
   if (c.steps.some((s) => s.status === 'needs-input')) return null;
   const brief = c.steps.find((s) => s.kind === 'brief');
   if (brief && brief.status !== 'done') return brief.status === 'queued' ? brief : null;
-  return c.steps.find((s) => s.kind === 'pack' && s.status === 'queued') ?? null;
+  const queued = c.steps.filter((s) => s.kind === 'pack' && s.status === 'queued');
+  // The campaign hub packages everything, so it always goes last.
+  return queued.find((s) => s.pack !== 'campaign-hub') ?? queued[0] ?? null;
+}
+
+/** Packs a campaign plan may ask for (made by Claude from the brief alone). */
+async function planMenu(): Promise<string> {
+  const packs = (await loadPacks()).filter((p) => p.category !== 'app' && !p.pipeline && !(p.sources && !p.sources.includes('github') && !p.sources.includes('local')) && !p.options.some((o) => o.key === 'video'));
+  return packs
+    .map((p) => `- \`${p.id}\` — ${p.name}: ${p.tagline}${p.options.length ? `\n  options: ${p.options.map((o) => `${o.key}=${o.type === 'select' ? o.choices.join('|') : o.type === 'number' ? `${o.min ?? ''}..${o.max ?? ''}` : 'text'}`).join('; ')}` : ''}`)
+    .join('\n');
+}
+
+/** Turn a finished campaign plan into queued steps, one per asset, plus the hub. */
+async function expandPlan(campaignId: string, planDir: string): Promise<number> {
+  let plan: any;
+  try {
+    plan = JSON.parse(await readFile(join(planDir, 'plan.json'), 'utf8'));
+  } catch {
+    return 0;
+  }
+  const steps: Step[] = [];
+  for (const a of (Array.isArray(plan.assets) ? plan.assets : []).slice(0, 24)) {
+    const pack = await getPack(String(a?.pack ?? ''));
+    if (!pack || pack.category === 'app' || pack.pipeline) continue;
+    const options = defaultOptions(pack);
+    for (const o of pack.options) {
+      const v = a.options?.[o.key];
+      if (v === undefined || v === null || v === '') continue;
+      const s = String(v).slice(0, 2000);
+      if (o.type === 'select' && !o.choices.includes(s)) continue;
+      if (o.type === 'number') {
+        const n = Number(s);
+        if (!Number.isFinite(n)) continue;
+        options[o.key] = String(Math.min(o.max ?? n, Math.max(o.min ?? n, Math.round(n))));
+      } else options[o.key] = s;
+    }
+    options._title = String(a.title ?? pack.name).slice(0, 120);
+    if (a.angle) options._angle = String(a.angle).slice(0, 400);
+    if (a.brief) options._brief = String(a.brief).slice(0, 2000);
+    steps.push({ id: newId('d'), kind: 'pack', pack: pack.id, options, status: 'queued', outputs: [], revisions: [] });
+  }
+  if (!steps.length) return 0;
+  const hub = await getPack('campaign-hub');
+  await updateCampaign(campaignId, (c) => {
+    c.steps.push(...steps);
+    if (hub && !c.steps.some((s) => s.pack === 'campaign-hub' && s.status === 'queued')) c.steps.push({ id: newId('d'), kind: 'pack', pack: 'campaign-hub', options: defaultOptions(hub), status: 'queued', outputs: [], revisions: [] });
+  });
+  return steps.length;
 }
 
 /** Atomically claim the next runnable step across all campaigns (oldest campaign first). */
@@ -158,7 +207,9 @@ ${campaignHeader(c)}
 
 Read ${join(campaignDir(c.id), 'brief')}/brief.md and brand.json first — research is already done and assets are in its assets/ folder; reuse them instead of re-fetching.${existsSync(join(campaignDir(c.id), 'brief', 'product-facts.md')) ? `\n\n**Real product UI** captured from the running app is in brief/assets/app/ (described in brief/assets/app/screens.json) — prefer it over website screenshots, and label it "Real product UI · sample data" where shown. **Claims:** only what brief/product-facts.md verifies; no invented customers, numbers, ratings or testimonials.` : ''}
 
-${renderTemplate(pack.prompt, vars).trim()}`;
+${existsSync(join(campaignDir(c.id), 'brief', 'CAMPAIGN-BRIEF.md')) ? `\n\nThis piece is part of a bigger campaign: read brief/CAMPAIGN-BRIEF.md (the line, the pillars, verified facts, naming) and stay on it.` : ''}
+
+${renderTemplate(pack.prompt, vars).trim()}${step.options._brief || step.options._angle ? `\n\n## Your part of the campaign: ${step.options._title ?? pack.name}\n${[step.options._angle, step.options._brief].filter(Boolean).join('\n')}` : ''}`;
 }
 
 /** Prepare the shared source folder before the brief runs. */
@@ -235,6 +286,7 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
         appEnv = await readCampaignEnv(id);
         prompt += `\n\n## Environment and questions\nThe user's environment variables are already set in your shell: ${Object.keys(appEnv).join(', ') || '(none given)'}. Never print, echo or copy their values into any file under out/ — refer to them by name only.\nIf you hit something you genuinely cannot fix yourself (a missing secret or API key, credentials you need, a decision only the user can make), stop and write out/question.json: {"text": "one specific question", "why": "what failed, in one line", "fields": [{"key": "STRIPE_SECRET_KEY", "label": "Stripe test secret key", "secret": true}]} and end your turn with NEEDS_INPUT. Shipcast pauses, asks the user, and resumes this session with the answer. Fix everything you can first (install tools, start Docker, run a throwaway database, seed sample data, set safe local defaults).`;
       }
+      if (pack.id === 'campaign-plan') prompt += `\n\n## Menu of formats\n${await planMenu()}`;
       allowSubagents = !!pack.subagents && settings.subagents !== 'never';
       outputs = pack.outputs.map((g) => `out/${g}`).concat('out/NOTES.md');
     }
@@ -315,6 +367,7 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
     let resultText = '';
     if (step.kind === 'brief') await phase('Researching your product');
     else if (pack?.pipeline === 'shorts') await phase('Cutting Shorts from your video');
+    else if (pack?.pipeline === 'hub') await phase('Packaging the campaign');
     else if (pack?.pipeline) await phase('Transcribing and captioning');
     else if (!renderOnly) await phase(specKind === 'storyboard' ? 'Writing the script' : specKind === 'infographic' ? 'Researching the framework' : specKind === 'deck' ? 'Writing the slides' : specKind === 'graphics' ? 'Designing the graphics' : pack?.id === 'copy-kit' ? 'Writing the posts' : 'Making it');
     if (pack?.pipeline === 'captions') {
@@ -368,6 +421,23 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
           why = (e as Error).message;
         }
       }
+    } else if (pack?.pipeline === 'hub') {
+      // No Claude: gather everything into one reviewable folder, stop the app, tell the user.
+      try {
+        const fresh = (await readCampaign(id)) ?? campaign;
+        const r = await buildHub(fresh, join(cwd, 'out'));
+        await log({ step: step.id, type: 'log', text: `Campaign hub: ${r.items} assets, ${r.files} files${r.zip ? ' + zip' : ''}` });
+        for (const l of await stopApp(fresh)) await log({ step: step.id, type: 'log', text: `App: ${l}` });
+        const failed = fresh.steps.filter((s) => s.status === 'failed').length;
+        await notifyDesktop(`${campaign.name} campaign is ready`, `${r.items} assets packaged${failed ? `, ${failed} need a look` : ''}. Open Shipcast to review.`);
+        if (!r.items) {
+          ok = false;
+          why = 'Nothing finished yet to package.';
+        }
+      } catch (e) {
+        ok = false;
+        why = (e as Error).message;
+      }
     } else if (!renderOnly) {
       const res = await execClaude(prompt, resume);
       ok = !!res.result?.ok;
@@ -393,6 +463,7 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
         if (appEnv) await scrubSecrets(cwd, appEnv);
         await updateStep(id, step.id, { status: 'needs-input', question, sessionId, phase: undefined, worker: undefined, pendingNote: undefined, costUsd: (step.costUsd ?? 0) + costUsd });
         await log({ step: step.id, type: 'status', status: 'needs-input', text: `Needs your input: ${question.text}` });
+        await notifyDesktop(`${campaign.name} needs one thing from you`, question.text);
         return;
       }
     }
@@ -506,6 +577,12 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
       if (existsSync(join(cwd, 'out', 'screens'))) await cp(join(cwd, 'out', 'screens'), join(brief, 'assets', 'app'), { recursive: true });
       for (const f of ['screens.json', 'product-facts.md']) if (existsSync(join(cwd, 'out', f))) await cp(join(cwd, 'out', f), f === 'screens.json' ? join(brief, 'assets', 'app', f) : join(brief, f));
       await log({ step: step.id, type: 'log', text: 'Real product UI and verified facts added to the campaign brief' });
+    }
+    // A plan becomes real jobs: one per asset, then the hub.
+    if (patch.status === 'done' && step.pack === 'campaign-plan') {
+      for (const f of ['CAMPAIGN-BRIEF.md', 'calendar.md']) if (existsSync(join(cwd, 'out', f))) await cp(join(cwd, 'out', f), join(dir, 'brief', f));
+      const added = await expandPlan(id, join(cwd, 'out'));
+      await log({ step: step.id, type: 'log', text: added ? `Queued ${added} campaign assets and the campaign hub` : 'The plan had no assets Shipcast can make' });
     }
     if (resultText && patch.status === 'done') await log({ step: step.id, type: 'result', text: resultText.slice(0, 1500), costUsd });
     await log({ step: step.id, type: 'status', status: patch.status, text: patch.error ?? `${files.length} file(s)` });

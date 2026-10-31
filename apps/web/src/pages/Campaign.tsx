@@ -137,8 +137,8 @@ function ResultCard({ campaign, step, pack, now, onOpen, onRetry }: { campaign: 
         )}
       </div>
       <div className="result-meta">
-        <h3>{name}</h3>
-        <p>{step.status === 'done' ? (step.revisions.length ? `Revised ${step.revisions.length}×` : 'Ready') : step.status === 'running' ? 'Making it now' : step.status === 'queued' ? 'Queued' : ''}</p>
+        <h3>{step.options._title ?? name}</h3>
+        <p>{step.options._title && step.status !== 'running' ? `${name} · ` : ''}{step.status === 'done' ? (step.revisions.length ? `Revised ${step.revisions.length}×` : 'Ready') : step.status === 'running' ? 'Making it now' : step.status === 'queued' ? 'Queued' : ''}</p>
       </div>
     </button>
   );
@@ -277,6 +277,23 @@ export function Campaign({ id }: { id: string }) {
       {campaign.steps.filter((s) => s.status === 'needs-input' && s.question).map((s) => (
         <NeedsInput key={s.id} campaign={campaign} step={s} packName={(packMap.get(s.pack!)?.name ?? 'This step')} onChange={setCampaign} />
       ))}
+
+      {campaign.steps.filter((s) => s.pack === 'campaign-hub' && s.status === 'done').slice(-1).map((s) => {
+        const index = s.outputs.find((o) => /-campaign\/index\.html$/.test(o));
+        const zip = s.outputs.find((o) => o.endsWith('.zip'));
+        return (
+          <div key={s.id} className="hub-ready">
+            <div>
+              <b>Your campaign is ready</b>
+              <span>Every video, carousel, post, caption and the calendar in one folder — it works offline.</span>
+            </div>
+            <div className="row-actions">
+              {index && <a className="btn primary" href={fileUrl(campaign.id, `deliverables/${s.id}/${index}`)} target="_blank" rel="noreferrer">Open the campaign</a>}
+              {zip && <a className="btn" href={`${fileUrl(campaign.id, `deliverables/${s.id}/${zip}`)}?download`}>Download zip</a>}
+            </div>
+          </div>
+        );
+      })}
 
       <BriefStrip campaign={campaign} step={brief} />
       {brief.status === 'failed' && (

@@ -57,6 +57,7 @@ export const PRESETS: PlatformPreset[] = [
   // ── stills ───────────────────────────────────────────────────────
   { id: 'linkedin-carousel', label: 'LinkedIn carousel page', kind: 'document', width: 1080, height: 1350, safe: box(80), maxBytes: 100 * MB, notes: 'PDF, 6–10 pages recommended.' },
   { id: 'instagram-carousel', label: 'Instagram carousel (4:5)', kind: 'image', width: 1080, height: 1350, safe: { top: 80, right: 80, bottom: 80, left: 80 }, notes: 'Grid shows a centred 3:4 crop.' },
+  { id: 'instagram-post', label: 'Feed post (1:1)', kind: 'image', width: 1080, height: 1080, safe: box(60), notes: 'Instagram, Facebook and LinkedIn feed.' },
   { id: 'linkedin-image', label: 'LinkedIn image (4:5)', kind: 'image', width: 1080, height: 1350, safe: box(60) },
   { id: 'youtube-thumbnail', label: 'YouTube thumbnail', kind: 'image', width: 1280, height: 720, maxBytes: 2 * MB, safe: { top: 36, right: 200, bottom: 90, left: 36 }, notes: 'Bottom-right holds the duration badge; must read at 160 px wide.' },
   { id: 'og-card', label: 'Link preview (OG)', kind: 'image', width: 1200, height: 630, safe: { top: 65, right: 100, bottom: 65, left: 100 } },

@@ -112,7 +112,7 @@ export interface Pack {
   /** Binaries the pack needs on PATH (checked by doctor). */
   tools: string[];
   /** Pipeline formats run entirely in the services — no Claude turn. */
-  pipeline?: 'captions' | 'shorts';
+  pipeline?: 'captions' | 'shorts' | 'hub';
   /** Spec formats: Claude writes this JSON spec and a service renders it. */
   spec?: 'deck' | 'graphics' | 'storyboard' | 'infographic';
   /** The workflow dispatches sub-agents (HyperFrames does, per frame). */

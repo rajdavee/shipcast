@@ -91,3 +91,7 @@ Write `out/app.json`:
 ```
 and `out/setup.md` (what you did, what failed and how you fixed it, what
 was disabled). Leave the app running for the next step.
+
+`stop` lists only what *you* started; Shipcast runs it when the campaign is
+packaged. If you used an app that was already running (yours to keep, not
+ours), set `"external": true` and leave `stop` empty.

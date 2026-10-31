@@ -1,0 +1,23 @@
+{
+  "id": "campaign-plan",
+  "name": "Campaign Plan",
+  "tagline": "One campaign line, a set of assets that each tell it a different way, and a posting calendar. Shipcast then makes every asset.",
+  "category": "app",
+  "order": 3,
+  "estimate": "3–6 min",
+  "accent": "#7c3aed",
+  "context": true,
+  "options": [
+    {
+      "key": "size",
+      "label": "Campaign size",
+      "type": "select",
+      "choices": ["focused", "standard", "big"],
+      "default": "standard"
+    }
+  ],
+  "outputs": ["plan.json", "CAMPAIGN-BRIEF.md", "calendar.md"],
+  "skills": [],
+  "tools": [],
+  "roles": ["positioning", "copy"]
+}

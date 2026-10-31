@@ -1,0 +1,38 @@
+{
+  "id": "social-post",
+  "name": "Social Posts",
+  "tagline": "Single-image posts for every feed and story — square, portrait, 16:9 and 9:16 — each with its own caption for LinkedIn, Instagram, X and Facebook, plus alt text.",
+  "category": "design",
+  "order": 9,
+  "estimate": "3–5 min",
+  "accent": "#db2777",
+  "spec": "graphics",
+  "options": [
+    {
+      "key": "posts",
+      "label": "Posts",
+      "type": "number",
+      "default": "3",
+      "min": 1,
+      "max": 6
+    },
+    {
+      "key": "theme",
+      "label": "Theme",
+      "type": "select",
+      "choices": ["auto", "editorial", "swiss", "bold", "midnight"],
+      "default": "auto"
+    },
+    {
+      "key": "topic",
+      "label": "Topic",
+      "type": "text",
+      "default": "",
+      "placeholder": "Blank = pick the strongest angles from the brief"
+    }
+  ],
+  "outputs": ["*.png", "*.jpg", "graphics.json", "captions.md", "captions.json", "*.md"],
+  "skills": [],
+  "tools": ["chrome"],
+  "roles": ["design-taste", "copy", "social", "humanize"]
+}

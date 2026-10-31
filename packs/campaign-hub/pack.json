@@ -1,0 +1,14 @@
+{
+  "id": "campaign-hub",
+  "name": "Campaign Hub",
+  "tagline": "Everything in one folder your team can open offline — videos, carousels, posts, captions and the calendar — plus a zip. Stops the app Shipcast started and tells you it's ready.",
+  "category": "app",
+  "order": 99,
+  "estimate": "1 min",
+  "accent": "#16a34a",
+  "pipeline": "hub",
+  "options": [],
+  "outputs": ["*-campaign/**", "*.zip"],
+  "skills": [],
+  "tools": []
+}

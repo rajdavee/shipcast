@@ -53,6 +53,7 @@ export function Home({ status, services, campaigns }: { status: Status | null; s
   const [brain, setBrain] = useState(false);
   const [full, setFull] = useState(false);
   const [envText, setEnvText] = useState('');
+  const [size, setSize] = useState<'focused' | 'standard' | 'big'>('standard');
   const [login, setLogin] = useState({ email: '', password: '', url: '' });
   const [error, setError] = useState<string | null>(null);
   const ta = useRef<HTMLTextAreaElement>(null);
@@ -109,7 +110,7 @@ export function Home({ status, services, campaigns }: { status: Status | null; s
         name: undefined,
         env: envText,
         login: login.email || login.password || login.url ? login : undefined,
-        deliverables: [{ pack: 'app-run' }, { pack: 'app-capture' }, { pack: 'campaign-plan' }],
+        deliverables: [{ pack: 'app-run' }, { pack: 'app-capture' }, { pack: 'campaign-plan', options: { size } }],
       });
       go(`/c/${c.id}`);
     } catch (e) {
@@ -183,6 +184,14 @@ export function Home({ status, services, campaigns }: { status: Status | null; s
                 <label className="field"><span>Test login email <small className="muted">(optional)</small></span><input className="input" value={login.email} onChange={(e) => setLogin({ ...login, email: e.target.value })} placeholder="demo@yourapp.com" /></label>
                 <label className="field"><span>Password</span><input className="input" type="password" autoComplete="off" value={login.password} onChange={(e) => setLogin({ ...login, password: e.target.value })} /></label>
                 <label className="field"><span>Already running at <small className="muted">(optional)</small></span><input className="input" value={login.url} onChange={(e) => setLogin({ ...login, url: e.target.value })} placeholder="http://localhost:3000" /></label>
+              </div>
+              <div className="seg-row" role="radiogroup" aria-label="Campaign size">
+                <span>Size</span>
+                {([['focused', '≈6 assets · 1–2 h'], ['standard', '≈10 assets · 2–3 h'], ['big', '≈16 assets · 3–4 h']] as const).map(([k, hint]) => (
+                  <button key={k} type="button" role="radio" aria-checked={size === k} className="chip-opt" aria-pressed={size === k} onClick={() => setSize(k)}>
+                    {k[0].toUpperCase() + k.slice(1)} <small className="muted">{hint}</small>
+                  </button>
+                ))}
               </div>
               <p className="hint">Your repo is copied first — the original folder is never changed. Nothing is published or uploaded; if something can't be fixed locally (a missing key, a login), Shipcast pauses and asks you here.</p>
               <div className="row-actions" style={{ justifyContent: 'flex-end' }}>
