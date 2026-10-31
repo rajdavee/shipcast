@@ -1,5 +1,9 @@
 // Types mirror services/engine/src/types.ts; the web app talks to it only over HTTP.
 export type SourceType = 'url' | 'github' | 'local' | 'text';
+export type Source = { type: SourceType; value: string };
+export interface BrainQuestion { id: string; question: string; why?: string; options: string[] }
+export interface BrainDirection { id: string; title: string; hook: string; angle: string; tone: string }
+export interface BrainTurn { understood: string; questions: BrainQuestion[]; directions: BrainDirection[] }
 export type StepStatus = 'queued' | 'running' | 'done' | 'failed' | 'canceled' | 'blocked';
 
 export interface Step {
@@ -127,6 +131,7 @@ export const api = {
   packs: () => call<Pack[]>('GET', '/api/packs'),
   installPack: (id: string) => call<{ pack: Pack; results: { skill: string; ok: boolean; log: string }[] }>('POST', `/api/packs/${id}/install`),
   settings: () => call<Settings>('GET', '/api/settings'),
+  brainstorm: (b: { source: Source; formats: string[]; notes?: string; asked?: BrainQuestion[]; answers?: Record<string, string> }) => call<BrainTurn>('POST', '/api/brainstorm', b),
   voice: () => call<VoiceState>('GET', '/api/voice'),
   saveVoice: (b: { apiKey?: string; provider?: 'kokoro' | 'elevenlabs'; voice?: string; model?: string }) => call<VoiceState>('PUT', '/api/voice', b),
   disconnectVoice: () => call<VoiceState>('DELETE', '/api/voice/elevenlabs'),

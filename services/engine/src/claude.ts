@@ -119,6 +119,8 @@ export interface RunOptions {
   appendSystemPrompt?: string;
   extraArgs?: string[];
   allowSubagents?: boolean;
+  /** Extra environment for this run (e.g. MAX_THINKING_TOKENS=0 for quick chats). */
+  env?: Record<string, string>;
   onEvent: (e: StreamEvent) => void;
 }
 
@@ -147,7 +149,7 @@ export function runClaude(o: RunOptions): ClaudeRun {
   const bin = process.env.SHIPCAST_CLAUDE_BIN ?? 'claude';
   const child = spawn(bin, buildArgs(o), {
     cwd: o.cwd,
-    env: { ...process.env, ...engineEnv() },
+    env: { ...process.env, ...engineEnv(), ...(o.env ?? {}) },
     stdio: ['ignore', 'pipe', 'pipe'],
     // Own process group, so stopping a run also stops the renders it started.
     detached: process.platform !== 'win32',

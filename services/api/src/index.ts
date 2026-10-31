@@ -41,6 +41,7 @@ import {
   type Source,
   type Step,
   elevenVoices,
+  brainstorm,
   pexelsCheck,
   getSecret,
   setSecret,
@@ -254,6 +255,21 @@ router.put('/api/broll', async (req) => {
 router.delete('/api/broll', async () => {
   await setSecret('pexels', null);
   return { connected: false };
+});
+
+// ── brainstorm: a short conversation before a campaign ─────────────────
+router.post('/api/brainstorm', async (req) => {
+  const b = await readJson(req);
+  const source = validateSource(b.source);
+  const formats = Array.isArray(b.formats) ? b.formats.map(String).slice(0, 12) : [];
+  const answers = b.answers && typeof b.answers === 'object' ? Object.fromEntries(Object.entries(b.answers).map(([k, v]) => [String(k).slice(0, 32), String(v).slice(0, 400)])) : undefined;
+  const asked = Array.isArray(b.asked) ? b.asked.slice(0, 4) : undefined;
+  const s = await readSettings();
+  try {
+    return await brainstorm({ source, formats, notes: typeof b.notes === 'string' ? b.notes.slice(0, 2000) : '', answers, asked, model: undefined });
+  } catch (e) {
+    throw new HttpError(502, (e as Error).message);
+  }
 });
 
 // ── campaigns ──────────────────────────────────────────────────────────

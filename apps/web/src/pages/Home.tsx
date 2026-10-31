@@ -3,9 +3,19 @@ import { api, detectSource, type Campaign, type SourceType, type Status } from '
 import { go, useLoad } from '../hooks.ts';
 import { DEFAULT_FORMATS, FORMATS } from '../formats.ts';
 import { CampaignCover } from '../components/CampaignCover.tsx';
+import { Brainstorm } from '../components/Brainstorm.tsx';
 
 const KIND: Record<SourceType, string> = { url: 'Website', github: 'GitHub repo', local: 'Folder on this computer', text: 'Description' };
 const PICK_KEY = 'shipcast.formats';
+const BRAIN_KEY = 'shipcast.brainstorm';
+const readBool = (k: string, d: boolean) => {
+  try {
+    const v = localStorage.getItem(k);
+    return v === null ? d : v === '1';
+  } catch {
+    return d;
+  }
+};
 
 function loadPicks(): string[] {
   try {
@@ -39,6 +49,8 @@ export function Home({ status, services, campaigns }: { status: Status | null; s
   const [shortLen, setShortLen] = useState<'15s' | '30s' | '60s'>('30s');
   const [longLen, setLongLen] = useState<'3 min' | '5 min' | '8 min' | '10 min'>('5 min');
   const [busy, setBusy] = useState(false);
+  const [brainOn, setBrainOn] = useState(() => readBool(BRAIN_KEY, true));
+  const [brain, setBrain] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const ta = useRef<HTMLTextAreaElement>(null);
   const packs = useLoad(() => api.packs());
@@ -49,7 +61,7 @@ export function Home({ status, services, campaigns }: { status: Status | null; s
   const chosen = picks.filter((id) => formats.some((f) => f.id === id));
   const claudeReady = status ? status.claude.loggedIn : true;
   const servicesDown = services?.filter((s) => !s.ok).map((s) => s.name) ?? [];
-  const canGo = !!source && chosen.length > 0 && !busy && claudeReady;
+  const canGo = !!source && chosen.length > 0 && !busy && claudeReady && !brain;
 
   useEffect(() => {
     const el = ta.current;
@@ -69,18 +81,26 @@ export function Home({ status, services, campaigns }: { status: Status | null; s
   const hasLong = chosen.includes('youtube-video');
   const optionsFor = (id: string): Record<string, string> => (SHORT.includes(id) ? { length: shortLen } : id === 'youtube-video' ? { length: longLen } : {});
 
-  async function make() {
-    if (!canGo || !source) return;
+  async function create(finalNotes: string) {
+    if (!source) return;
     setBusy(true);
     setError(null);
     try {
-      const c = await api.createCampaign({ source, notes, deliverables: chosen.map((id) => ({ pack: id, options: optionsFor(id) })) });
+      const c = await api.createCampaign({ source, notes: finalNotes, deliverables: chosen.map((id) => ({ pack: id, options: optionsFor(id) })) });
       go(`/c/${c.id}`);
     } catch (e) {
       setError(String((e as Error).message));
       setBusy(false);
+      setBrain(false);
     }
   }
+
+  function make() {
+    if (!canGo || !source) return;
+    if (brainOn) setBrain(true);
+    else create(notes);
+  }
+
 
   const minutes = Math.max(5, chosen.length * 3) + (hasLong ? Number(longLen.split(' ')[0]) * 3 : 0);
 
@@ -121,6 +141,13 @@ export function Home({ status, services, campaigns }: { status: Status | null; s
           <span className="tnum">{chosen.length ? `${chosen.length} ${chosen.length === 1 ? 'piece' : 'pieces'} · about ${minutes} min` : 'Pick at least one format'}</span>
         </div>
       </div>
+
+      <label className="brain-toggle">
+        <input type="checkbox" checked={brainOn} onChange={(e) => { setBrainOn(e.target.checked); try { localStorage.setItem(BRAIN_KEY, e.target.checked ? '1' : '0'); } catch {} }} />
+        Brainstorm with me first — a few quick questions and three directions to pick from
+      </label>
+
+      {brain && source && <Brainstorm source={source} formats={chosen} notes={notes} onDone={create} onCancel={() => setBrain(false)} />}
 
       {!text && (
         <div className="examples">

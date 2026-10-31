@@ -173,3 +173,14 @@ test('voice defaults to local Kokoro and never exposes a key', async () => {
   assert.equal(s.body.voiceProvider, 'kokoro');
   assert.equal(JSON.stringify(s.body).includes('sk_'), false);
 });
+
+test('brainstorm asks first, then offers directions', async () => {
+  const source = { type: 'text', value: 'A habit tracker for remote teams' };
+  const first = await api('/api/brainstorm', { method: 'POST', json: { source, formats: ['reel'] } });
+  assert.equal(first.status, 200);
+  assert.equal(first.body.questions[0].id, 'audience');
+  assert.ok(first.body.questions[0].options.length >= 2);
+  const second = await api('/api/brainstorm', { method: 'POST', json: { source, formats: ['reel'], asked: first.body.questions, answers: { audience: 'Team leads' } } });
+  assert.equal(second.body.directions[0].title, 'The 30-second standup');
+  assert.deepEqual(second.body.questions, []);
+});

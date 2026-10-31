@@ -21,3 +21,4 @@ export * from './icons.ts';
 export * from './voices.ts';
 export * from './shorts.ts';
 export * from './broll.ts';
+export * from './brainstorm.ts';

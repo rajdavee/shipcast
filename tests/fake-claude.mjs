@@ -28,6 +28,14 @@ if (process.env.FAKE_CLAUDE_MODE === 'fail') {
 if (process.env.FAKE_CLAUDE_MODE === 'hang') {
   setInterval(() => {}, 1000);
 } else {
+  if (prompt.includes('[shipcast-brainstorm]')) {
+    const answered = prompt.includes('Their answers:');
+    const reply = answered
+      ? { understood: 'A habit tracker for remote teams.', questions: [], directions: [{ id: 'd1', title: 'The 30-second standup', hook: 'Your standup could be a voice note.', angle: 'Time saved per person per week.', tone: 'warm, direct' }] }
+      : { understood: 'A habit tracker for remote teams.', questions: [{ id: 'audience', question: 'Who is it for?', why: 'sets the voice', options: ['Team leads', 'Founders', 'Remote ICs'] }], directions: [] };
+    emit({ type: 'result', subtype: 'success', is_error: false, result: JSON.stringify(reply), session_id: session });
+    process.exit(0);
+  }
   if (prompt.includes('shipcast:brief')) {
     writeFileSync('brief.md', '# Brief\n');
     writeFileSync('brand.json', '{"name":"Test"}\n');
