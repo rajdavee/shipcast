@@ -112,8 +112,9 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 }
 
 export interface VoiceState {
-  provider: 'kokoro' | 'elevenlabs';
+  provider: 'kokoro' | 'elevenlabs' | 'chatterbox';
   connected: boolean;
+  chatterbox?: boolean;
   voice?: string;
   model?: string;
   voices?: { id: string; name: string; category?: string; labels?: Record<string, string>; preview?: string }[];
@@ -133,7 +134,7 @@ export const api = {
   settings: () => call<Settings>('GET', '/api/settings'),
   brainstorm: (b: { source: Source; formats: string[]; notes?: string; asked?: BrainQuestion[]; answers?: Record<string, string> }) => call<BrainTurn>('POST', '/api/brainstorm', b),
   voice: () => call<VoiceState>('GET', '/api/voice'),
-  saveVoice: (b: { apiKey?: string; provider?: 'kokoro' | 'elevenlabs'; voice?: string; model?: string }) => call<VoiceState>('PUT', '/api/voice', b),
+  saveVoice: (b: { apiKey?: string; provider?: 'kokoro' | 'elevenlabs' | 'chatterbox'; voice?: string; model?: string }) => call<VoiceState>('PUT', '/api/voice', b),
   disconnectVoice: () => call<VoiceState>('DELETE', '/api/voice/elevenlabs'),
   broll: () => call<{ connected: boolean }>('GET', '/api/broll'),
   saveBroll: (apiKey: string) => call<{ connected: boolean }>('PUT', '/api/broll', { apiKey }),

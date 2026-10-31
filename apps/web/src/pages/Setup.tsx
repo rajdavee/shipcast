@@ -205,6 +205,7 @@ const MODELS: [string, string][] = [
 /** Voiceover engine: free local Kokoro, or the user's own ElevenLabs account. */
 function VoiceSection() {
   const v = useLoad(() => api.voice());
+  const [installing, setInstalling] = useState(false);
   const [key, setKey] = useState('');
   const [busy, setBusy] = useState(false);
   const d = v.data;
@@ -228,12 +229,24 @@ function VoiceSection() {
       <p>Kokoro runs on this computer for free. Connect your own ElevenLabs account for more natural voices — your key stays on this computer.</p>
       <div className="rows">
         <div className="srow">
-          <i className={`dot ${d && (!d.connected || d.provider === 'kokoro') ? 'ok' : ''}`} />
+          <i className={`dot ${d?.provider === 'kokoro' ? 'ok' : ''}`} />
           <div>
             <h3>Kokoro (free, local)</h3>
-            <p>{d?.provider === 'kokoro' || !d?.connected ? 'In use for every voiceover.' : 'Available as the fallback if ElevenLabs fails.'}</p>
+            <p>{d?.provider === 'kokoro' ? 'In use for every voiceover.' : 'Always available as the fallback.'}</p>
           </div>
-          {d?.connected && d.provider !== 'kokoro' && <button className="btn" disabled={busy} onClick={() => save({ provider: 'kokoro' }, 'Using Kokoro')}>Use Kokoro</button>}
+          {d && d.provider !== 'kokoro' && <button className="btn" disabled={busy} onClick={() => save({ provider: 'kokoro' }, 'Using Kokoro')}>Use Kokoro</button>}
+        </div>
+        <div className="srow">
+          <i className={`dot ${d?.provider === 'chatterbox' ? 'ok' : ''}`} />
+          <div>
+            <h3>Chatterbox (free, local, more natural)</h3>
+            <p>{d?.chatterbox ? (d.provider === 'chatterbox' ? 'In use for every voiceover.' : 'Installed, not in use.') : 'Open-source (MIT) voice that runs on this computer. Installs PyTorch (~2 GB, a few minutes).'}</p>
+          </div>
+          {d?.chatterbox ? (
+            d.provider !== 'chatterbox' && <button className="btn primary" disabled={busy} onClick={() => save({ provider: 'chatterbox' }, 'Using Chatterbox')}>Use it</button>
+          ) : (
+            <button className="btn" disabled={installing} onClick={async () => { setInstalling(true); try { const r = await api.setup('chatterbox'); toast(r.ok ? 'Chatterbox installed' : 'Install failed — see the log in Activity'); if (r.ok) await save({ provider: 'chatterbox' }, 'Using Chatterbox'); } catch (e) { toast(String((e as Error).message)); } finally { setInstalling(false); } }}>{installing ? 'Installing…' : 'Install'}</button>
+          )}
         </div>
         <div className="srow">
           <i className={`dot ${d?.connected && d.provider === 'elevenlabs' ? 'ok' : ''}`} />

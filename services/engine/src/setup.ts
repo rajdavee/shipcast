@@ -1,3 +1,4 @@
+import { setupChatterbox } from './chatterbox.ts';
 import { existsSync } from 'node:fs';
 import { writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -49,6 +50,10 @@ export const SETUPS = {
       if (ok) await writeFile(voiceMarker(), new Date().toISOString());
       return { ok, log };
     },
+  },
+  chatterbox: {
+    label: 'Chatterbox voice (optional, ~2 GB)',
+    run: () => setupChatterbox(),
   },
   chrome: {
     label: 'Headless Chrome',

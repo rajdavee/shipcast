@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { assertInHome, createService, elevenSpeak, engineEnv, finishVideo, getPreset, measureLoudness, probe, run, SERVICE_PORTS, voiceReady } from '@shipcast/engine';
+import { assertInHome, chatterboxSpeak, createService, elevenSpeak, engineEnv, finishVideo, getPreset, measureLoudness, probe, run, SERVICE_PORTS, voiceReady } from '@shipcast/engine';
 import { alignScript, buildCues, toSrt, toVtt, type Word } from './align.ts';
 import { addSfx, makeMusic, MOODS, toWav, type Mood, type Sfx } from './synth.ts';
 
@@ -64,7 +64,8 @@ export function createMediaService() {
       voice: async ({ text, voice = 'af_heart', speed = 1, out }, ctx) => {
         if (!text?.trim()) throw new Error('text is required');
         const eleven = typeof voice === 'string' && voice.startsWith('eleven:');
-        if (!eleven && !VOICES.includes(voice)) throw new Error(`voice must be one of ${VOICES.join(', ')} or eleven:<voice id>`);
+        const local = voice === 'chatterbox';
+        if (!eleven && !local && !VOICES.includes(voice)) throw new Error(`voice must be one of ${VOICES.join(', ')} or eleven:<voice id>`);
         const wav = out ? assertInHome(out, 'out') : join(ctx.dir, 'voice.wav');
         await mkdir(dirname(wav), { recursive: true });
         ctx.progress(0.1, 'synthesizing');
@@ -84,6 +85,19 @@ export function createMediaService() {
             return { file: wav, duration: p.duration, engine: 'elevenlabs', voice, words };
           } catch (e) {
             ctx.progress(0.15, `ElevenLabs failed (${(e as Error).message.slice(0, 120)}); using Kokoro`);
+            voice = 'af_heart';
+          }
+        }
+        if (local) {
+          // Local Chatterbox: natural delivery, offline; timings come from whisper like Kokoro's.
+          try {
+            await chatterboxSpeak(text, wav);
+            const words = alignScript(text, await transcribe(wav, ctx.dir));
+            const p = await probe(wav);
+            await writeFile(wav.replace(/\.wav$/, '.words.json'), JSON.stringify(words, null, 1));
+            return { file: wav, duration: p.duration, engine: 'chatterbox', voice, words };
+          } catch (e) {
+            ctx.progress(0.15, `Chatterbox failed (${(e as Error).message.slice(0, 120)}); using Kokoro`);
             voice = 'af_heart';
           }
         }

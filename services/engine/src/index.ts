@@ -23,3 +23,4 @@ export * from './shorts.ts';
 export * from './broll.ts';
 export * from './brainstorm.ts';
 export * from './variety.ts';
+export * from './chatterbox.ts';

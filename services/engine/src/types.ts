@@ -125,7 +125,7 @@ export interface Settings {
   /** Extra args appended to every claude invocation. */
   extraArgs: string[];
   /** Voiceover engine: local Kokoro (free) or your own ElevenLabs account. */
-  voiceProvider: 'kokoro' | 'elevenlabs';
+  voiceProvider: 'kokoro' | 'elevenlabs' | 'chatterbox';
   /** ElevenLabs voice id used for every voiceover when that provider is on. */
   elevenVoice: string;
   /** ElevenLabs model id. */

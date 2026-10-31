@@ -41,6 +41,7 @@ import {
   type Source,
   type Step,
   elevenVoices,
+  chatterboxReady,
   brainstorm,
   pexelsCheck,
   getSecret,
@@ -206,7 +207,8 @@ router.get('/api/voice', async () => {
       error = (e as Error).message;
     }
   }
-  return { provider: connected ? s.voiceProvider : 'kokoro', connected, voice: s.elevenVoice, model: s.elevenModel, voices, error };
+  const provider = s.voiceProvider === 'chatterbox' ? (chatterboxReady() ? 'chatterbox' : 'kokoro') : connected ? s.voiceProvider : 'kokoro';
+  return { provider, connected, chatterbox: chatterboxReady(), voice: s.elevenVoice, model: s.elevenModel, voices, error };
 });
 router.put('/api/voice', async (req) => {
   const b = await readJson(req);
@@ -224,7 +226,7 @@ router.put('/api/voice', async (req) => {
     await writeSettings({ voiceProvider: 'elevenlabs', elevenVoice: s.elevenVoice || voices[0]?.id || '' });
   }
   const patch: Record<string, unknown> = {};
-  if (b.provider === 'kokoro' || b.provider === 'elevenlabs') patch.voiceProvider = b.provider;
+  if (b.provider === 'kokoro' || b.provider === 'elevenlabs' || b.provider === 'chatterbox') patch.voiceProvider = b.provider;
   if (typeof b.voice === 'string' && /^[\w-]{0,64}$/.test(b.voice)) patch.elevenVoice = b.voice;
   if (typeof b.model === 'string' && /^[\w.-]{1,64}$/.test(b.model)) patch.elevenModel = b.model;
   if (Object.keys(patch).length) await writeSettings(patch);
