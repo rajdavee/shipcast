@@ -1,4 +1,5 @@
 import { mkdir, writeFile, rm } from 'node:fs/promises';
+import { catalogMarkdown, renderSpec, SPEC_FILE } from './specs.ts';
 import { existsSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { join } from 'node:path';
@@ -208,6 +209,9 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
       allowSubagents = !!pack.subagents && settings.subagents !== 'never';
       outputs = pack.outputs.map((g) => `out/${g}`).concat('out/NOTES.md');
     }
+    const pack = step.kind === 'pack' ? await getPack(step.pack!) : undefined;
+    const specKind = pack?.spec;
+    const renderOnly = !!step.renderOnly && !!specKind;
     if (note) {
       if (step.sessionId) {
         resume = step.sessionId;
@@ -215,7 +219,7 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
       } else {
         prompt += `\n\nThe user asked for this change on the previous attempt: ${note}`;
       }
-    } else if (step.kind === 'pack') {
+    } else if (step.kind === 'pack' && !renderOnly) {
       // A fresh (re)run starts clean so stale renders can't be mistaken for results.
       await rm(join(cwd, 'out'), { recursive: true, force: true });
     }
@@ -223,46 +227,84 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
     await mkdir(join(cwd, 'work'), { recursive: true });
     // Keep the live feed readable: show paths relative to the campaign.
     const short = (t: string) => t.replaceAll(cwd + '/', '').replaceAll(dir + '/', '');
-    await log({ step: step.id, type: 'status', status: 'running', text: note ? `Revising: ${note}` : 'Started' });
+    await log({ step: step.id, type: 'status', status: 'running', text: renderOnly ? 'Re-rendering your edits' : note ? `Revising: ${note}` : 'Started' });
 
-    const handle = runClaude({
-      prompt,
-      cwd,
-      pluginDir: PLUGIN_DIR,
-      addDirs: extraDirs,
-      allowedTools: settings.allowedTools,
-      model: settings.model || undefined,
-      resume,
-      appendSystemPrompt: shipcastRules(campaign),
-      extraArgs: settings.extraArgs,
-      allowSubagents,
-      onEvent: (e: StreamEvent) => {
-        if (e.kind === 'init') updateStep(id, step.id, { sessionId: e.sessionId }).catch(() => {});
-        else if (e.kind === 'text') log({ step: step.id, type: 'text', text: e.text });
-        else if (e.kind === 'tool') log({ step: step.id, type: 'tool', tool: e.tool, text: short(e.summary) });
-        else if (e.kind === 'tool_result' && e.isError) log({ step: step.id, type: 'tool_result', text: short(e.summary) });
-      },
-    });
-    const kill = handle.kill;
-    hooks.onSpawn?.(kill);
+    // Spec formats get a live catalog of layouts/scenes to write against.
+    if (specKind && !renderOnly) await writeFile(join(cwd, 'catalog.md'), await catalogMarkdown(specKind));
 
     let timedOut = false;
-    const timer = setTimeout(() => {
-      timedOut = true;
-      kill();
-    }, settings.stepTimeoutMinutes * 60_000);
     let canceled = false;
-    const poll = setInterval(async () => {
-      const c = await readCampaign(id);
-      if (c?.steps.find((s) => s.id === step.id)?.cancelRequested) {
-        canceled = true;
-        kill();
-      }
-    }, 2000);
+    let costUsd = 0;
+    let sessionId = step.sessionId;
+    const deadline = Date.now() + settings.stepTimeoutMinutes * 60_000;
+    const execClaude = async (p: string, resumeId?: string) => {
+      const handle = runClaude({
+        prompt: p,
+        cwd,
+        pluginDir: PLUGIN_DIR,
+        addDirs: extraDirs,
+        allowedTools: settings.allowedTools,
+        model: settings.model || undefined,
+        resume: resumeId,
+        appendSystemPrompt: shipcastRules(campaign),
+        extraArgs: settings.extraArgs,
+        allowSubagents,
+        onEvent: (e: StreamEvent) => {
+          if (e.kind === 'init') updateStep(id, step.id, { sessionId: e.sessionId }).catch(() => {});
+          else if (e.kind === 'text') log({ step: step.id, type: 'text', text: e.text });
+          else if (e.kind === 'tool') log({ step: step.id, type: 'tool', tool: e.tool, text: short(e.summary) });
+          else if (e.kind === 'tool_result' && e.isError) log({ step: step.id, type: 'tool_result', text: short(e.summary) });
+        },
+      });
+      hooks.onSpawn?.(handle.kill);
+      const timer = setTimeout(() => {
+        timedOut = true;
+        handle.kill();
+      }, Math.max(deadline - Date.now(), 1000));
+      const poll = setInterval(async () => {
+        const c = await readCampaign(id);
+        if (c?.steps.find((s) => s.id === step.id)?.cancelRequested) {
+          canceled = true;
+          handle.kill();
+        }
+      }, 2000);
+      const res = await handle.done;
+      clearTimeout(timer);
+      clearInterval(poll);
+      costUsd += res.result?.costUsd ?? 0;
+      sessionId = res.sessionId ?? sessionId;
+      return res;
+    };
 
-    const res = await handle.done;
-    clearTimeout(timer);
-    clearInterval(poll);
+    let ok = true;
+    let why = '';
+    let resultText = '';
+    if (!renderOnly) {
+      const res = await execClaude(prompt, resume);
+      ok = !!res.result?.ok;
+      resultText = res.result?.text ?? '';
+      if (!ok) why = res.result?.text || res.stderr.trim().split('\n').slice(-3).join(' ') || `claude exited with code ${res.code}`;
+    }
+
+    // Spec formats: render through the services; hand problems back to the same session (≤ 2 fix rounds).
+    if (ok && specKind && !canceled && !timedOut) {
+      for (let round = 0; ; round++) {
+        await log({ step: step.id, type: 'log', text: round ? `Re-rendering after fixes (round ${round})…` : `Rendering ${SPEC_FILE[specKind]} with the ${specKind === 'storyboard' ? 'render' : 'stills'} service…` });
+        const r = await renderSpec(specKind, cwd, join(dir, 'brief'));
+        await log({ step: step.id, type: 'log', text: r.ok ? `Rendered: ${r.summary}` : `Quality check found ${r.feedback.length} issue(s): ${r.feedback.slice(0, 3).join(' · ')}` });
+        if (r.ok) break;
+        if (round >= 2 || renderOnly || !sessionId || canceled || timedOut || Date.now() > deadline) {
+          // Keep whatever rendered; only fail if nothing did.
+          if (r.summary === 'render failed' || r.summary === 'no spec' || r.summary === 'bad json' || r.summary === 'invalid storyboard') {
+            ok = false;
+            why = r.feedback.join(' ').slice(0, 600);
+          }
+          break;
+        }
+        const fix = await execClaude(`The render service checked your ${SPEC_FILE[specKind]} and found these problems:\n${r.feedback.map((f) => `- ${f}`).join('\n')}\n\nEdit out/${SPEC_FILE[specKind]} to fix every one of them (shorter text, different layout, valid fields). Don't render anything yourself — just update the JSON.`, sessionId);
+        if (!fix.result?.ok) break;
+      }
+    }
 
     const files = await matchOutputs(cwd, outputs);
     const patch: Partial<Step> = {
@@ -271,9 +313,10 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
       outputs: files,
       pendingNote: undefined,
       cancelRequested: undefined,
+      renderOnly: undefined,
       worker: undefined,
-      sessionId: res.sessionId ?? step.sessionId,
-      costUsd: (step.costUsd ?? 0) + (res.result?.costUsd ?? 0),
+      sessionId,
+      costUsd: (step.costUsd ?? 0) + costUsd,
     };
     if (note) patch.revisions = [...step.revisions, { note, at: new Date().toISOString() }];
 
@@ -281,16 +324,13 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
       Object.assign(patch, { status: 'canceled' });
     } else if (timedOut) {
       Object.assign(patch, { status: 'failed', error: `Stopped after ${settings.stepTimeoutMinutes} minutes` });
-    } else if (res.result?.ok && (step.kind === 'brief' ? files.includes('brief.md') : files.some((f) => f !== 'out/NOTES.md'))) {
+    } else if (ok && (step.kind === 'brief' ? files.includes('brief.md') : files.some((f) => f !== 'out/NOTES.md' && !f.endsWith('.json')))) {
       Object.assign(patch, { status: 'done' });
     } else {
-      const why = res.result?.ok
-        ? 'Claude finished but no deliverable files were found in out/.'
-        : res.result?.text || res.stderr.trim().split('\n').slice(-3).join(' ') || `claude exited with code ${res.code}`;
-      Object.assign(patch, { status: 'failed', error: why.slice(0, 600) });
+      Object.assign(patch, { status: 'failed', error: (why || 'Claude finished but no deliverable files were found in out/.').slice(0, 600) });
     }
     await updateStep(id, step.id, patch);
-    if (res.result?.text && patch.status === 'done') await log({ step: step.id, type: 'result', text: res.result.text.slice(0, 1500), costUsd: res.result.costUsd });
+    if (resultText && patch.status === 'done') await log({ step: step.id, type: 'result', text: resultText.slice(0, 1500), costUsd });
     await log({ step: step.id, type: 'status', status: patch.status, text: patch.error ?? `${files.length} file(s)` });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

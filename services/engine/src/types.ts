@@ -33,6 +33,8 @@ export interface Step {
   /** Set when a revision is queued; consumed by the worker. */
   pendingNote?: string;
   cancelRequested?: boolean;
+  /** Re-render the edited spec without running Claude. */
+  renderOnly?: boolean;
   worker?: string;
 }
 
@@ -93,6 +95,8 @@ export interface Pack {
   skills: SkillDep[];
   /** Binaries the pack needs on PATH (checked by doctor). */
   tools: string[];
+  /** Spec formats: Claude writes this JSON spec and a service renders it. */
+  spec?: 'deck' | 'graphics' | 'storyboard';
   /** The workflow dispatches sub-agents (HyperFrames does, per frame). */
   subagents?: boolean;
   /** Sort order in the UI (lower first). */

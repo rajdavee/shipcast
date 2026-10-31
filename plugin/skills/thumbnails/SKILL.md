@@ -1,53 +1,42 @@
 ---
 name: thumbnails
-description: Design a set of click-worthy still graphics from a campaign brief — YouTube thumbnail, Open Graph / link-preview card, X and LinkedIn post images, and a 9:16 story card — as PNGs rendered from HTML. Use when someone asks for thumbnails, social cards, OG images, banners or static post graphics for a product.
+description: Art-direct a set of still graphics as a Shipcast graphics spec (graphics.json) — three YouTube thumbnail variants for Test & Compare, link-preview card, GitHub social preview, X/LinkedIn post images, stories and banners — rendered by the Shipcast stills service. Use when someone asks for thumbnails, social cards, OG images, banners or static post graphics.
 ---
 
-# Thumbnails & social cards
+# Thumbnails & social graphics (graphics spec)
 
-Stills are judged in under a second at small sizes. One idea per image, one
-focal point, contrast that survives a phone screen in sunlight.
+Stills are judged in under a second at small sizes. Your job: the hook words,
+the picture choice, and which layout carries each idea. The stills service
+owns type, contrast, safe zones and export.
 
-## Sizes
+Read `./catalog.md` first (layouts, fields, presets). Never invent a layout.
 
-| File | Size | Use |
-|---|---|---|
-| `youtube-thumb.png` | 1280×720 | YouTube video thumbnail |
-| `og-card.png` | 1200×630 | Link preview (site, GitHub social preview, Slack) |
-| `x-post.png` | 1600×900 | X / Twitter image post |
-| `linkedin-post.png` | 1200×1500 | LinkedIn single-image post |
-| `story.png` | 1080×1920 | Instagram / LinkedIn story, YouTube community |
-| `github-banner.png` | 1280×640 | README header |
+## Output
 
-The prompt says which set to make (`set`: all · youtube · social · github).
+`out/graphics.json`:
 
-## Direction
-
-Use `brand.json` colors, fonts and logo and `assets/` screenshots.
-
-- **YouTube:** 3–5 word headline max, 110–160px, heavy weight, high-contrast
-  stroke or shadow; the product UI zoomed into one striking detail; a strong
-  diagonal or circle/arrow pointing at it. Test legibility by viewing it at
-  320×180 — if it fails, cut words.
-- **OG / GitHub:** calmer — logo, product name, the one-liner, a cropped real
-  screenshot in a device or browser frame, brand background with subtle grain
-  or grid. Safe zone: keep text 80px from every edge.
-- **Posts / story:** hook headline from the brief + supporting visual; story
-  keeps text inside the middle 1080×1420 (UI overlays cover the top and bottom).
-- Make the set feel like one family: same grid, type, accent device.
-
-Make 2 headline variants for the YouTube thumbnail (`youtube-thumb.png`,
-`youtube-thumb-b.png`) so the user can A/B test.
-
-## Build
-
-One HTML file per image in `work/` sized exactly to its canvas, then:
-
-```bash
-SNAP="<this skill's base dir>/../../scripts/snap.mjs"
-node "$SNAP" --size 1280x720 --out out/youtube-thumb.png work/youtube-thumb.html
+```json
+{
+  "items": [
+    { "type": "thumbnail", "layout": "headline-shot", "preset": "youtube-thumbnail", "name": "youtube-a.jpg", "fields": { "headline": "Ship in *one* paste", "image": "assets/hero.png", "focus": "center" } },
+    { "type": "thumbnail", "layout": "big-number", "preset": "youtube-thumbnail", "name": "youtube-b.jpg", "fields": { "value": "10×", "headline": "faster launches" } },
+    { "type": "thumbnail", "layout": "versus", "preset": "youtube-thumbnail", "name": "youtube-c.jpg", "fields": { "left": "2 days", "right": "1 paste", "badge": "VS" } },
+    { "type": "card", "layout": "link-card", "theme": "midnight", "preset": "og-card", "name": "og-card.png", "fields": { "title": "…", "subtitle": "…", "image": "assets/hero.png" } }
+  ]
+}
 ```
 
-Read every PNG back and fix collisions, cut-off text, low contrast and
-anything that looks like a stock template. Write `out/NOTES.md` with the
-alt text for each image.
+Don't render anything yourself — the worker renders it, checks overflow and
+safe zones, and sends problems back.
+
+## Rules
+
+- **YouTube: three variants** (A/B/C) with *different* hooks and layouts — YouTube Test & Compare picks the winner by watch time.
+- 2–4 words per thumbnail headline. Complement the video title, don't repeat it. Must read at 160 px wide.
+- One focal subject; real product imagery from `assets/` (look at the images, pick the strongest).
+- Nothing important bottom-right on thumbnails (the duration badge sits there).
+- Cards: the brand's one-liner, real screenshot, 0–3 short chips (license, "open source", a real number).
+- Which set to make comes from the prompt (`set`): `youtube` = 3 thumbnails; `social` = og-card + x-image + linkedin-image + story-image; `github` = github-banner + og-card; `all` = everything plus x-header and linkedin-banner.
+- Real claims only.
+
+Finish with `out/NOTES.md`: alt text for each image and which thumbnail you'd bet on.

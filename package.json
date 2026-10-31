@@ -1,15 +1,31 @@
 {
   "name": "shipcast",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "Local-first studio that turns a URL or a GitHub repo into a full launch campaign — videos, motion graphics, carousels, thumbnails and copy — using your own Claude Code login.",
+  "description": "Local-first studio that turns a URL or a GitHub repo into a full launch campaign \u2014 videos, motion graphics, carousels, thumbnails and copy \u2014 using your own Claude Code login.",
   "type": "module",
   "license": "MIT",
   "author": "rajdavee",
-  "repository": { "type": "git", "url": "git+https://github.com/rajdavee/shipcast.git" },
-  "engines": { "node": ">=22.18" },
-  "workspaces": ["apps/web", "services/engine", "services/api", "services/worker"],
-  "bin": { "shipcast": "bin/shipcast.ts" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rajdavee/shipcast.git"
+  },
+  "engines": {
+    "node": ">=22.18"
+  },
+  "workspaces": [
+    "apps/web",
+    "services/engine",
+    "services/api",
+    "services/worker",
+    "services/render",
+    "services/stills",
+    "services/media",
+    "services/qa"
+  ],
+  "bin": {
+    "shipcast": "bin/shipcast.ts"
+  },
   "scripts": {
     "dev": "node bin/shipcast.ts dev",
     "build": "npm run build -w apps/web",
@@ -17,7 +33,13 @@
     "worker": "node services/worker/src/main.ts",
     "doctor": "node bin/shipcast.ts doctor",
     "test": "node --test \"services/**/*.test.ts\" \"tests/*.test.ts\"",
-    "typecheck": "tsc -p tsconfig.json --noEmit && npm run typecheck -w apps/web"
+    "typecheck": "tsc -p tsconfig.json --noEmit && npm run typecheck -w apps/web",
+    "status": "node bin/shipcast.ts status",
+    "service:render": "node services/render/src/main.ts",
+    "service:stills": "node services/stills/src/main.ts",
+    "service:media": "node services/media/src/main.ts",
+    "service:qa": "node services/qa/src/main.ts",
+    "api": "node services/api/src/main.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

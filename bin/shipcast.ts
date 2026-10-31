@@ -1,38 +1,113 @@
 #!/usr/bin/env node
-import { spawn } from 'node:child_process';
-import { createApp } from '@shipcast/api';
-import { startWorker } from '@shipcast/worker';
-import { doctor, ROOT } from '@shipcast/engine';
+import { spawn, type ChildProcess } from 'node:child_process';
+import { createServer } from 'node:net';
+import { join } from 'node:path';
+import { doctor, ROOT, SERVICE_PORTS, serviceHealth, type ServiceName } from '@shipcast/engine';
 
 const [cmd = 'start', ...rest] = process.argv.slice(2);
 const flag = (name: string) => rest.includes(`--${name}`);
-const port = Number(process.env.PORT ?? 4317);
+const opt = (name: string) => {
+  const i = rest.indexOf(`--${name}`);
+  return i >= 0 ? rest[i + 1] : undefined;
+};
+const apiPort = Number(process.env.PORT ?? 4317);
 
-async function serve({ withWorker }: { withWorker: boolean }) {
-  const app = createApp();
-  await new Promise<void>((r) => app.listen(port, '127.0.0.1', r));
-  console.log(`\n  ▲ Shipcast studio  →  http://localhost:${port}\n`);
-  const worker = withWorker ? startWorker() : null;
-  const shutdown = async () => {
-    app.close();
-    await worker?.stop();
-    process.exit(0);
+const SERVICES: Record<string, { entry: string; port?: number }> = {
+  api: { entry: 'services/api/src/main.ts', port: apiPort },
+  worker: { entry: 'services/worker/src/main.ts' },
+  render: { entry: 'services/render/src/main.ts', port: SERVICE_PORTS.render },
+  stills: { entry: 'services/stills/src/main.ts', port: SERVICE_PORTS.stills },
+  media: { entry: 'services/media/src/main.ts', port: SERVICE_PORTS.media },
+  qa: { entry: 'services/qa/src/main.ts', port: SERVICE_PORTS.qa },
+};
+
+const COLORS: Record<string, string> = { api: '36', worker: '35', render: '33', stills: '32', media: '34', qa: '31' };
+
+function portFree(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const s = createServer();
+    s.once('error', () => resolve(false));
+    s.listen(port, '127.0.0.1', () => s.close(() => resolve(true)));
+  });
+}
+
+async function freePort(start: number): Promise<number> {
+  for (let p = start; p < start + 50; p++) if (await portFree(p)) return p;
+  throw new Error(`no free port near ${start}`);
+}
+
+/**
+ * Supervisor: one process per service, restarted with backoff if it dies.
+ * Busy default ports are moved and every service is told where the others
+ * live through SHIPCAST_<NAME>_URL.
+ */
+async function supervise(names: string[]) {
+  const env: Record<string, string> = {};
+  const ports: Record<string, number> = {};
+  for (const n of names) {
+    const want = SERVICES[n].port;
+    if (!want) continue;
+    const port = n === 'api' ? want : await freePort(want);
+    if (n === 'api' && !(await portFree(port))) throw new Error(`port ${port} is in use — set PORT to use another`);
+    ports[n] = port;
+    if (n !== 'api') env[`SHIPCAST_${n.toUpperCase()}_URL`] = `http://127.0.0.1:${port}`;
+  }
+  const children = new Map<string, ChildProcess>();
+  let stopping = false;
+  const launch = (n: string, attempt = 0) => {
+    const c = spawn(process.execPath, [join(ROOT, SERVICES[n].entry)], {
+      env: { ...process.env, ...env, ...(ports[n] ? { PORT: String(ports[n]) } : {}) },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const tag = `\x1b[${COLORS[n]}m${n.padEnd(6)}\x1b[0m │ `;
+    const pipe = (s: NodeJS.ReadableStream) => s.on('data', (d) => process.stdout.write(String(d).replace(/^(?=.)/gm, tag)));
+    pipe(c.stdout!);
+    pipe(c.stderr!);
+    const started = Date.now();
+    c.on('exit', (code) => {
+      children.delete(n);
+      if (stopping) return;
+      const next = Date.now() - started > 30_000 ? 0 : attempt + 1;
+      const wait = Math.min(30_000, 500 * 2 ** next);
+      process.stdout.write(`${tag}exited (${code}); restarting in ${(wait / 1000).toFixed(1)}s\n`);
+      setTimeout(() => launch(n, next), wait);
+    });
+    children.set(n, c);
+  };
+  for (const n of names) launch(n);
+  if (names.includes('api')) console.log(`\n  ▲ Shipcast studio  →  http://localhost:${ports.api}\n`);
+  const shutdown = () => {
+    stopping = true;
+    for (const c of children.values()) c.kill('SIGTERM');
+    setTimeout(() => process.exit(0), 4000).unref();
+    if (!children.size) process.exit(0);
+    let left = children.size;
+    for (const c of children.values()) c.on('exit', () => --left === 0 && process.exit(0));
   };
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
 }
 
 switch (cmd) {
-  case 'start':
-    await serve({ withWorker: !flag('no-worker') });
+  case 'start': {
+    const only = opt('only')?.split(',').map((s) => s.trim());
+    const skip = new Set(opt('skip')?.split(',') ?? []);
+    if (flag('no-worker')) skip.add('worker');
+    const names = (only ?? Object.keys(SERVICES)).filter((n) => SERVICES[n] && !skip.has(n));
+    await supervise(names);
     break;
-  case 'api':
-    await serve({ withWorker: false });
-    break;
+  }
   case 'dev': {
-    await serve({ withWorker: true });
+    await supervise(Object.keys(SERVICES));
     const vite = spawn('npm', ['run', 'dev', '-w', 'apps/web'], { cwd: ROOT, stdio: 'inherit' });
     process.on('exit', () => vite.kill());
+    break;
+  }
+  case 'status': {
+    for (const n of Object.keys(SERVICE_PORTS) as ServiceName[]) {
+      const h = await serviceHealth(n);
+      console.log(`  ${h ? '\x1b[32m●\x1b[0m' : '\x1b[31m○\x1b[0m'} ${n.padEnd(7)} ${h ? `queued ${h.queued} · running ${h.running}` : 'not reachable'}`);
+    }
     break;
   }
   case 'doctor': {
@@ -44,10 +119,15 @@ switch (cmd) {
     process.exit(checks.some((c) => c.required && !c.ok) ? 1 : 0);
   }
   default:
-    console.log(`usage: shipcast [start|dev|api|doctor]
+    console.log(`usage: shipcast <command>
 
-  start        studio + worker on http://localhost:${port} (default)
-  start --no-worker   studio only; run \`npm run worker\` separately
-  dev          same, plus the Vite dev server with hot reload
-  doctor       check Claude Code, GitHub CLI, FFmpeg, Chrome, voice + captions`);
+  start                      every service, supervised (studio on http://localhost:${apiPort})
+  start --only api,worker    just these services (others can run elsewhere)
+  start --skip render        everything except these
+  dev                        start + Vite hot reload for the studio UI
+  status                     health of the capability services
+  doctor                     check Claude Code, GitHub CLI, FFmpeg, Chrome, voice, captions
+
+services: ${Object.keys(SERVICES).join(', ')}
+point a service elsewhere with SHIPCAST_<NAME>_URL (e.g. SHIPCAST_RENDER_URL=http://gpu-box:4320)`);
 }

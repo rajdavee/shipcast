@@ -1,0 +1,42 @@
+# Optional: run each Shipcast service in its own container.
+#   docker compose up --build        → studio on http://localhost:4317
+# The worker uses your Claude Code login, mounted read-only from ~/.claude.
+x-service: &service
+  build: .
+  image: shipcast
+  restart: unless-stopped
+  volumes:
+    - shipcast-data:/data
+  environment:
+    SHIPCAST_RENDER_URL: http://render:4320
+    SHIPCAST_STILLS_URL: http://stills:4321
+    SHIPCAST_MEDIA_URL: http://media:4322
+    SHIPCAST_QA_URL: http://qa:4323
+
+services:
+  api:
+    <<: *service
+    environment: { SHIPCAST_SERVICE: api, SHIPCAST_RENDER_URL: http://render:4320, SHIPCAST_STILLS_URL: http://stills:4321, SHIPCAST_MEDIA_URL: http://media:4322, SHIPCAST_QA_URL: http://qa:4323 }
+    ports: ["127.0.0.1:4317:4317"]
+  worker:
+    <<: *service
+    environment: { SHIPCAST_SERVICE: worker, SHIPCAST_RENDER_URL: http://render:4320, SHIPCAST_STILLS_URL: http://stills:4321, SHIPCAST_MEDIA_URL: http://media:4322, SHIPCAST_QA_URL: http://qa:4323 }
+    volumes:
+      - shipcast-data:/data
+      - ${HOME}/.claude:/root/.claude:ro
+      - ${HOME}/.claude.json:/root/.claude.json:ro
+  render:
+    <<: *service
+    environment: { SHIPCAST_SERVICE: render, PORT: "4320", SHIPCAST_MEDIA_URL: http://media:4322, SHIPCAST_QA_URL: http://qa:4323 }
+  stills:
+    <<: *service
+    environment: { SHIPCAST_SERVICE: stills, PORT: "4321" }
+  media:
+    <<: *service
+    environment: { SHIPCAST_SERVICE: media, PORT: "4322" }
+  qa:
+    <<: *service
+    environment: { SHIPCAST_SERVICE: qa, PORT: "4323" }
+
+volumes:
+  shipcast-data:

@@ -1,109 +1,49 @@
 ---
 name: carousel
-description: Design a scroll-stopping LinkedIn / Instagram carousel (document post) from a campaign brief — 6–10 slides as PNGs, a ready-to-upload PDF, an optional animated MP4 version, and the post caption. Use when someone asks for a carousel, a LinkedIn document post, swipe slides, or an Instagram slideshow about a product.
+description: Write a scroll-stopping LinkedIn / Instagram carousel as a Shipcast deck spec (deck.json) — angle, slide-by-slide copy and layout choices — that the Shipcast stills service renders into PNG slides and an upload-ready PDF, plus the post caption. Use when someone asks for a carousel, LinkedIn document post, or swipe slides about a product.
 ---
 
-# Carousel
+# Carousel (deck spec)
 
 A carousel is a tiny magazine: one idea per slide, a cover that makes people
-swipe, and a last slide that tells them what to do. Design it like an editorial
-designer, not like a slide deck.
+swipe, a last slide that tells them what to do. You write the words and pick
+layouts; the stills service owns typography, grids, themes and export.
 
-## Inputs
+Read `./catalog.md` first: it lists every theme, layout and field (with
+character limits). Never invent a layout or field.
 
-- The campaign brief (`brief.md`, `brand.json`, `assets/`) — path is in the prompt.
-- Options from the prompt: `platform` (linkedin 1080×1350 · instagram 1080×1350 ·
-  square 1080×1080), `slides` (count), `angle`, `motion` (whether to also render
-  an MP4).
+## Output
 
-## 1. Story first
+1. `out/deck.json`:
 
-Pick one angle (the prompt may set it). Strong carousel angles:
-
-| Angle | Shape |
-|---|---|
-| `problem-solution` | Pain → why it persists → the product's move → proof → CTA |
-| `how-it-works` | Cover → 3–5 steps, each showing the real UI → result → CTA |
-| `listicle` | "N things…" — one per slide, numbered big |
-| `before-after` | Split slides: old way vs. new way |
-| `myth-buster` | "Myth:" / "Reality:" pairs |
-| `launch` | What's new → the 3 best bits → who it's for → CTA |
-
-Write `work/outline.md` first: per slide, the headline (≤ 8 words), one
-supporting line (≤ 18 words), and the visual. Read it back as a stranger would.
-The cover must work alone in the feed: a specific promise or tension, never
-"Introducing X".
-
-## 2. Design system
-
-Build from `brand.json`: its colors, display + body fonts (load from Google
-Fonts with a `<link>` when they're Google fonts; otherwise use the fallback),
-logo. Then make it feel *designed*:
-
-- A strict grid: 96px outer margins, 12-column, baseline rhythm of 8px.
-- Huge display type for headlines (96–150px on the cover, 64–88px inside),
-  tight tracking (-0.02em to -0.04em), body 32–38px. Never below 28px.
-- One accent color used sparingly for emphasis words and numbers.
-- A recurring device that ties slides together: slide counter `03/08`, a
-  progress bar, a continuous line or shape that flows across slide edges, or a
-  big ghost number.
-- Real product imagery: crop screenshots from `assets/` into device frames or
-  rounded panels with soft shadows; zoom into the one detail that matters.
-- Texture over flatness: subtle grain (SVG noise), gradient meshes, glass
-  panels, or a grid pattern — pick one, use it consistently.
-- Last slide: CTA (from `brand.json.cta`), logo, handle/URL, "Save this ↗" or
-  "Repost ♻︎" nudge.
-
-## 3. Build
-
-Write one self-contained HTML file per slide into `work/slides/`
-(`slide-01.html` … ), each exactly the slide size with `html,body{margin:0}`,
-plus `work/carousel.html` that stacks all slides with
-`@page { size: <w>px <h>px; margin: 0 }` and `page-break-after: always`.
-Reference assets with absolute `file://` paths or copy them into `work/`.
-
-Render:
-
-```bash
-SNAP="<this skill's base dir>/../../scripts/snap.mjs"
-node "$SNAP" --size 1080x1350 --outdir out/slides work/slides/*.html
-node "$SNAP" --size 1080x1350 --pdf out/carousel.pdf work/carousel.html
+```json
+{
+  "theme": "editorial",
+  "preset": "linkedin-carousel",
+  "handle": "@acme",
+  "slides": [
+    { "layout": "cover", "fields": { "kicker": "For B2B founders", "title": "Your demo video is *losing* deals", "subtitle": "5 fixes that took ours from 2% to 9% reply rate" } },
+    { "layout": "points", "fields": { "title": "The 3-step fix", "items": ["Hook first — the result in the first 2 seconds", "Real UI — no stock footage", "One CTA — and say it out loud"] } },
+    { "layout": "cta", "fields": { "title": "Steal this playbook", "button": "Try Acme free", "url": "acme.com" } }
+  ]
+}
 ```
 
-Then **look at every PNG** (read the image files). Fix overflow, widows,
-collisions, low contrast (WCAG AA for body text), anything smaller than 28px,
-and anything that looks like a template. Re-render until each slide is
-postable on its own.
+2. `out/caption.md` — the LinkedIn post that goes with it: a 2-line hook that isn't the cover repeated (≤ 210 characters before "…see more"), 3–6 short lines of value, a soft CTA, 3–5 hashtags.
 
-## 4. Motion version (when `motion` is `yes`)
+Don't render anything yourself — the worker renders `deck.json`, checks every slide for overflow and tiny text, and sends problems back to you.
 
-Make `out/carousel.mp4` with the bundled script — a gentle push-in on each
-slide and a transition between them (~2.6s per slide, 30fps):
+## Story
 
-```bash
-node "<this skill's base dir>/../../scripts/slides-to-video.mjs" --out out/carousel.mp4 \
-  --size 1080x1350 --hold 2.6 --transition slideleft out/slides/*.png
-```
+Pick one angle (the prompt may set it): `problem-solution`, `how-it-works`, `listicle`, `before-after`, `myth-buster`, `launch`. Then:
 
-Pick the transition to match the design (`slideleft` for a swipe feel,
-`fade` for calm, `wipeleft`/`circleopen` for punch). Add `--music <file>` only
-if a music file is already available locally (the user's uploads or a track
-another format rendered); otherwise leave it silent and say so in NOTES.md.
-Confirm the length with `ffprobe -v error -show_entries format=duration -of csv=p=0 out/carousel.mp4`
-— it should be about slides × 2.6s.
+- **6–10 slides.** Slide 1 `cover`; last slide `cta`.
+- **Cover** = a specific promise, number or tension. Never "Introducing X".
+- **Slide 2** = stakes (`statement`) — why this matters now.
+- **Middle** = the framework: `points`, `step` (with a real screenshot from `assets/` when it helps), `compare`, `stat` (real numbers only), `quote` (real people only), `image`.
+- **N-1** = recap or the single most useful takeaway.
+- Each slide's headline ≤ 8 words; wrap the one word that matters in `*stars*`.
+- Pick the theme that fits the brand: `editorial` (brand background), `swiss` (light, analytical), `bold` (loud, brand color), `midnight` (dark, premium).
+- Use the brand's own words and proof from the brief. No invented stats, quotes or customers.
 
-## 5. Caption
-
-Write `out/caption.md`: the LinkedIn post that goes with the carousel — a
-2-line hook that isn't the cover repeated, 3–6 short lines of value, a soft
-CTA, 3–5 relevant hashtags. Plain text, no emoji walls, no "excited to share".
-
-## Deliverables
-
-```
-out/slides/slide-01.png … slide-NN.png
-out/carousel.pdf            upload this as a LinkedIn document
-out/carousel.mp4            (motion: yes)
-out/caption.md
-out/NOTES.md
-```
+Finish with `out/NOTES.md`: the angle in one line and why this theme.
