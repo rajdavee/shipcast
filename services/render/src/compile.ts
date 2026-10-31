@@ -82,9 +82,13 @@ function subcomp(id: string, width: number, height: number, part: { markup: stri
   return `<!doctype html><html><head><meta charset="UTF-8"></head><body><template>
 <style>${part.css}</style>
 <div id="${id}" data-composition-id="${id}" data-width="${width}" data-height="${height}">${part.markup}</div>
-<script>(()=>{const root=document.getElementById("${id}");
-const fit=()=>{for(const el of root.querySelectorAll("h1,h2,.num,p")){const cs=getComputedStyle(el);if(cs.display==="inline"||!el.clientWidth)continue;let s=parseFloat(cs.fontSize);const min=Math.max(s*.45,28);const room=()=>{const p=el.parentElement.getBoundingClientRect(),r=el.getBoundingClientRect(),c=root.getBoundingClientRect();return Math.min(el.clientWidth,p.right-r.left,c.right-r.left);};for(let i=0;i<30&&s>min&&el.scrollWidth>room()+1;i++){s*=.94;el.style.fontSize=s+"px";}}};
-fit();if(document.fonts&&document.fonts.ready)document.fonts.ready.then(fit);
+<script>(()=>{const root=document.getElementById("${id}")||document.querySelector('[data-composition-id="${id}"]');
+// Shrink a headline only if it truly overflows. Wait for real layout first: before the scene is
+// mounted its box is 0 wide and every line would look too long. Always fit from the authored size.
+const fit=()=>{const c=root.getBoundingClientRect();if(c.width<${Math.round(width / 2)})return false;for(const el of root.querySelectorAll("h1,h2,.num,p")){const cs=getComputedStyle(el);if(cs.display==="inline"||!el.clientWidth)continue;if(!el.dataset.fs0)el.dataset.fs0=parseFloat(cs.fontSize);let s=+el.dataset.fs0;el.style.fontSize=s+"px";const min=Math.max(s*.6,28);const room=()=>{const p=el.parentElement.getBoundingClientRect(),r=el.getBoundingClientRect();return Math.min(el.clientWidth,p.right-r.left,c.right-r.left);};for(let i=0;i<30&&s>min&&el.scrollWidth>room()+Math.max(6,s*.08);i++){s*=.95;el.style.fontSize=s+"px";}}return true;};
+let tries=0;const tryFit=()=>{if(!fit()&&tries++<120)requestAnimationFrame(tryFit);};tryFit();
+if(window.ResizeObserver)new ResizeObserver(()=>fit()).observe(root);
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(fit);
 const tl=gsap.timeline({paused:true});
 ${part.js}
 window.__timelines["${id}"]=tl;})();</script>
@@ -260,7 +264,8 @@ export async function compileStoryboard(story: Storyboard, opts: { dir: string; 
 ${fonts.css}
 ${brandCss(fallbackBrand)}
 html,body{margin:0;background:#000}
-#main{position:relative;width:100%;height:100%;overflow:hidden;font-family:var(--font-body)}
+#main{position:relative;width:${width}px;height:${height}px;overflow:hidden;font-family:var(--font-body)}
+[id^="host-"]{position:absolute;left:0;top:0;width:${width}px;height:${height}px}
 .sc-tx{position:absolute;inset:0;z-index:50;pointer-events:none}
 .sc-tx.flash{background:#fff;opacity:0}
 .sc-tx.wipe{background:var(--brand-primary)}

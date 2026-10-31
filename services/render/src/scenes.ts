@@ -95,7 +95,7 @@ function bg(c: SceneCtx, mode: 'dark' | 'brand' | 'light' = 'dark') {
   const ink = mode === 'brand' ? 'var(--brand-on-primary)' : mode === 'light' ? 'var(--brand-text)' : '#f4f5f8';
   return {
     markup: `<div class="bg"><i class="g1"></i><i class="g2"></i><i class="grain"></i></div>`,
-    css: `${S}{position:absolute;inset:0;overflow:hidden;background:${base};color:${ink};font-family:var(--font-body)}
+    css: `${S}{position:absolute;left:0;top:0;width:${c.width}px;height:${c.height}px;overflow:hidden;background:${base};color:${ink};font-family:var(--font-body)}
 ${S} .bg,${S} .bg i{position:absolute;inset:0}
 ${S} .bg .g1{inset:-20%;background:radial-gradient(40% 40% at 75% 25%,color-mix(in srgb,var(--brand-primary) ${mode === 'brand' ? 0 : mode === 'dark' ? 26 : 45}%,transparent),transparent 70%)}
 ${S} .bg .g2{inset:-20%;background:radial-gradient(45% 45% at 20% 85%,color-mix(in srgb,var(--brand-secondary) ${mode === 'brand' ? 25 : 30}%,transparent),transparent 70%)}
@@ -225,7 +225,7 @@ ${S} mark .hl{position:absolute;left:0;top:0;right:0;bottom:0;padding:0 .08em;ba
       const fx = Math.min(Math.max(Number(f.focusX ?? 0.5), 0), 1);
       const fy = Math.min(Math.max(Number(f.focusY ?? 0.4), 0), 1);
       const zoom = Math.min(Math.max(Number(f.zoom ?? 1.6), 1), 2.4);
-      const titleH = f.title ? Math.round((vertical ? 150 : 120) * u) : 0;
+      const titleH = f.title ? Math.round((vertical ? 170 : 140) * u) : 0;
       const phone = f.device === 'phone';
       const availW = c.width - pad.l - pad.r;
       // Imagery may run under the platform's bottom UI (only text must stay clear of it).
@@ -238,7 +238,7 @@ ${S} mark .hl{position:absolute;left:0;top:0;right:0;bottom:0;padding:0 .08em;ba
       return {
         markup:
           b.markup +
-          `${f.title ? `<h2 class="cap" style="position:absolute;left:${pad.l}px;right:${pad.r}px;top:${pad.t}px;font-size:${Math.round((vertical ? 68 : 60) * u)}px">${words(f.title)}</h2>` : ''}
+          `${f.title ? `<h2 class="cap" style="position:absolute;left:${pad.l}px;right:${pad.r}px;top:${pad.t}px;font-size:${Math.round((vertical ? 80 : 76) * u)}px">${words(f.title)}</h2>` : ''}
 <div class="win${phone ? ' phone' : ''}" style="left:${left}px;top:${pad.t + titleH}px;width:${w}px;height:${h}px"><div class="cam">${phone ? '' : '<div class="bar"><i></i><i></i><i></i></div>'}<img src="${img(f.image, c)}" alt=""></div>${phone ? '<i class="notch"></i>' : ''}</div>
 ${click ? `<div class="cursor"><svg viewBox="0 0 24 24" width="${Math.round(54 * u)}" height="${Math.round(54 * u)}"><path d="M4 2l16 9.5-7 1.6-3.6 6.9z" fill="#fff" stroke="#111" stroke-width="1.4" stroke-linejoin="round"/></svg><i class="ripple"></i></div>` : ''}`,
         css:
@@ -287,8 +287,8 @@ tl.fromTo("${S} .ripple",{scale:.3,opacity:.9},{scale:1.7,opacity:0,duration:.6,
           b.markup +
           stage(
             c,
-            `${f.title ? `<h2 style="font-size:${Math.round((vertical ? 84 : 76) * u)}px;margin-bottom:${Math.round(48 * u)}px">${words(f.title)}</h2>` : ''}<ul>${items
-              .map((it) => `<li style="font-size:${Math.round((vertical ? 54 : 50) * u)}px"><b><svg viewBox="0 0 24 24" width="${Math.round(30 * u)}" height="${Math.round(30 * u)}"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg></b><span>${esc(it)}</span></li>`)
+            `${f.title ? `<h2 style="font-size:${Math.round((vertical ? 96 : 92) * u)}px;margin-bottom:${Math.round(52 * u)}px">${words(f.title)}</h2>` : ''}<ul>${items
+              .map((it) => `<li style="font-size:${Math.round((vertical ? 60 : 58) * u)}px"><b><svg viewBox="0 0 24 24" width="${Math.round(30 * u)}" height="${Math.round(30 * u)}"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg></b><span>${esc(it)}</span></li>`)
               .join('')}</ul>`,
           ),
         css:
@@ -374,14 +374,14 @@ ${S} .col b{opacity:.8}`,
       const { u, pad, S } = frame(c);
       const b = bg(c, 'dark');
       const phone = f.device === 'phone';
-      const titleH = f.title ? Math.round(120 * u) : 0;
+      const titleH = f.title ? Math.round(140 * u) : 0;
       const availH = c.height - pad.t - pad.b - titleH;
       const fh = availH;
       const fw = phone ? Math.round(fh * 0.49) : c.width - pad.l - pad.r;
       return {
         markup:
           b.markup +
-          `${f.title ? `<h2 class="cap" style="position:absolute;left:${pad.l}px;right:${pad.r}px;top:${pad.t}px;font-size:${Math.round(60 * u)}px">${words(f.title)}</h2>` : ''}<div class="dev" style="left:${(c.width - fw) / 2}px;top:${pad.t + titleH}px;width:${fw}px;height:${fh}px"><img src="${img(f.image, c)}" alt=""></div>`,
+          `${f.title ? `<h2 class="cap" style="position:absolute;left:${pad.l}px;right:${pad.r}px;top:${pad.t}px;font-size:${Math.round(76 * u)}px">${words(f.title)}</h2>` : ''}<div class="dev" style="left:${(c.width - fw) / 2}px;top:${pad.t + titleH}px;width:${fw}px;height:${fh}px"><img src="${img(f.image, c)}" alt=""></div>`,
         css:
           b.css +
           headCss(S) +
@@ -405,14 +405,14 @@ ${S} .dev img{display:block;width:100%;height:auto}`,
       const { u, vertical, pad, S } = frame(c);
       const b = bg(c, 'dark');
       const lines = list(f.output).slice(0, 6);
-      const titleH = f.title ? Math.round((vertical ? 150 : 120) * u) : 0;
+      const titleH = f.title ? Math.round((vertical ? 170 : 140) * u) : 0;
       const fs = Math.round((vertical ? 32 : 38) * u);
       const cmd = String(f.command ?? '');
       const typeDur = Math.min(1.4, 0.035 * cmd.length + 0.3);
       return {
         markup:
           b.markup +
-          `${f.title ? `<h2 class="cap" style="position:absolute;left:${pad.l}px;right:${pad.r}px;top:${pad.t}px;font-size:${Math.round((vertical ? 68 : 60) * u)}px">${words(f.title)}</h2>` : ''}
+          `${f.title ? `<h2 class="cap" style="position:absolute;left:${pad.l}px;right:${pad.r}px;top:${pad.t}px;font-size:${Math.round((vertical ? 80 : 76) * u)}px">${words(f.title)}</h2>` : ''}
 <div class="term" style="left:${pad.l}px;right:${pad.r}px;top:${pad.t + titleH}px;font-size:${fs}px"><div class="tb"><i></i><i></i><i></i></div><div class="tt"><div class="ln cmd"><span class="pr">$</span> <span class="ty">${esc(cmd)}</span><span class="caret"></span></div>${lines
             .map((l) => `<div class="ln out${/^✓/.test(l) ? ' ok' : /^✗/.test(l) ? ' bad' : ''}">${esc(l)}</div>`)
             .join('')}</div></div>`,
@@ -468,17 +468,17 @@ tl.fromTo("${S} .out",{opacity:0,y:${8 * u}},{opacity:1,y:0,duration:.18,ease:"p
           b.markup +
           stage(
             c,
-            `<h2 style="font-size:${Math.round((vertical ? 76 : 68) * u)}px;margin-bottom:${Math.round(44 * u)}px">${words(f.title)}</h2><div class="bars">${rows
+            `<h2 style="font-size:${Math.round((vertical ? 88 : 84) * u)}px;margin-bottom:${Math.round(48 * u)}px">${words(f.title)}</h2><div class="bars">${rows
               .map((r, i) => `<div class="row${r.label.toLowerCase() === hi || (!hi && i === 0) ? ' hi' : ''}"><span class="lb">${esc(r.label)}</span><span class="track"><i class="bar" style="width:${Math.max(2, (r.n / max) * 100).toFixed(1)}%"></i></span><span class="val">${esc(r.text)}</span></div>`)
               .join('')}</div>${f.note ? `<p class="sub" style="font-size:${Math.round(28 * u)}px;margin-top:${Math.round(30 * u)}px">${esc(f.note)}</p>` : ''}`,
           ),
         css:
           b.css +
           headCss(S) +
-          `${S} .bars{display:grid;gap:${Math.round(22 * u)}px;width:100%}
-${S} .row{display:grid;grid-template-columns:${Math.round((vertical ? 210 : 260) * u)}px 1fr ${Math.round(170 * u)}px;align-items:center;gap:${Math.round(20 * u)}px;font-family:var(--font-display);font-size:${Math.round(34 * u)}px;font-weight:700}
+          `${S} .bars{display:grid;gap:${Math.round(30 * u)}px;width:100%}
+${S} .row{display:grid;grid-template-columns:${Math.round((vertical ? 210 : 260) * u)}px 1fr ${Math.round(170 * u)}px;align-items:center;gap:${Math.round(20 * u)}px;font-family:var(--font-display);font-size:${Math.round(42 * u)}px;font-weight:700}
 ${S} .lb{opacity:.75;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-${S} .track{height:${Math.round(42 * u)}px;border-radius:${Math.round(10 * u)}px;background:rgba(255,255,255,.06);overflow:hidden}
+${S} .track{height:${Math.round(64 * u)}px;border-radius:${Math.round(14 * u)}px;background:rgba(255,255,255,.06);overflow:hidden}
 ${S} .bar{display:block;height:100%;border-radius:${Math.round(10 * u)}px;background:rgba(255,255,255,.28);transform-origin:0 50%}
 ${S} .row.hi .bar{background:${accent}}${S} .row.hi .lb,${S} .row.hi .val{opacity:1;color:${accent}}
 ${S} .val{font-variant-numeric:tabular-nums;text-align:right;opacity:.85}`,
