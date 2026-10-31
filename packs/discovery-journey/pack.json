@@ -59,6 +59,7 @@
     "chrome"
   ],
   "roles": [
+    "story",
     "gsap",
     "motion-doctrine",
     "transitions",

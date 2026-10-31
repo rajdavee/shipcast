@@ -87,6 +87,7 @@
     "chrome"
   ],
   "roles": [
+    "script",
     "video-strategy",
     "copy",
     "humanize"

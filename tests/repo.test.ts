@@ -22,8 +22,8 @@ test('skill hub registry entries are pinned, licensed and self-consistent', asyn
   for (const p of reg.packages) {
     assert.ok(!ids.has(p.id), `duplicate id ${p.id}`);
     ids.add(p.id);
-    assert.match(p.repo, /^[\w.-]+\/[\w.-]+$/, p.id);
-    assert.match(p.ref, /^[0-9a-f]{40}$/, `${p.id} must pin a full commit SHA`);
+    assert.ok(p.repo === 'local' || /^[\w.-]+\/[\w.-]+$/.test(p.repo), p.id);
+    if (p.repo !== 'local') assert.match(p.ref, /^[0-9a-f]{40}$/, `${p.id} must pin a full commit SHA`);
     assert.ok(p.licence, `${p.id} needs a licence (or "none")`);
     assert.ok(p.paths.length > 0);
     const names = p.paths.map((x: string) => p.names?.[x] ?? (x === '.' ? p.id : x.split('/').pop()));

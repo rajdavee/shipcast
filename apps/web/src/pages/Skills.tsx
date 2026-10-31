@@ -90,7 +90,7 @@ function SkillCard({ p, busy, act }: { p: HubPackage & { installed: boolean; ena
         <b>{p.name}</b>
         <span className="verdict" title={`${p.verdict}/5 for professional work`}>{'●'.repeat(p.verdict)}{'○'.repeat(5 - p.verdict)}</span>
       </header>
-      <a className="repo" href={`https://github.com/${p.repo}`} target="_blank" rel="noreferrer">{p.repo}{p.stars ? ` · ★ ${p.stars >= 1000 ? `${Math.round(p.stars / 100) / 10}k` : p.stars}` : ''}</a>
+      {p.repo === 'local' ? <span className="repo">Built into Shipcast</span> : <a className="repo" href={`https://github.com/${p.repo}`} target="_blank" rel="noreferrer">{p.repo}{p.stars ? ` · ★ ${p.stars >= 1000 ? `${Math.round(p.stars / 100) / 10}k` : p.stars}` : ''}</a>}
       <p>{p.summary}</p>
       <div className="tags">
         <span className={`lic ${p.permissive ? 'ok' : 'warn'}`}>{p.licence === 'none' ? 'No licence' : p.licence}</span>

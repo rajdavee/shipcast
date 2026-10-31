@@ -84,6 +84,7 @@
     "chrome"
   ],
   "roles": [
+    "story",
     "copy",
     "humanize"
   ]

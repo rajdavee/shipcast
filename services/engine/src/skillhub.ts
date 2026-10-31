@@ -84,12 +84,15 @@ async function saveState(s: HubState) {
 }
 
 export const isEnabled = (p: HubPackage, s: HubState) => s.enabled[p.id] ?? !!p.default;
-export const isInstalled = (p: HubPackage, s: HubState) => s.installed[p.id]?.ref === p.ref && existsSync(storeDir(p.id));
+/** Built-in packages ship with Shipcast's own plugin (repo "local"); they are always installed. */
+export const isLocal = (p: HubPackage) => p.repo === 'local';
+export const isInstalled = (p: HubPackage, s: HubState) => isLocal(p) || (s.installed[p.id]?.ref === p.ref && existsSync(storeDir(p.id)));
 
 /** Download the pinned commit and keep only the package's skill folders. */
 export async function installPackage(id: string, opts: { acceptLicence?: boolean } = {}): Promise<{ ok: boolean; log: string }> {
   const pkg = (await loadRegistry()).find((p) => p.id === id);
   if (!pkg) return { ok: false, log: `unknown skill package ${id}` };
+  if (isLocal(pkg)) return { ok: true, log: `${pkg.name} is built in` };
   const state = await hubState();
   if (!isPermissive(pkg.licence) && !state.accepted[id] && !opts.acceptLicence) return { ok: false, log: `${pkg.name} is licensed "${pkg.licence}". Accept its licence to install it.` };
   if (!/^[\w.-]+\/[\w.-]+$/.test(pkg.repo) || !/^[0-9a-f]{7,40}$|^v?[\w.-]+$/.test(pkg.ref)) return { ok: false, log: 'bad repo or ref in registry' };
@@ -151,7 +154,7 @@ export async function buildHubPlugin(): Promise<string[]> {
   await writeFile(join(dir, '.claude-plugin', 'plugin.json'), JSON.stringify({ name: 'hub', description: "Upstream skills enabled in Shipcast's Skill Hub", version: '1.0.0' }, null, 2));
   const names: string[] = [];
   for (const p of reg) {
-    if (!isEnabled(p, s) || !isInstalled(p, s)) continue;
+    if (isLocal(p) || !isEnabled(p, s) || !isInstalled(p, s)) continue;
     for (const path of p.paths) {
       const name = skillName(p, path);
       if (!existsSync(join(storeDir(p.id), name)) || names.includes(name)) continue;
@@ -196,5 +199,5 @@ export async function ensureForRoles(roles: string[], packages: string[] = []): 
 /** The lines appended to a pack's prompt so Claude uses the right specialist for each part. */
 export function rolesPrompt(assigned: { role: string; pkg: HubPackage; skill: string }[]): string {
   if (!assigned.length) return '';
-  return `\n\n## Specialist skills for this job (Shipcast Skill Hub)\n${assigned.map((a) => `- **${a.role}** → use the \`hub:${a.skill}\` skill (${a.pkg.name}, ${a.pkg.repo})`).join('\n')}\nLoad each one when you reach that part of the work; Shipcast's own skills still define the output format.`;
+  return `\n\n## Specialist skills for this job (Shipcast Skill Hub)\n${assigned.map((a) => `- **${a.role}** → use the \`${isLocal(a.pkg) ? 'shipcast' : 'hub'}:${a.skill}\` skill (${a.pkg.name}${isLocal(a.pkg) ? '' : `, ${a.pkg.repo}`})`).join('\n')}\nLoad each one when you reach that part of the work; Shipcast's own skills still define the output format.`;
 }

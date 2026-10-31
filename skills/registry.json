@@ -2,6 +2,25 @@
   "$comment": "Curated upstream Claude skills for Shipcast's Skill Hub. Each package installs from its repo at the pinned ref into ~/.shipcast/skills (never into ~/.claude). Nothing here is vendored.",
   "packages": [
     {
+      "id": "shipcast-script",
+      "name": "Shipcast scriptwriting",
+      "repo": "local",
+      "ref": "builtin",
+      "paths": [
+        "plugin/skills/scriptwriting"
+      ],
+      "licence": "MIT",
+      "area": "story",
+      "roles": {
+        "script": "scriptwriting",
+        "story": "scriptwriting",
+        "hooks": "scriptwriting"
+      },
+      "summary": "Shipcast's own craft skill for voiceover and story: hook devices, structures from 15-second shorts to 10-minute videos, story spines, open loops and re-hooks, and writing for the ear.",
+      "verdict": 5,
+      "default": true
+    },
+    {
       "id": "hyperframes-workflows",
       "name": "HyperFrames video workflows",
       "repo": "heygen-com/hyperframes",
