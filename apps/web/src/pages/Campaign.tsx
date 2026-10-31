@@ -117,6 +117,7 @@ function ResultCard({ campaign, step, pack, now, onOpen, onRetry }: { campaign: 
         )}
         {step.status === 'queued' && <div className="waiting">{step.renderOnly ? 'Re-rendering soon' : 'Up next'}</div>}
         {step.status === 'blocked' && <div className="waiting">Starts after research</div>}
+        {step.status === 'needs-input' && <div className="waiting ask-wait">Waiting for your answer above</div>}
         {step.status === 'canceled' && <div className="waiting">Stopped</div>}
         {step.status === 'failed' && (
           <div className="failed">
@@ -140,6 +141,52 @@ function ResultCard({ campaign, step, pack, now, onOpen, onRetry }: { campaign: 
         <p>{step.status === 'done' ? (step.revisions.length ? `Revised ${step.revisions.length}×` : 'Ready') : step.status === 'running' ? 'Making it now' : step.status === 'queued' ? 'Queued' : ''}</p>
       </div>
     </button>
+  );
+}
+
+
+/** A step paused with a question from Claude: answer here and it picks up where it stopped. */
+function NeedsInput({ campaign, step, packName, onChange }: { campaign: C; step: Step; packName: string; onChange: (c: C) => void }) {
+  const q = step.question!;
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const send = async () => {
+    setBusy(true);
+    try {
+      onChange(await api.answer(campaign.id, step.id, values, note));
+      toast('Thanks — picking up where it stopped');
+    } catch (e) {
+      toast(String((e as Error).message));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const filled = Object.values(values).some((v) => v.trim()) || note.trim();
+  return (
+    <form className="ask-card" onSubmit={(e) => { e.preventDefault(); if (filled) send(); }}>
+      <div className="ask-head">
+        <span className="ask-badge">Needs you</span>
+        <span className="muted">{packName} paused</span>
+      </div>
+      <h3>{q.text}</h3>
+      {q.why && <p className="ask-why">{q.why}</p>}
+      <div className="ask-fields">
+        {q.fields.map((f) => (
+          <label key={f.key} className="field">
+            <span>{f.label}{f.secret && <small className="muted"> · stays on this computer, never shown again</small>}</span>
+            <input className="input" type={f.secret ? 'password' : 'text'} autoComplete="off" placeholder={f.placeholder ?? (f.secret ? f.key : '')} value={values[f.key] ?? ''} onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))} />
+          </label>
+        ))}
+        <label className="field">
+          <span>Anything else Claude should know? <small className="muted">(optional)</small></span>
+          <input className="input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. “skip payments, use the demo plan”" />
+        </label>
+      </div>
+      <div className="row-actions" style={{ justifyContent: 'flex-end' }}>
+        <button className="btn primary" disabled={!filled || busy}>{busy ? 'Sending…' : 'Send and continue'}</button>
+      </div>
+    </form>
   );
 }
 
@@ -180,7 +227,10 @@ export function Campaign({ id }: { id: string }) {
     }
   };
 
-  const summary = live
+  const asking = campaign.steps.some((s) => s.status === 'needs-input');
+  const summary = asking
+    ? 'Paused — Claude needs one thing from you (below), then it carries on.'
+    : live
     ? brief.status !== 'done'
       ? 'Researching first — everything else builds on it.'
       : `${ready} of ${items.length} ready. The rest appear here as they finish.`
@@ -223,6 +273,10 @@ export function Campaign({ id }: { id: string }) {
       </div>
 
       <p className="summary" aria-live="polite">{live && <i className="dot live" />}{summary}</p>
+
+      {campaign.steps.filter((s) => s.status === 'needs-input' && s.question).map((s) => (
+        <NeedsInput key={s.id} campaign={campaign} step={s} packName={(packMap.get(s.pack!)?.name ?? 'This step')} onChange={setCampaign} />
+      ))}
 
       <BriefStrip campaign={campaign} step={brief} />
       {brief.status === 'failed' && (

@@ -51,6 +51,9 @@ export function Home({ status, services, campaigns }: { status: Status | null; s
   const [busy, setBusy] = useState(false);
   const [brainOn, setBrainOn] = useState(() => readBool(BRAIN_KEY, true));
   const [brain, setBrain] = useState(false);
+  const [full, setFull] = useState(false);
+  const [envText, setEnvText] = useState('');
+  const [login, setLogin] = useState({ email: '', password: '', url: '' });
   const [error, setError] = useState<string | null>(null);
   const ta = useRef<HTMLTextAreaElement>(null);
   const packs = useLoad(() => api.packs());
@@ -92,6 +95,26 @@ export function Home({ status, services, campaigns }: { status: Status | null; s
       setError(String((e as Error).message));
       setBusy(false);
       setBrain(false);
+    }
+  }
+
+  async function makeFull() {
+    if (!source || (source.type !== 'local' && source.type !== 'github')) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const c = await api.createCampaign({
+        source,
+        notes,
+        name: undefined,
+        env: envText,
+        login: login.email || login.password || login.url ? login : undefined,
+        deliverables: [{ pack: 'app-run' }, { pack: 'app-capture' }, { pack: 'campaign-plan' }],
+      });
+      go(`/c/${c.id}`);
+    } catch (e) {
+      setError(String((e as Error).message));
+      setBusy(false);
     }
   }
 
@@ -141,6 +164,34 @@ export function Home({ status, services, campaigns }: { status: Status | null; s
           <span className="tnum">{chosen.length ? `${chosen.length} ${chosen.length === 1 ? 'piece' : 'pieces'} · about ${minutes} min` : 'Pick at least one format'}</span>
         </div>
       </div>
+
+      <button className="full-toggle" aria-expanded={full} onClick={() => setFull(!full)}>
+        <b>Full campaign from your app</b>
+        <span>Connect a repo or folder — Shipcast runs it locally, captures real screens and makes films, carousels, posts and a posting calendar. Runs in the background (2–4 h); we'll notify you.</span>
+      </button>
+      {full && (
+        <section className="full-panel">
+          {!source || (source.type !== 'local' && source.type !== 'github') ? (
+            <p className="muted">Type a GitHub repo (owner/repo) or a folder path (/Users/…/my-app) in the box above.</p>
+          ) : (
+            <>
+              <label className="field">
+                <span>Environment variables <small className="muted">· KEY=value per line, stays on this computer, never shown again</small></span>
+                <textarea className="textarea mono" rows={5} value={envText} onChange={(e) => setEnvText(e.target.value)} placeholder={'DATABASE_URL=postgres://…\nSTRIPE_SECRET_KEY=sk_test_…\n# leave out what you don\u2019t have — Shipcast asks if it really needs it'} />
+              </label>
+              <div className="full-login">
+                <label className="field"><span>Test login email <small className="muted">(optional)</small></span><input className="input" value={login.email} onChange={(e) => setLogin({ ...login, email: e.target.value })} placeholder="demo@yourapp.com" /></label>
+                <label className="field"><span>Password</span><input className="input" type="password" autoComplete="off" value={login.password} onChange={(e) => setLogin({ ...login, password: e.target.value })} /></label>
+                <label className="field"><span>Already running at <small className="muted">(optional)</small></span><input className="input" value={login.url} onChange={(e) => setLogin({ ...login, url: e.target.value })} placeholder="http://localhost:3000" /></label>
+              </div>
+              <p className="hint">Your repo is copied first — the original folder is never changed. Nothing is published or uploaded; if something can't be fixed locally (a missing key, a login), Shipcast pauses and asks you here.</p>
+              <div className="row-actions" style={{ justifyContent: 'flex-end' }}>
+                <button className="btn primary lg" disabled={busy || !claudeReady} onClick={makeFull}>{busy ? 'Starting…' : 'Start the full campaign'}</button>
+              </div>
+            </>
+          )}
+        </section>
+      )}
 
       <label className="brain-toggle">
         <input type="checkbox" checked={brainOn} onChange={(e) => { setBrainOn(e.target.checked); try { localStorage.setItem(BRAIN_KEY, e.target.checked ? '1' : '0'); } catch {} }} />

@@ -485,3 +485,22 @@ code { font-size: 0.92em; background: var(--bg-2); padding: 1px 6px; border-radi
 .add-skill b { display: block; font: 700 15px/1.2 var(--display); }
 .add-skill span { display: block; font-size: 12.5px; color: var(--muted); line-height: 1.4; margin-top: 3px; }
 @media (max-width: 860px) { .add-skill { grid-template-columns: 1fr; } }
+
+/* ── needs input ───────────────────────────────────── */
+.ask-card { margin-top: 18px; padding: 20px 22px; border-radius: var(--r-3); background: var(--surface); box-shadow: 0 0 0 2px var(--marker), var(--lift); display: grid; gap: 12px; }
+.ask-head { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.ask-badge { padding: 3px 10px; border-radius: 999px; background: var(--marker); color: #1b1a12; font-weight: 700; font-size: 12px; }
+.ask-card h3 { font: 700 20px/1.3 var(--display); letter-spacing: -0.01em; }
+.ask-why { font-size: 14px; color: var(--text-2); font-family: ui-monospace, monospace; background: var(--bg); padding: 8px 12px; border-radius: 8px; white-space: pre-wrap; }
+.ask-fields { display: grid; gap: 12px; }
+.ask-wait { color: var(--warn); font-weight: 600; }
+
+/* ── full campaign ─────────────────────────────────── */
+.full-toggle { display: grid; gap: 4px; text-align: left; max-width: 760px; width: 100%; margin: 16px auto 0; padding: 14px 18px; border-radius: var(--r-3); border: 1.5px dashed var(--line-2); background: transparent; cursor: pointer; color: inherit; }
+.full-toggle:hover, .full-toggle[aria-expanded='true'] { border-color: var(--text-2); background: var(--surface); }
+.full-toggle b { font: 700 15px/1.2 var(--display); }
+.full-toggle span { font-size: 13px; color: var(--muted); line-height: 1.45; }
+.full-panel { max-width: 760px; margin: 10px auto 0; padding: 18px; border-radius: var(--r-3); background: var(--surface); box-shadow: var(--print); display: grid; gap: 14px; }
+.full-login { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.textarea.mono { font-family: ui-monospace, monospace; font-size: 13px; }
+@media (max-width: 700px) { .full-login { grid-template-columns: 1fr; } }

@@ -7,12 +7,14 @@ export interface BrainQuestion { id: string; question: string; why?: string; opt
 export interface BrainDirection { id: string; title: string; hook: string; angle: string; tone: string }
 export interface BrainTurn { understood: string; questions: BrainQuestion[]; directions: BrainDirection[]; formats?: string[] }
 export interface BoardBeat { scene: string; title: string; line: string; note: string; seconds: number }
-export type StepStatus = 'queued' | 'running' | 'done' | 'failed' | 'canceled' | 'blocked';
+export type StepStatus = 'queued' | 'running' | 'done' | 'failed' | 'canceled' | 'blocked' | 'needs-input';
+export interface StepQuestion { text: string; why?: string; fields: { key: string; label: string; secret?: boolean; placeholder?: string }[] }
 
 export interface Step {
   id: string;
   kind: 'brief' | 'pack';
   pack?: string;
+  question?: StepQuestion;
   options: Record<string, string>;
   status: StepStatus;
   startedAt?: string;
@@ -156,6 +158,9 @@ export const api = {
   deleteCampaign: (id: string) => call<{ ok: true }>('DELETE', `/api/campaigns/${id}`),
   addStep: (id: string, pack: string, options: Record<string, string>) => call<Campaign>('POST', `/api/campaigns/${id}/steps`, { pack, options }),
   removeStep: (id: string, step: string) => call<Campaign>('DELETE', `/api/campaigns/${id}/steps/${step}`),
+  answer: (id: string, step: string, values: Record<string, string>, note?: string) => call<Campaign>('POST', `/api/campaigns/${id}/steps/${step}/answer`, { values, note }),
+  envKeys: (id: string) => call<{ keys: string[] }>('GET', `/api/campaigns/${id}/env`),
+  saveEnv: (id: string, text: string) => call<{ keys: string[] }>('PUT', `/api/campaigns/${id}/env`, { text }),
   revise: (id: string, step: string, note: string) => call<Campaign>('POST', `/api/campaigns/${id}/steps/${step}/revise`, { note }),
   retry: (id: string, step: string) => call<Campaign>('POST', `/api/campaigns/${id}/steps/${step}/retry`),
   cancel: (id: string, step: string) => call<Campaign>('POST', `/api/campaigns/${id}/steps/${step}/cancel`),
