@@ -325,7 +325,7 @@ h1, h2, h3, h4, p { margin: 0; }
 .copy-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .copy-head h4 { font-size: 13px; font-weight: 700; color: var(--muted); }
 .copy-text { white-space: pre-wrap; line-height: 1.6; max-width: 70ch; }
-.copy-channel { font-size: 17px; font-weight: 800; margin: 20px 0 6px; text-transform: capitalize; }
+.copy-channel { font-size: 17px; font-weight: 800; margin: 20px 0 6px; }
 .qa-list { display: grid; gap: 6px; }
 .qa-row { display: grid; grid-template-columns: 64px 1fr; gap: 10px; font-size: 13px; padding: 9px 12px; border-radius: var(--r-2); background: var(--surface); border: 1px solid var(--line); }
 .qa-row b { text-transform: capitalize; }

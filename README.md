@@ -60,14 +60,15 @@ npm start            # → http://localhost:4317
 
 Then:
 
-1. **Connections** — confirm Claude is connected (or click *Sign in with
-   Claude*), optionally connect GitHub. The page also checks FFmpeg, Chrome,
-   voice and captions.
-2. **New campaign** — paste `yourproduct.com`, `owner/repo`, a folder path, or
-   a paragraph describing the product.
-3. Pick formats (or a bundle like *Launch kit*), tweak options, start.
-4. Watch the run sheet: research first, then each deliverable, with a live feed
-   of what Claude is doing. Play, preview, copy, download, or ask for changes.
+1. **Paste** a website, `owner/repo`, or a few sentences about your product.
+2. **Pick a goal** — Launch kit, Social pack or Video only — and press *Make it*.
+   (*Customize* lets you choose individual formats and options.)
+3. **Watch it come together**: Shipcast shows what it learned (colors, logo,
+   screenshots), then each result appears as it's ready.
+4. **Open any result** to preview, download, edit it, or just type what to
+   change ("punchier hook", "slower on the chart").
+
+If something isn't connected, the **Setup** page tells you exactly what to do.
 
 `npm run doctor` checks your machine; `npm run status` shows the services.
 
@@ -78,8 +79,11 @@ Python — and narrated formats use it automatically. Without it, videos fall
 back to your OS voice.
 
 <p align="center">
-  <img src="docs/assets/studio-run.png" alt="Run sheet: research, then each deliverable, with the reel playing" width="440" />
-  <img src="docs/assets/studio-editor.png" alt="Scene editor: change any field, preview frames, re-render without Claude" width="440" />
+  <img src="docs/assets/studio-new.png" alt="Create: one box — paste a link, pick a goal" width="900" />
+</p>
+<p align="center">
+  <img src="docs/assets/studio-run.png" alt="A project: what Shipcast learned about the product, then every result in a gallery" width="440" />
+  <img src="docs/assets/studio-editor.png" alt="Any result opens in a drawer: preview, edit scenes, quality checks, ask for changes" width="440" />
 </p>
 
 ## Formats

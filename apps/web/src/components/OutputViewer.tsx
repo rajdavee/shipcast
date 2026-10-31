@@ -23,6 +23,7 @@ function useText(url: string | null, version: string) {
   return text;
 }
 
+const CHANNELS: Record<string, string> = { linkedin: 'LinkedIn', x: 'X', twitter: 'X', youtube: 'YouTube', instagram: 'Instagram', tiktok: 'TikTok', producthunt: 'Product Hunt', hackernews: 'Hacker News', newsletter: 'Newsletter', ads: 'Ads' };
 const copy = (t: string) => navigator.clipboard.writeText(t).then(() => toast('Copied'));
 
 export function OutputViewer({ campaign, step, events }: { campaign: Campaign; step: Step; events: CampaignEvent[] }) {
@@ -127,7 +128,7 @@ function CopyKit({ url, version }: { url: string; version: string }) {
     <div className="doc">
       {Object.entries(data).map(([channel, items]) => (
         <div key={channel}>
-          <h3 className="copy-channel">{channel === 'x' ? 'X' : channel}</h3>
+          <h3 className="copy-channel">{CHANNELS[channel.toLowerCase()] ?? channel}</h3>
           {(Array.isArray(items) ? items : []).map((it, i) => (
             <div key={i} className="copy-block">
               <div className="copy-head">

@@ -35,7 +35,8 @@ export function Home({ status, services, campaigns }: { status: Status | null; s
   const selected = (picked ?? [...goalPacks]).filter((id) => byId.has(id));
   const usable = (p: Pack) => !source || !p.sources.length || p.sources.includes(source.type);
   const runnable = selected.filter((id) => usable(byId.get(id)!));
-  const claudeReady = !!status?.claude.loggedIn;
+  // Unknown (still checking) counts as ready; the server reports a missing login anyway.
+  const claudeReady = status ? status.claude.loggedIn : true;
   const servicesDown = services?.filter((s) => !s.ok).map((s) => s.name) ?? [];
 
   // Grow the composer with its content.
