@@ -213,7 +213,7 @@ export function Campaign({ id }: { id: string }) {
         </div>
         <div className="actions">
           <button className="btn" onClick={() => setAdding(true)}>Add more</button>
-          <a className="btn" href={`/api/campaigns/${id}/export`}>Download all</a>
+          {done > (brief.status === 'done' ? 1 : 0) ? <a className="btn" href={`/api/campaigns/${id}/export`}>Download all</a> : <button className="btn" disabled title="Nothing is ready yet">Download all</button>}
           <button className="btn ghost" onClick={() => api.reveal(id)}>Open folder</button>
         </div>
       </div>
@@ -222,7 +222,7 @@ export function Campaign({ id }: { id: string }) {
         <div className="progress-bar"><i style={{ width: `${Math.round((done / total) * 100)}%` }} /></div>
         <div className="progress-text">
           <span>
-            {running ? <><b>{runningName}</b> — {running.phase ?? 'working'}…</> : live ? 'Starting the next one…' : failed ? `Finished — ${failed} didn't work, you can try again.` : 'All done. Click anything to preview, edit or download.'}
+            {running ? (running.kind === 'brief' ? <><b>{running.phase ?? 'Researching'}…</b></> : <><b>{runningName}</b> · {(running.phase ?? 'working').toLowerCase()}…</>) : live ? 'Starting the next one…' : failed ? `Finished — ${failed} didn't work, you can try again.` : 'All done. Click anything to preview, edit or download.'}
           </span>
           <span className="tnum muted">{done} of {total}</span>
         </div>
