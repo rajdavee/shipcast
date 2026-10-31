@@ -61,6 +61,10 @@ class Session {
 export interface CaptureOptions {
   width: number;
   height: number;
+  /** Device pixel ratio (2 for crisp phone captures). */
+  scale?: number;
+  /** Emulate a touch phone (mobile layout, touch events, mobile UA). */
+  mobile?: boolean;
   /** Extra settle time after fonts/images are ready (ms). */
   settleMs?: number;
 }
@@ -68,6 +72,8 @@ export interface CaptureOptions {
 export interface PageHandle {
   eval<T = any>(expression: string): Promise<T>;
   screenshot(format?: 'png' | 'jpeg', quality?: number): Promise<Buffer>;
+  /** Whole page, up to maxHeight CSS px. */
+  fullPage(maxHeight?: number): Promise<Buffer>;
   pdf(): Promise<Buffer>;
   close(): Promise<void>;
 }
@@ -161,7 +167,9 @@ export class Browser {
     }
     const { sessionId } = this.tab;
     const send = (m: string, p: Record<string, unknown> = {}) => s.send(m, p, sessionId);
-    await send('Emulation.setDeviceMetricsOverride', { width: opts.width, height: opts.height, deviceScaleFactor: 1, mobile: false });
+    await send('Emulation.setDeviceMetricsOverride', { width: opts.width, height: opts.height, deviceScaleFactor: opts.scale ?? 1, mobile: !!opts.mobile });
+    await send('Emulation.setTouchEmulationEnabled', { enabled: !!opts.mobile }).catch(() => {});
+    await send('Emulation.setUserAgentOverride', { userAgent: opts.mobile ? 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1' : 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36' }).catch(() => {});
     await send('Emulation.setDefaultBackgroundColorOverride', { color: { r: 0, g: 0, b: 0, a: 0 } });
     await send('Page.navigate', { url });
     const evalIn = async <T>(expression: string): Promise<T> => {
@@ -177,6 +185,15 @@ export class Browser {
       eval: evalIn,
       screenshot: async (format = 'png', quality = 92) => {
         const r = await send('Page.captureScreenshot', { format, ...(format === 'jpeg' ? { quality } : {}), clip: { x: 0, y: 0, width: opts.width, height: opts.height, scale: 1 }, captureBeyondViewport: false });
+        return Buffer.from(r.data, 'base64');
+      },
+      fullPage: async (maxHeight = 9000) => {
+        const m = await send('Page.getLayoutMetrics');
+        const h = Math.min(Math.ceil((m.cssContentSize ?? m.contentSize).height), maxHeight);
+        await send('Emulation.setDeviceMetricsOverride', { width: opts.width, height: h, deviceScaleFactor: opts.scale ?? 1, mobile: !!opts.mobile });
+        await new Promise((r) => setTimeout(r, 400));
+        const r = await send('Page.captureScreenshot', { format: 'png', clip: { x: 0, y: 0, width: opts.width, height: h, scale: 1 }, captureBeyondViewport: true });
+        await send('Emulation.setDeviceMetricsOverride', { width: opts.width, height: opts.height, deviceScaleFactor: opts.scale ?? 1, mobile: !!opts.mobile });
         return Buffer.from(r.data, 'base64');
       },
       pdf: async () => {
@@ -279,4 +296,26 @@ export const FIT_SCRIPT = `(() => {
     }
   }
   return changed;
+})()`;
+
+/**
+ * Make a live website screenshot-ready: dismiss cookie/consent banners and
+ * overlays, stop animations at their end state, and scroll the page once so
+ * lazy content loads, then return to the top.
+ */
+export const TIDY_PAGE_SCRIPT = `(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const words = /^(accept|accept all|allow all|agree|i agree|got it|ok|okay|close|dismiss|no thanks|reject all|only necessary)$/i;
+  for (const b of document.querySelectorAll('button, [role=button], a')) {
+    const t = (b.innerText || b.getAttribute('aria-label') || '').trim();
+    if (t.length < 24 && words.test(t)) { try { b.click(); } catch {} }
+  }
+  const css = document.createElement('style');
+  css.textContent = '[id*=cookie i],[class*=cookie i],[id*=consent i],[class*=consent i],[class*=gdpr i],[id*=onetrust i],[class*=intercom i],[id*=intercom i],[class*=crisp i],iframe[title*=chat i]{display:none!important} *{animation-play-state:paused!important;caret-color:transparent!important}';
+  document.head.appendChild(css);
+  const H = Math.min(document.documentElement.scrollHeight, 12000);
+  for (let y = 0; y < H; y += innerHeight * 0.8) { scrollTo(0, y); await sleep(120); }
+  scrollTo(0, 0);
+  await sleep(500);
+  return H;
 })()`;

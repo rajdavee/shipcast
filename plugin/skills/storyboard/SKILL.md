@@ -43,7 +43,7 @@ back to you to fix.
 
 1. **Hook in the first 1.5 s.** Scene 1 states a specific tension, promise or number in ≤ 8 words. No logo intro, no "Introducing". Pull from the brief's Hooks.
 2. **One idea per scene.** 4–8 scenes for 15–35 s; a new visual every 2–4 s on vertical.
-3. **Show the real product.** At least one `product` or `scroll` scene with a real screenshot; aim `focusX/focusY` at the one control or result that matters (fractions of the image, 0–1; look at the image first).
+3. **Show the real product.** At least one `product` or `scroll` scene with a real screenshot; aim `focusX/focusY` at the one control or result that matters (fractions of the image, 0–1; look at the image first). On vertical, prefer the `*-mobile.png` captures with `"device": "phone"`; `*-full.png` captures suit `scroll`.
 4. **Proof over adjectives.** Use `stat`, `quote` or `compare` only with real material from the brief. Never invent numbers, users or testimonials.
 5. **Land the CTA.** End on `outro` with the brief's CTA and URL; hold ≥ 2.5 s.
 6. **Voiceover = spoken, not written.** ~2.4 words/sec, 4–14 words per scene, contractions, short sentences, the same claim as the on-screen text (not a repeat of every word). Spell brand names exactly as `brand.json`.

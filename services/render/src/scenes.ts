@@ -217,6 +217,7 @@ ${S} mark .hl{position:absolute;left:0;top:0;right:0;bottom:0;padding:0 .08em;ba
       { id: 'focusY', type: 'number', label: 'Focus Y (0–1)', optional: true },
       { id: 'zoom', type: 'number', label: 'Zoom (1–2.2)', optional: true },
       { id: 'click', type: 'text', label: 'Click (yes/no)', optional: true },
+      { id: 'device', type: 'text', label: 'Frame (browser/phone)', optional: true, help: 'phone = a mobile screenshot in a phone; best for vertical video' },
     ],
     build: (f, c) => {
       const { u, vertical, pad, S } = frame(c);
@@ -225,14 +226,18 @@ ${S} mark .hl{position:absolute;left:0;top:0;right:0;bottom:0;padding:0 .08em;ba
       const fy = Math.min(Math.max(Number(f.focusY ?? 0.4), 0), 1);
       const zoom = Math.min(Math.max(Number(f.zoom ?? 1.6), 1), 2.4);
       const titleH = f.title ? Math.round((vertical ? 150 : 120) * u) : 0;
-      const w = c.width - pad.l - pad.r;
+      const phone = f.device === 'phone';
+      const availW = c.width - pad.l - pad.r;
       const h = c.height - pad.t - pad.b - titleH;
+      // Phones keep a 9:19.5 body inside the available box; browsers fill it.
+      const w = phone ? Math.min(availW, Math.round(h / 2.05)) : availW;
+      const left = phone ? Math.round(pad.l + (availW - w) / 2) : pad.l;
       const click = String(f.click ?? 'yes') !== 'no';
       return {
         markup:
           b.markup +
           `${f.title ? `<h2 class="cap" style="position:absolute;left:${pad.l}px;right:${pad.r}px;top:${pad.t}px;font-size:${Math.round((vertical ? 68 : 60) * u)}px">${words(f.title)}</h2>` : ''}
-<div class="win" style="left:${pad.l}px;top:${pad.t + titleH}px;width:${w}px;height:${h}px"><div class="cam"><div class="bar"><i></i><i></i><i></i></div><img src="${img(f.image, c)}" alt=""></div></div>
+<div class="win${phone ? ' phone' : ''}" style="left:${left}px;top:${pad.t + titleH}px;width:${w}px;height:${h}px"><div class="cam">${phone ? '' : '<div class="bar"><i></i><i></i><i></i></div>'}<img src="${img(f.image, c)}" alt=""></div>${phone ? '<i class="notch"></i>' : ''}</div>
 ${click ? `<div class="cursor"><svg viewBox="0 0 24 24" width="${Math.round(54 * u)}" height="${Math.round(54 * u)}"><path d="M4 2l16 9.5-7 1.6-3.6 6.9z" fill="#fff" stroke="#111" stroke-width="1.4" stroke-linejoin="round"/></svg><i class="ripple"></i></div>` : ''}`,
         css:
           b.css +
@@ -242,6 +247,9 @@ ${S} .cam{position:absolute;inset:0;transform-origin:${fx * 100}% ${fy * 100}%}
 ${S} .bar{height:${Math.round(40 * u)}px;display:flex;align-items:center;gap:${Math.round(9 * u)}px;padding:0 ${Math.round(16 * u)}px;background:#1d2029}
 ${S} .bar i{width:${Math.round(12 * u)}px;height:${Math.round(12 * u)}px;border-radius:50%;background:#3a3e4a}
 ${S} .cam img{display:block;width:100%;height:calc(100% - ${Math.round(40 * u)}px);object-fit:cover;object-position:top center}
+${S} .win.phone{border-radius:${Math.round(64 * u)}px;box-shadow:0 0 0 ${Math.round(14 * u)}px #0c0d11,0 0 0 ${Math.round(16 * u)}px #2a2d36,0 ${50 * u}px ${110 * u}px -${30 * u}px rgba(0,0,0,.7)}
+${S} .win.phone .cam img{height:100%}
+${S} .notch{position:absolute;left:50%;top:${Math.round(16 * u)}px;width:${Math.round(110 * u)}px;height:${Math.round(32 * u)}px;margin-left:-${Math.round(55 * u)}px;border-radius:${Math.round(20 * u)}px;background:#0c0d11}
 ${S} .cursor{position:absolute;left:0;top:0;filter:drop-shadow(0 6px 10px rgba(0,0,0,.45))}
 ${S} .ripple{position:absolute;left:${Math.round(-30 * u)}px;top:${Math.round(-30 * u)}px;width:${Math.round(64 * u)}px;height:${Math.round(64 * u)}px;border-radius:50%;border:${Math.max(2, Math.round(4 * u))}px solid var(--brand-primary);opacity:0}`,
         js:
@@ -250,7 +258,7 @@ ${S} .ripple{position:absolute;left:${Math.round(-30 * u)}px;top:${Math.round(-3
           `tl.fromTo("${S} .win",{y:${80 * u},rotateX:12,opacity:0,transformPerspective:1600},{y:0,rotateX:0,opacity:1,duration:1,ease:"expo.out"},.1);
 tl.fromTo("${S} .cam",{scale:1},{scale:${zoom},duration:1.1,ease:"power3.inOut"},1.2);` +
           (click
-            ? `const tx=${pad.l + w * fx}, ty=${pad.t + titleH + 40 * u + (h - 40 * u) * fy};
+            ? `const tx=${left + w * fx}, ty=${pad.t + titleH + (phone ? 0 : 40 * u) + (h - (phone ? 0 : 40 * u)) * fy};
 tl.fromTo("${S} .cursor",{x:${c.width * 0.86},y:${c.height * 0.9},opacity:0},{x:tx,y:ty,opacity:1,duration:1.15,ease:"power3.inOut"},1.1);
 tl.fromTo("${S} .cursor svg",{scale:1},{scale:.82,duration:.09,yoyo:true,repeat:1,ease:"power2.out",transformOrigin:"10% 10%"},2.35);
 tl.fromTo("${S} .ripple",{scale:.3,opacity:.9},{scale:1.7,opacity:0,duration:.6,ease:"expo.out"},2.38);`

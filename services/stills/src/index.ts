@@ -1,7 +1,7 @@
 import { mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { assertInHome, browser, createService, FIT_SCRIPT, run, getPreset, layoutAuditScript, loadBrand, normalizeBrand, presetForSize, SERVICE_PORTS, type BrandKit, type LayoutAudit } from '@shipcast/engine';
+import { assertInHome, browser, createService, FIT_SCRIPT, run, TIDY_PAGE_SCRIPT, getPreset, layoutAuditScript, loadBrand, normalizeBrand, presetForSize, SERVICE_PORTS, type BrandKit, type LayoutAudit } from '@shipcast/engine';
 import { CAROUSEL_LAYOUTS, renderCarouselSlide, THEMES } from './templates/carousel.ts';
 import type { RenderCtx } from './templates/common.ts';
 import { CARD_LAYOUTS, renderCard, renderThumbnail, THUMBNAIL_LAYOUTS } from './templates/graphics.ts';
@@ -164,6 +164,37 @@ export function createStillsService() {
           results.push({ ...(await capture(html, join(outDir, /\.(png|jpe?g)$/.test(name) ? name : `${name}.png`), width, height, safe)), preset: g.preset, layout: g.layout });
         }
         return { items: results };
+      },
+
+      /**
+       * Screenshots of a live site for videos and slides: desktop and phone
+       * viewports, plus a full-page capture for the scroll scene.
+       */
+      capture: async ({ url, outDir, name = 'site', shots = ['desktop', 'mobile', 'full'] }: { url: string; outDir: string; name?: string; shots?: string[] }) => {
+        if (!/^https?:\/\//i.test(String(url))) throw new Error('url must be http(s)');
+        const dir = assertInHome(outDir, 'outDir');
+        await mkdir(dir, { recursive: true });
+        const safeName = String(name).replace(/[^\w-]/g, '_');
+        const out: Record<string, string> = {};
+        const views: Record<string, { width: number; height: number; scale?: number; mobile?: boolean }> = { desktop: { width: 1440, height: 900, scale: 1 }, mobile: { width: 390, height: 844, scale: 2, mobile: true } };
+        for (const v of ['desktop', 'mobile'] as const) {
+          if (!shots.includes(v) && !(v === 'desktop' && shots.includes('full'))) continue;
+          const page = await browser().open(url, { ...views[v], settleMs: 600 });
+          try {
+            await page.eval(TIDY_PAGE_SCRIPT);
+            if (shots.includes(v)) {
+              out[v] = join(dir, `${safeName}-${v}.png`);
+              await writeFile(out[v], await page.screenshot('png'));
+            }
+            if (v === 'desktop' && shots.includes('full')) {
+              out.full = join(dir, `${safeName}-full.png`);
+              await writeFile(out.full, await page.fullPage(9000));
+            }
+          } finally {
+            await page.close();
+          }
+        }
+        return out;
       },
 
       /** Arbitrary HTML file (authored by Claude) → image, with audit. */
