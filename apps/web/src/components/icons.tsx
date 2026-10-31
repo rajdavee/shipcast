@@ -31,9 +31,9 @@ export const Icon = {
 export function Mark({ className = 'brand-mark' }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 32 32" aria-hidden="true">
-      <rect width="32" height="32" rx="8" fill="var(--chroma)" />
+      <rect width="32" height="32" rx="8" fill="var(--accent)" />
       <path d="M9 21.5c2.2 1.6 4.5 2.4 7 2.4 3.4 0 5.6-1.6 5.6-4 0-2.2-1.6-3.2-5-4l-1.6-.4c-2-.5-2.8-1-2.8-2 0-1.1 1.1-1.8 2.9-1.8 1.8 0 3.4.6 4.9 1.7l1.6-2.5c-1.8-1.4-4-2.1-6.5-2.1-3.4 0-5.7 1.7-5.7 4.3 0 2.3 1.5 3.4 5 4.2l1.6.4c2 .5 2.7 1 2.7 2 0 1.2-1.2 1.9-3 1.9-2.1 0-4-.8-5.6-2.1z" fill="#fff" />
-      <circle cx="25" cy="7" r="3" fill="var(--tally)" />
+      <circle cx="25" cy="7" r="3" fill="var(--live)" />
     </svg>
   );
 }

@@ -33,6 +33,8 @@ export interface Step {
   /** Set when a revision is queued; consumed by the worker. */
   pendingNote?: string;
   cancelRequested?: boolean;
+  /** Plain-language phase for the UI ("Writing the script", "Rendering", …). */
+  phase?: string;
   /** Re-render the edited spec without running Claude. */
   renderOnly?: boolean;
   worker?: string;

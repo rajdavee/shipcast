@@ -17,6 +17,8 @@ export interface Step {
   revisions: { note: string; at: string }[];
   pendingNote?: string;
   cancelRequested?: boolean;
+  phase?: string;
+  renderOnly?: boolean;
 }
 
 export interface Campaign {

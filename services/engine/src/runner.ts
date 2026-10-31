@@ -278,9 +278,13 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
       return res;
     };
 
+    const phase = (p: string) => updateStep(id, step.id, { phase: p }).catch(() => {});
     let ok = true;
     let why = '';
     let resultText = '';
+    if (step.kind === 'brief') await phase('Researching your product');
+    else if (pack?.pipeline) await phase('Transcribing and captioning');
+    else if (!renderOnly) await phase(specKind === 'storyboard' ? 'Writing the script' : specKind === 'deck' ? 'Writing the slides' : specKind === 'graphics' ? 'Designing the graphics' : pack?.id === 'copy-kit' ? 'Writing the posts' : 'Making it');
     if (pack?.pipeline === 'captions') {
       // No Claude: transcribe the upload, style the captions, render, master, check.
       const uploads = join(dir, 'uploads');
@@ -312,6 +316,7 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
     let reviewed = false;
     if (ok && specKind && !canceled && !timedOut) {
       for (let round = 0; ; round++) {
+        await phase(round ? 'Applying fixes' : specKind === 'storyboard' ? 'Rendering the video' : 'Rendering');
         await log({ step: step.id, type: 'log', text: round ? `Re-rendering after fixes (round ${round})…` : `Rendering ${SPEC_FILE[specKind]} with the ${specKind === 'storyboard' ? 'render' : 'stills'} service…` });
         const force: Record<string, unknown> = {};
         if (pack?.id === 'carousel') force.motion = step.options.motion === 'no' ? null : 'chill';
@@ -321,6 +326,7 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
           // Director's review: QA can't judge taste. Claude looks at the frames once and may revise.
           if (specKind === 'storyboard' && settings.directorReview && !renderOnly && !reviewed && sessionId && Date.now() < deadline && !canceled && !timedOut) {
             reviewed = true;
+            await phase('Final review');
             await log({ step: step.id, type: 'log', text: "Director's review: checking the rendered frames…" });
             const rev = await execClaude(
               `Your video rendered and passed the automated checks. Now review it like a creative director. Look at out/video.sheet.jpg (12 frames across the whole video, left to right, top to bottom) and out/video.jpg (the first-frame thumbnail).\n\nJudge: is the hook instantly clear? Does every scene's picture match what its voice line says? Is each product zoom aimed at the right detail? Any text cramped, tiny, or fighting the captions? Does the pacing drag anywhere?\n\nIf it's genuinely good, reply with just APPROVED. If something is clearly worth fixing, edit out/storyboard.json (the smallest change that fixes it), add one line per change to out/NOTES.md, and reply CHANGED. Don't change things for the sake of it.`,
@@ -372,6 +378,7 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
       pendingNote: undefined,
       cancelRequested: undefined,
       renderOnly: undefined,
+      phase: undefined,
       worker: undefined,
       sessionId,
       costUsd: (step.costUsd ?? 0) + costUsd,

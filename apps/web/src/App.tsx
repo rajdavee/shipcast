@@ -1,83 +1,56 @@
 import { api } from './api.ts';
 import { useLoad, useRoute, useToast } from './hooks.ts';
 import { Mark } from './components/icons.tsx';
-import { NewCampaign } from './pages/NewCampaign.tsx';
-import { Campaigns } from './pages/Campaigns.tsx';
-import { CampaignView } from './pages/CampaignView.tsx';
-import { Connect } from './pages/Connect.tsx';
-import { Packs } from './pages/Packs.tsx';
-import { SettingsPage } from './pages/Settings.tsx';
+import { Home } from './pages/Home.tsx';
+import { Campaign } from './pages/Campaign.tsx';
+import { Library } from './pages/Library.tsx';
+import { Setup } from './pages/Setup.tsx';
 
 export function App() {
   const route = useRoute();
-  const status = useLoad(() => api.status(), [], 8000);
-  const campaigns = useLoad(() => api.campaigns(), [route[0]], 5000);
+  const status = useLoad(() => api.status(), [], 10000);
+  const services = useLoad(() => api.services(), [], 10000);
+  const campaigns = useLoad(() => api.campaigns(), [route.join('/')], 6000);
   const toastMsg = useToast();
-  const live = campaigns.data?.some((c) => c.steps.some((s) => s.status === 'running'));
-  const s = status.data;
-
-  const nav = [
-    ['new', 'New campaign', null],
-    ['campaigns', 'Campaigns', campaigns.data?.length || null],
-    ['packs', 'Formats', null],
-    ['connect', 'Connections', null],
-    ['settings', 'Settings', null],
-  ] as const;
-  const current = route[0] === 'c' ? 'campaigns' : route[0];
-
-  let page;
-  switch (route[0]) {
-    case 'campaigns':
-      page = <Campaigns campaigns={campaigns.data} />;
-      break;
-    case 'c':
-      page = <CampaignView id={route[1]} />;
-      break;
-    case 'connect':
-      page = <Connect status={s} onChange={status.reload} />;
-      break;
-    case 'packs':
-      page = <Packs />;
-      break;
-    case 'settings':
-      page = <SettingsPage />;
-      break;
-    default:
-      page = <NewCampaign status={s} />;
-  }
+  const live = campaigns.data?.some((c) => c.steps.some((s) => s.status === 'running' || s.status === 'queued'));
+  const ready = !!status.data?.claude.loggedIn && !!services.data?.every((s) => s.ok);
+  const page = route[0] === 'c' ? 'library' : route[0];
 
   return (
-    <div className="shell">
-      <nav className="rail" aria-label="Main">
-        <a className="brand" href="#/new">
-          <Mark />
-          <span className="brand-word">Shipcast</span>
+    <>
+      <header className="top">
+        <a className="logo" href="#/new" aria-label="Shipcast home">
+          <Mark className="" />
+          <span className="wordmark-text">Shipcast</span>
         </a>
-        {nav.map(([key, label, count]) => (
-          <a key={key} className="nav-link" href={`#/${key}`} aria-current={current === key ? 'page' : undefined}>
-            {label}
-            {count ? <span className="nav-count tnum">{count}</span> : null}
-          </a>
-        ))}
-        <div className="rail-foot">
+        <nav className="tabs-top" aria-label="Main">
+          <a href="#/new" aria-current={page === 'new' ? 'page' : undefined}>Create</a>
+          <a href="#/library" aria-current={page === 'library' ? 'page' : undefined}>Library</a>
+          <a href="#/setup" aria-current={page === 'setup' ? 'page' : undefined}>Setup</a>
+        </nav>
+        <div className="top-right">
           {live && (
-            <a className="signal" href="#/campaigns">
-              <i className="lamp live" />
-              <span><b>Rendering now</b></span>
+            <a className="pill-status" href="#/library">
+              <i className="dot live" />
+              <span className="lbl">Working</span>
             </a>
           )}
-          <a className="signal" href="#/connect" title={s?.claude.account ?? ''}>
-            <i className={`lamp ${s ? (s.claude.loggedIn ? 'on' : 'off') : ''}`} />
-            <span>Claude {s?.claude.loggedIn ? <b>connected</b> : 'not connected'}</span>
-          </a>
-          <a className="signal" href="#/connect">
-            <i className={`lamp ${s ? (s.github.loggedIn ? 'on' : '') : ''}`} />
-            <span>GitHub {s?.github.loggedIn ? <b>@{s.github.login}</b> : 'optional'}</span>
+          <a className="pill-status" href="#/setup" title={ready ? 'Everything is connected' : 'Finish setup'}>
+            <i className={`dot ${status.data && services.data ? (ready ? 'ok' : 'bad') : ''}`} />
+            <span className="lbl">{!status.data || !services.data ? 'Checking…' : ready ? 'Ready' : 'Finish setup'}</span>
           </a>
         </div>
-      </nav>
-      <main className="main">{page}</main>
+      </header>
+      {route[0] === 'c' && route[1] ? (
+        <Campaign id={route[1]} />
+      ) : route[0] === 'library' ? (
+        <Library campaigns={campaigns.data} />
+      ) : route[0] === 'setup' ? (
+        <Setup status={status.data} onChange={status.reload} />
+      ) : (
+        <Home status={status.data} services={services.data} campaigns={campaigns.data} />
+      )}
       {toastMsg && <div className="toast" role="status">{toastMsg}</div>}
-    </div>
+    </>
   );
 }

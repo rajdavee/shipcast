@@ -253,10 +253,10 @@ export function SpecEditor({ campaign, step, kind, images, onSaved }: Props) {
               </>
             )}
             <div className="sheet-actions">
-              <button className="btn small" onClick={() => move(-1)} disabled={sel === 0}>Move up</button>
-              <button className="btn small" onClick={() => move(1)} disabled={sel === items.length - 1}>Move down</button>
-              <button className="btn small" onClick={() => { update((d) => d[listKey].splice(sel + 1, 0, structuredClone(cur))); setSel(sel + 1); }}>Duplicate</button>
-              <button className="btn small danger" disabled={items.length <= 1} onClick={() => { update((d) => d[listKey].splice(sel, 1)); setSel(Math.max(0, sel - 1)); }}>Delete</button>
+              <button className="btn sm" onClick={() => move(-1)} disabled={sel === 0}>Move up</button>
+              <button className="btn sm" onClick={() => move(1)} disabled={sel === items.length - 1}>Move down</button>
+              <button className="btn sm" onClick={() => { update((d) => d[listKey].splice(sel + 1, 0, structuredClone(cur))); setSel(sel + 1); }}>Duplicate</button>
+              <button className="btn sm danger" disabled={items.length <= 1} onClick={() => { update((d) => d[listKey].splice(sel, 1)); setSel(Math.max(0, sel - 1)); }}>Delete</button>
             </div>
           </div>
         )}
@@ -266,7 +266,7 @@ export function SpecEditor({ campaign, step, kind, images, onSaved }: Props) {
         <div className="doc" style={{ padding: 14 }}>
           <div className="copy-head" style={{ marginBottom: 10 }}>
             <span className="hint">Preview · one frame per scene · {preview.duration.toFixed(1)} s total</span>
-            <button className="btn small ghost" onClick={() => setPreview(null)}>Close</button>
+            <button className="btn sm ghost" onClick={() => setPreview(null)}>Close</button>
           </div>
           <div className="thumbs">
             {preview.frames.map((f, i) => (
@@ -281,8 +281,8 @@ export function SpecEditor({ campaign, step, kind, images, onSaved }: Props) {
       <div className="editor-bar">
         <span className="hint">{dirty ? 'Unsaved changes' : 'Edit any field, then re-render — no Claude run needed.'}</span>
         <div className="sheet-actions" style={{ marginTop: 0 }}>
-          {dirty && <button className="btn small ghost" onClick={() => setSpec(JSON.parse(orig))}>Discard</button>}
-          {kind === 'storyboard' && <button className="btn small" disabled={previewing} onClick={runPreview}>{previewing ? 'Previewing…' : 'Preview frames'}</button>}
+          {dirty && <button className="btn sm ghost" onClick={() => setSpec(JSON.parse(orig))}>Discard</button>}
+          {kind === 'storyboard' && <button className="btn sm" disabled={previewing} onClick={runPreview}>{previewing ? 'Previewing…' : 'Preview frames'}</button>}
           <button className="btn primary" disabled={!dirty || busy || step.status === 'running'} onClick={save}>{busy ? 'Saving…' : 'Save & re-render'}</button>
         </div>
       </div>
