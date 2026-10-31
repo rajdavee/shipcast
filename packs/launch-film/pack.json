@@ -1,20 +1,84 @@
 {
   "id": "launch-film",
   "name": "Launch Film",
-  "tagline": "A polished 20–40s launch film: hook, the real product in motion, proof, CTA — for YouTube, LinkedIn or your site.",
+  "tagline": "A polished 20\u201340s launch film: hook, the real product in motion, proof, CTA \u2014 for YouTube, LinkedIn or your site.",
   "category": "video",
   "order": 2,
-  "estimate": "5–10 min",
+  "estimate": "5\u201310 min",
   "accent": "#ff5a36",
   "spec": "storyboard",
   "options": [
-    { "key": "preset", "label": "Format", "type": "select", "choices": ["youtube", "linkedin-video", "square-video", "vertical", "x-video"], "default": "youtube" },
-    { "key": "length", "label": "Length", "type": "select", "choices": ["20s", "30s", "40s"], "default": "30s" },
-    { "key": "voice", "label": "Voice", "type": "select", "choices": ["none", "am_michael", "af_heart", "af_nova", "am_adam", "bf_emma", "bm_george"], "default": "am_michael" },
-    { "key": "captions", "label": "Captions", "type": "select", "choices": ["clean", "karaoke", "boxed", "bold", "none"], "default": "clean" },
-    { "key": "angle", "label": "Angle", "type": "text", "default": "", "placeholder": "e.g. v2 launch — the new editor" }
+    {
+      "key": "preset",
+      "label": "Format",
+      "type": "select",
+      "choices": [
+        "youtube",
+        "linkedin-video",
+        "square-video",
+        "vertical",
+        "x-video"
+      ],
+      "default": "youtube"
+    },
+    {
+      "key": "length",
+      "label": "Length",
+      "type": "select",
+      "choices": [
+        "20s",
+        "30s",
+        "40s"
+      ],
+      "default": "30s"
+    },
+    {
+      "key": "voice",
+      "label": "Voice",
+      "type": "select",
+      "choices": [
+        "none",
+        "am_michael",
+        "af_heart",
+        "af_nova",
+        "am_adam",
+        "bf_emma",
+        "bm_george"
+      ],
+      "default": "am_michael"
+    },
+    {
+      "key": "captions",
+      "label": "Captions",
+      "type": "select",
+      "choices": [
+        "clean",
+        "karaoke",
+        "boxed",
+        "bold",
+        "none"
+      ],
+      "default": "clean"
+    },
+    {
+      "key": "angle",
+      "label": "Angle",
+      "type": "text",
+      "default": "",
+      "placeholder": "e.g. v2 launch \u2014 the new editor"
+    }
   ],
-  "outputs": ["video.mp4", "video.jpg", "video.sheet.jpg", "storyboard.json", "*.md"],
+  "outputs": [
+    "video.mp4",
+    "video.jpg",
+    "video.sheet.jpg",
+    "storyboard.json",
+    "*.md",
+    "qa.json"
+  ],
   "skills": [],
-  "tools": ["ffmpeg", "chrome"]
+  "tools": [
+    "ffmpeg",
+    "chrome"
+  ]
 }

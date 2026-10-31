@@ -5,6 +5,7 @@ import { Icon } from '../components/icons.tsx';
 
 export function Connect({ status, onChange }: { status: Status | null; onChange: () => void }) {
   const checks = useLoad(() => api.doctor());
+  const services = useLoad(() => api.services(), [], 5000);
   const [claudeLogin, setClaudeLogin] = useState<LoginState | null>(null);
   const [ghLogin, setGhLogin] = useState<LoginState | null>(null);
   const [fixing, setFixing] = useState<string | null>(null);
@@ -105,6 +106,25 @@ export function Connect({ status, onChange }: { status: Status | null; onChange:
           )}
         </div>
       </div>
+
+      <section className="section">
+        <div className="section-head">
+          <h2 className="section-title">Services</h2>
+          <span className="hint">Each runs as its own process — <code>shipcast status</code> shows the same.</span>
+        </div>
+        <div className="checks">
+          {(services.data ?? []).map((s) => (
+            <div key={s.name} className="check">
+              <div className="check-top">
+                <i className={`lamp ${s.ok ? 'on' : 'off'}`} />
+                {{ render: 'Render — video', stills: 'Stills — images & PDFs', media: 'Media — voice, captions, mix', qa: 'QA — quality gates' }[s.name] ?? s.name}
+              </div>
+              <div className="check-detail">{s.ok ? `${s.running ? 'working' : 'idle'}${s.queued ? ` · ${s.queued} queued` : ''}${s.voice ? ` · voice: ${s.voice}` : ''}` : 'not reachable — run `shipcast start`'}</div>
+            </div>
+          ))}
+          {!services.data && <p className="hint">Checking services…</p>}
+        </div>
+      </section>
 
       <section className="section">
         <div className="section-head">

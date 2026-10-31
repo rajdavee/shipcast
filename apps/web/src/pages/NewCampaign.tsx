@@ -13,15 +13,15 @@ const KIND_LABEL: Record<SourceType, string> = {
 };
 
 const BUNDLES: { name: string; packs: string[] }[] = [
-  { name: 'Launch kit', packs: ['launch-video', 'carousel', 'thumbnails', 'copy-kit'] },
-  { name: 'Social week', packs: ['social-short', 'discovery-journey', 'carousel', 'copy-kit'] },
-  { name: 'Video only', packs: ['launch-video', 'product-promo', 'social-short'] },
+  { name: 'Launch kit', packs: ['launch-film', 'reel', 'carousel', 'thumbnails', 'copy-kit'] },
+  { name: 'Social week', packs: ['reel', 'feature-spotlight', 'carousel', 'copy-kit'] },
+  { name: 'Video only', packs: ['launch-film', 'reel', 'explainer-video'] },
 ];
 
 export function NewCampaign({ status }: { status: Status | null }) {
   const packs = useLoad(() => api.packs());
   const [input, setInput] = useState('');
-  const [selected, setSelected] = useState<string[]>(['launch-video', 'carousel', 'copy-kit']);
+  const [selected, setSelected] = useState<string[]>(['reel', 'carousel', 'thumbnails', 'copy-kit']);
   const [options, setOptions] = useState<Record<string, Record<string, string>>>({});
   const [details, setDetails] = useState({ name: '', goal: '', audience: '', tone: '', notes: '' });
   const [repos, setRepos] = useState<{ nameWithOwner: string; isPrivate: boolean }[] | null>(null);
@@ -159,33 +159,46 @@ export function NewCampaign({ status }: { status: Status | null }) {
           </div>
         </div>
         {packs.error && <p className="error-text">{packs.error}</p>}
-        <div className="reel">
-          {all.map((p) => {
-            const on = selected.includes(p.id);
-            const ok = usable(p);
-            return (
-              <button
-                key={p.id}
-                className="tile"
-                aria-pressed={on}
-                aria-disabled={!ok}
-                title={ok ? p.tagline : `Needs a ${p.sources.map((s) => KIND_LABEL[s]).join(' or ')} source`}
-                onClick={() => toggle(p)}
-              >
-                <PackFrame pack={p} options={options[p.id]} />
-                <span className="tile-check">
-                  <Icon.check />
-                </span>
-                <span className="tile-name">{p.name}</span>
-                <span className="tile-line">{p.tagline}</span>
-                <span className="tile-meta">
-                  <span className="tnum">{p.estimate}</span>
-                  {p.skills.some((s) => !s.installed) && <span>needs install</span>}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+        {[
+          { label: 'Studio · rendered, quality-checked, editable', test: (p: Pack) => !!p.spec },
+          { label: 'Copy', test: (p: Pack) => !p.spec && p.category === 'copy' },
+          { label: 'Freeform · made directly by Claude with HyperFrames or brag — for custom ideas', test: (p: Pack) => !p.spec && p.category !== 'copy' },
+        ].map((group) => {
+          const items = all.filter(group.test);
+          if (!items.length) return null;
+          return (
+            <div key={group.label}>
+              <p className="section-label">{group.label}</p>
+              <div className="reel">
+                {items.map((p) => {
+                  const on = selected.includes(p.id);
+                  const ok = usable(p);
+                  return (
+                    <button
+                      key={p.id}
+                      className="tile"
+                      aria-pressed={on}
+                      aria-disabled={!ok}
+                      title={ok ? p.tagline : `Needs a ${p.sources.map((s) => KIND_LABEL[s]).join(' or ')} source`}
+                      onClick={() => toggle(p)}
+                    >
+                      <PackFrame pack={p} options={options[p.id]} />
+                      <span className="tile-check">
+                        <Icon.check />
+                      </span>
+                      <span className="tile-name">{p.name.replace(/ · (freeform|brag)$/, '')}</span>
+                      <span className="tile-line">{p.tagline}</span>
+                      <span className="tile-meta">
+                        <span className="tnum">{p.estimate}</span>
+                        {p.spec ? <span className="chip-mini">Editable</span> : p.skills.some((s) => !s.installed) ? <span>needs install</span> : null}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
 
         {chosen.length > 0 && (
           <div className="inspector">

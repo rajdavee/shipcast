@@ -1,5 +1,6 @@
 import { createServer, type Server } from 'node:http';
 import { existsSync, createWriteStream, realpathSync } from 'node:fs';
+import { readFile, writeFile as writeFileP } from 'node:fs/promises';
 import { mkdir } from 'node:fs/promises';
 import { join, resolve, sep, basename } from 'node:path';
 import { spawn } from 'node:child_process';
@@ -27,6 +28,10 @@ import {
   readEvents,
   readSettings,
   SETUPS,
+  SPEC_FILE,
+  callService,
+  serviceHealth,
+  SERVICE_PORTS,
   updateCampaign,
   walk,
   writeSettings,
@@ -43,6 +48,8 @@ const router = new Router();
 
 const packView = (p: Pack) => ({
   id: p.id,
+  spec: p.spec ?? null,
+  order: p.order ?? 99,
   name: p.name,
   tagline: p.tagline,
   category: p.category,
@@ -142,6 +149,28 @@ router.post('/api/packs/:id/install', async (req, _res, p) => {
     results.push({ skill: dep.name, ...(await installSkill(dep)) });
   }
   return { pack: packView(pack), results };
+});
+
+// ── capability services ────────────────────────────────────────────────
+router.get('/api/services', async () => {
+  const names = Object.keys(SERVICE_PORTS) as (keyof typeof SERVICE_PORTS)[];
+  const health = await Promise.all(names.map((n) => serviceHealth(n)));
+  return names.map((n, i) => ({ name: n, ok: !!health[i], ...(health[i] ?? {}) }));
+});
+
+const catalogs = new Map<string, { at: number; data: unknown }>();
+router.get('/api/catalog/:kind', async (_q, _r, p) => {
+  const svc = p.kind === 'storyboard' ? 'render' : p.kind === 'deck' || p.kind === 'graphics' ? 'stills' : null;
+  if (!svc) throw new HttpError(404, 'unknown catalog');
+  const hit = catalogs.get(svc);
+  if (hit && Date.now() - hit.at < 60_000) return hit.data;
+  try {
+    const data = await callService(svc, 'catalog', {}, { timeoutMs: 15_000 });
+    catalogs.set(svc, { at: Date.now(), data });
+    return data;
+  } catch (e) {
+    throw new HttpError(503, (e as Error).message);
+  }
 });
 
 router.get('/api/settings', () => readSettings());
@@ -246,6 +275,37 @@ router.delete('/api/campaigns/:id/steps/:step', async (_q, _r, p) =>
     c.steps = c.steps.filter((x) => x.id !== s.id);
   }),
 );
+
+// Spec formats: read and edit the JSON the render services consume.
+async function specPath(id: string, stepId: string) {
+  const c = await mustCampaign(id);
+  const step = c.steps.find((s) => s.id === stepId);
+  if (!step?.pack) throw new HttpError(404, 'step not found');
+  const pack = await getPack(step.pack);
+  if (!pack?.spec) throw new HttpError(400, 'this format has no editable spec');
+  return { file: join(campaignDir(id), 'deliverables', stepId, 'out', SPEC_FILE[pack.spec]), kind: pack.spec, step };
+}
+
+router.get('/api/campaigns/:id/steps/:step/spec', async (_q, _r, p) => {
+  const { file, kind } = await specPath(p.id, p.step);
+  if (!existsSync(file)) throw new HttpError(404, 'no spec yet — the format has not run');
+  return { kind, spec: JSON.parse(await readFile(file, 'utf8')) };
+});
+
+router.put('/api/campaigns/:id/steps/:step/spec', async (req, _r, p) => {
+  const { file, step } = await specPath(p.id, p.step);
+  if (step.status === 'running' || step.status === 'queued') throw new HttpError(409, 'wait for the current run to finish');
+  const body = await readJson(req);
+  if (!body.spec || typeof body.spec !== 'object') throw new HttpError(400, 'spec is required');
+  await writeFileP(file, JSON.stringify(body.spec, null, 2));
+  const c = await mutateStep(p.id, p.step, (s) => {
+    s.status = 'queued';
+    s.renderOnly = true;
+    s.error = undefined;
+  });
+  await appendEvent(p.id, { step: p.step, type: 'log', text: 'Edits saved — re-rendering' });
+  return c;
+});
 
 // Server-sent events: replays the log, then tails it.
 router.get('/api/campaigns/:id/events', async (req, res, p) => {

@@ -4,6 +4,8 @@ import { go, toast, useLoad } from '../hooks.ts';
 import { PackFrame } from '../components/PackFrame.tsx';
 import { OutputViewer } from '../components/OutputViewer.tsx';
 import { OptionInput } from '../components/OptionInput.tsx';
+import { SpecEditor } from '../components/SpecEditor.tsx';
+import { fileUrl } from '../api.ts';
 
 const STATUS_TEXT: Record<Step['status'], string> = {
   queued: 'Queued',
@@ -47,6 +49,10 @@ export function CampaignView({ id }: { id: string }) {
   const packMap = useMemo(() => new Map((packs.data ?? []).map((p) => [p.id, p])), [packs.data]);
   const [selected, setSelected] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [tab, setTab] = useState<'result' | 'edit' | 'quality'>('result');
+  const tree = useLoad(() => api.tree(id), [id]);
+  useEffect(() => setTab('result'), [selected]);
+  const images = (tree.data?.brief ?? []).filter((f) => f.startsWith('assets/') && /\.(png|jpe?g|webp|gif|svg)$/i.test(f));
   const running = campaign?.steps.some((s) => s.status === 'running') ?? false;
   const now = useNow(running);
 
@@ -182,7 +188,21 @@ export function CampaignView({ id }: { id: string }) {
           {step.status === 'blocked' && <div className="banner info">This starts once the research & brief step succeeds.</div>}
           {step.pendingNote && step.status === 'queued' && <div className="banner info">Revision queued: “{step.pendingNote}”</div>}
 
-          <OutputViewer campaign={campaign} step={step} events={events} />
+          {pack?.spec && step.outputs.length > 0 && (
+            <div className="tabs" role="tablist">
+              <button role="tab" aria-selected={tab === 'result'} onClick={() => setTab('result')}>Result</button>
+              <button role="tab" aria-selected={tab === 'edit'} onClick={() => setTab('edit')}>Edit {pack.spec === 'deck' ? 'slides' : pack.spec === 'graphics' ? 'graphics' : 'scenes'}</button>
+              {step.outputs.some((o) => o.endsWith('qa.json')) && <button role="tab" aria-selected={tab === 'quality'} onClick={() => setTab('quality')}>Quality checks</button>}
+            </div>
+          )}
+
+          {pack?.spec && tab === 'edit' && step.outputs.length > 0 ? (
+            <SpecEditor campaign={campaign} step={step} kind={pack.spec} images={images} onSaved={(c) => { setCampaign(c); setTab('result'); }} />
+          ) : pack?.spec && tab === 'quality' ? (
+            <QualityReport campaign={campaign} step={step} />
+          ) : (
+            <OutputViewer campaign={campaign} step={step} events={events} />
+          )}
 
           {(step.status === 'done' || step.status === 'failed') && <Revise onSubmit={(note) => act(() => api.revise(id, step.id, note), 'Revision queued')} kind={step.kind} />}
 
@@ -201,6 +221,27 @@ export function CampaignView({ id }: { id: string }) {
           }}
         />
       )}
+    </div>
+  );
+}
+
+function QualityReport({ campaign, step }: { campaign: Campaign; step: Step }) {
+  const f = step.outputs.find((o) => o.endsWith('qa.json'));
+  const qa = useLoad(() => (f ? fetch(fileUrl(campaign.id, `deliverables/${step.id}/${f}`) + `?v=${step.endedAt}`).then((r) => r.json()) : Promise.resolve(null)), [step.id, step.endedAt]);
+  const r = qa.data as null | { pass: boolean; issues: { rule: string; severity: string; message: string; fix?: string }[]; facts: any };
+  if (!r) return <p className="hint">Loading…</p>;
+  const loud = r.facts?.loudness;
+  const v = r.facts?.probe?.video;
+  return (
+    <div className="qa">
+      <div className={`banner ${r.pass ? 'info' : ''}`}>{r.pass ? 'Passed every blocking check.' : 'Some checks failed — see below.'} {v ? `${v.width}×${v.height} · ${v.fps} fps · ${v.codec} · ${r.facts.probe.duration.toFixed(1)} s` : ''}{loud ? ` · ${loud.integrated.toFixed(1)} LUFS · peak ${loud.truePeak.toFixed(1)} dBTP` : ''}</div>
+      {r.issues.length === 0 && <p className="hint">No issues: safe size and codec, target loudness, no black or frozen stretches.</p>}
+      {r.issues.map((i, k) => (
+        <div key={k} className={`qa-row ${i.severity}`}>
+          <b>{i.severity}</b>
+          <span>{i.message}{i.fix ? <span className="hint"> — {i.fix}</span> : null}</span>
+        </div>
+      ))}
     </div>
   );
 }

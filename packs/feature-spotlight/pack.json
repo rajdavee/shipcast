@@ -1,17 +1,44 @@
 {
   "id": "feature-spotlight",
   "name": "Feature Spotlight",
-  "tagline": "8–15s silent motion graphic for the feed: one feature, one number or one comparison — loops cleanly.",
+  "tagline": "8\u201315s silent motion graphic for the feed: one feature, one number or one comparison \u2014 loops cleanly.",
   "category": "motion",
   "order": 3,
-  "estimate": "3–6 min",
+  "estimate": "3\u20136 min",
   "accent": "#ffb020",
   "spec": "storyboard",
   "options": [
-    { "key": "preset", "label": "Format", "type": "select", "choices": ["linkedin-video", "square-video", "vertical", "youtube"], "default": "linkedin-video" },
-    { "key": "focus", "label": "Focus", "type": "text", "default": "", "placeholder": "Blank = the strongest feature in the brief" }
+    {
+      "key": "preset",
+      "label": "Format",
+      "type": "select",
+      "choices": [
+        "linkedin-video",
+        "square-video",
+        "vertical",
+        "youtube"
+      ],
+      "default": "linkedin-video"
+    },
+    {
+      "key": "focus",
+      "label": "Focus",
+      "type": "text",
+      "default": "",
+      "placeholder": "Blank = the strongest feature in the brief"
+    }
   ],
-  "outputs": ["video.mp4", "video.jpg", "video.sheet.jpg", "storyboard.json", "*.md"],
+  "outputs": [
+    "video.mp4",
+    "video.jpg",
+    "video.sheet.jpg",
+    "storyboard.json",
+    "*.md",
+    "qa.json"
+  ],
   "skills": [],
-  "tools": ["ffmpeg", "chrome"]
+  "tools": [
+    "ffmpeg",
+    "chrome"
+  ]
 }
