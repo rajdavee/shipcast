@@ -1,4 +1,5 @@
 import { pathToFileURL } from 'node:url';
+import { explainerScenes } from './scenes-explainer.ts';
 import { contrastRatio, ensureContrast, luminance, onColor, type BrandKit, type SafeZone } from '@shipcast/engine';
 
 /** Mix a colour toward white until it reads (≥ 3:1, WCAG large text) on a dark ground. */
@@ -883,6 +884,8 @@ tl.fromTo("${S} .stage",{scale:1},{scale:1.04,duration:${c.duration},ease:"none"
     },
   },
 ];
+
+SCENES.push(...explainerScenes({ frame, bg, words, fit, img, headCss, has, wordIn, list, esc, readableOnDark }));
 
 export function getScene(id: string): SceneDef {
   const s = SCENES.find((x) => x.id === id);

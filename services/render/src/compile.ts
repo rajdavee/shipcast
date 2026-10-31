@@ -2,8 +2,9 @@ import { copyFile, mkdir, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { basename, extname, join } from 'node:path';
 import { createHash } from 'node:crypto';
-import { brandCss, getPreset, loadBrand, localizeFonts, normalizeBrand, resolveIcons, run, type BrandKit, type PlatformPreset } from '@shipcast/engine';
+import { brandCss, getPreset, loadBrand, localizeFonts, normalizeBrand, probe, resolveIcons, run, type BrandKit, type PlatformPreset } from '@shipcast/engine';
 import { getScene, type SceneCtx } from './scenes.ts';
+import { parseSteps } from './scenes-explainer.ts';
 import { MOODS, type Mood } from '@shipcast/media';
 import { buildCaptions, CAPTION_STYLES, type CaptionStyle, type Word } from './captions.ts';
 
@@ -95,6 +96,10 @@ export function validateStoryboard(s: Storyboard): string[] {
       try {
         const def = getScene(sc.scene);
         for (const f of def.fields) if (!f.optional && (sc.fields?.[f.id] === undefined || sc.fields?.[f.id] === '')) errs.push(`scene ${i + 1} (${sc.scene}): missing field "${f.id}"`);
+        if (sc.scene === 'walkthrough' && sc.fields?.steps !== undefined) {
+          const lines = (Array.isArray(sc.fields.steps) ? sc.fields.steps : String(sc.fields.steps).split('\n')).map(String).filter((x) => x.trim());
+          if (!parseSteps(lines, (v) => v as string[]).length) errs.push(`scene ${i + 1} (walkthrough): steps need "x,y,w,h | LABEL | caption" with four 0–1 numbers`);
+        }
       } catch (e) {
         errs.push(`scene ${i + 1}: ${(e as Error).message}`);
       }
@@ -157,6 +162,16 @@ export async function compileStoryboard(story: Storyboard, opts: { dir: string; 
     }
   }
 
+  // A recording can't play past its own end: cap those scenes at the clip's remaining length.
+  const clipCap: Record<number, number> = {};
+  for (const [i, sc] of story.scenes.entries()) {
+    if (sc.scene !== 'recording' || !sc.fields?.video) continue;
+    const v = String(sc.fields.video);
+    const file = v.startsWith('/') ? v : join(opts.brandDir ?? '', v);
+    const p = existsSync(file) ? await probe(file).catch(() => null) : null;
+    if (p?.duration) clipCap[i] = Math.max(1, p.duration - (Number(sc.fields.from) || 0) - 0.05);
+  }
+
   // 2. Timeline. With a procedural bed, every scene length is a whole number of beats so cuts land on the beat.
   const mood: Mood | null = story.music === null ? null : story.music?.file ? null : (story.music?.mood ?? 'uplifting');
   const beat = mood ? 60 / MOODS[mood].bpm : 0;
@@ -167,7 +182,8 @@ export async function compileStoryboard(story: Storyboard, opts: { dir: string; 
     const vo = voiced[i] ? voiced[i].duration + VO_LEAD + VO_TAIL : 0;
     // The last scene holds an extra beat so the closing line is read, not flashed.
     const tail = i === story.scenes.length - 1 ? 1.2 : 0;
-    const duration = Math.round(snap(Math.max(sc.duration ?? 0, min, vo + tail)) * 1000) / 1000;
+    let duration = Math.round(snap(Math.max(sc.duration ?? 0, min, vo + tail)) * 1000) / 1000;
+    if (clipCap[i] !== undefined) duration = Math.min(duration, Math.round(clipCap[i] * 1000) / 1000);
     const entry = { sc, i, id: `s${i + 1}-${sc.scene ?? sc.block}`.replace(/[^\w-]/g, ''), start: Math.round(t * 100) / 100, duration };
     t += duration;
     return entry;
@@ -176,7 +192,7 @@ export async function compileStoryboard(story: Storyboard, opts: { dir: string; 
 
   // Edit rhythm: punch in on the words that carry the line (numbers, *accented* words, the strongest
   // word of a long line) — at most two per scene, never on scenes with their own camera or slam.
-  const NO_PUNCH = new Set(['product', 'scroll', 'kinetic', 'logos', 'stack3d', 'chapter', 'outro', 'logo-sting']);
+  const NO_PUNCH = new Set(['product', 'walkthrough', 'recording', 'part', 'scroll', 'kinetic', 'logos', 'stack3d', 'chapter', 'outro', 'logo-sting']);
   const punchesFor = (e: (typeof timeline)[number]): number[] => {
     const v = voiced[e.i];
     if (!v?.words.length || !e.sc.scene || NO_PUNCH.has(e.sc.scene)) return [];
