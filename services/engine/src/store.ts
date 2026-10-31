@@ -10,6 +10,7 @@ export const DEFAULT_SETTINGS: Settings = {
   allowedTools: ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'WebFetch', 'WebSearch', 'Skill', 'TodoWrite'],
   stepTimeoutMinutes: 60,
   subagents: 'pack',
+  directorReview: true,
   extraArgs: [],
 };
 

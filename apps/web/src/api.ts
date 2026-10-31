@@ -90,6 +90,7 @@ export interface Settings {
   allowedTools: string[];
   stepTimeoutMinutes: number;
   subagents: 'pack' | 'never';
+  directorReview: boolean;
 }
 
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {

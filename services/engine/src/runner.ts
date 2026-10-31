@@ -287,12 +287,29 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
     }
 
     // Spec formats: render through the services; hand problems back to the same session (≤ 2 fix rounds).
+    let reviewed = false;
     if (ok && specKind && !canceled && !timedOut) {
       for (let round = 0; ; round++) {
         await log({ step: step.id, type: 'log', text: round ? `Re-rendering after fixes (round ${round})…` : `Rendering ${SPEC_FILE[specKind]} with the ${specKind === 'storyboard' ? 'render' : 'stills'} service…` });
         const r = await renderSpec(specKind, cwd, join(dir, 'brief'));
         await log({ step: step.id, type: 'log', text: r.ok ? `Rendered: ${r.summary}` : `Quality check found ${r.feedback.length} issue(s): ${r.feedback.slice(0, 3).join(' · ')}` });
-        if (r.ok) break;
+        if (r.ok) {
+          // Director's review: QA can't judge taste. Claude looks at the frames once and may revise.
+          if (specKind === 'storyboard' && settings.directorReview && !renderOnly && !reviewed && sessionId && Date.now() < deadline && !canceled && !timedOut) {
+            reviewed = true;
+            await log({ step: step.id, type: 'log', text: "Director's review: checking the rendered frames…" });
+            const rev = await execClaude(
+              `Your video rendered and passed the automated checks. Now review it like a creative director. Look at out/video.sheet.jpg (12 frames across the whole video, left to right, top to bottom) and out/video.jpg (the first-frame thumbnail).\n\nJudge: is the hook instantly clear? Does every scene's picture match what its voice line says? Is each product zoom aimed at the right detail? Any text cramped, tiny, or fighting the captions? Does the pacing drag anywhere?\n\nIf it's genuinely good, reply with just APPROVED. If something is clearly worth fixing, edit out/storyboard.json (the smallest change that fixes it), add one line per change to out/NOTES.md, and reply CHANGED. Don't change things for the sake of it.`,
+              sessionId,
+            );
+            if (rev.result?.ok && /\bCHANGED\b/.test(rev.result.text ?? '')) {
+              await log({ step: step.id, type: 'log', text: "Director's review: revising the storyboard" });
+              continue;
+            }
+            await log({ step: step.id, type: 'log', text: "Director's review: approved" });
+          }
+          break;
+        }
         if (round >= 2 || renderOnly || !sessionId || canceled || timedOut || Date.now() > deadline) {
           // Keep whatever rendered; only fail if nothing did.
           if (r.summary === 'render failed' || r.summary === 'no spec' || r.summary === 'bad json' || r.summary === 'invalid storyboard') {

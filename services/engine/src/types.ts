@@ -114,6 +114,8 @@ export interface Settings {
   stepTimeoutMinutes: number;
   /** 'pack' lets packs that need sub-agents use them; 'never' blocks them everywhere (saves usage, may slow big videos). */
   subagents: 'pack' | 'never';
+  /** After a video passes QA, Claude reviews the frames like a creative director (one revision round). */
+  directorReview: boolean;
   /** Extra args appended to every claude invocation. */
   extraArgs: string[];
 }

@@ -20,6 +20,7 @@ const BUNDLES: { name: string; packs: string[] }[] = [
 
 export function NewCampaign({ status }: { status: Status | null }) {
   const packs = useLoad(() => api.packs());
+  const services = useLoad(() => api.services(), [], 10000);
   const [input, setInput] = useState('');
   const [selected, setSelected] = useState<string[]>(['reel', 'carousel', 'thumbnails', 'copy-kit']);
   const [options, setOptions] = useState<Record<string, Record<string, string>>>({});
@@ -105,11 +106,7 @@ export function NewCampaign({ status }: { status: Status | null }) {
         Shipcast reads your site or repo once, then makes the videos, motion graphics, carousels, thumbnails and posts — on your machine, with your own Claude login.
       </p>
 
-      {status && !claudeReady && (
-        <div className="banner" style={{ marginBottom: 18 }}>
-          Claude Code isn't connected yet. <a href="#/connect">Connect it</a> — it's the only account Shipcast needs.
-        </div>
-      )}
+      <Setup status={status} services={services.data} />
 
       <label className="source-bar">
         <input
@@ -276,6 +273,34 @@ export function NewCampaign({ status }: { status: Status | null }) {
         <button className="btn primary" disabled={!source || !runnable.length || busy || !claudeReady} onClick={start}>
           {busy ? 'Starting…' : 'Start campaign'}
         </button>
+      </div>
+    </div>
+  );
+}
+
+function Setup({ status, services }: { status: Status | null; services: { name: string; ok: boolean; voice?: string }[] | null }) {
+  if (!status || !services) return null;
+  const down = services.filter((s) => !s.ok).map((s) => s.name);
+  const voice = services.find((s) => s.name === 'media')?.voice;
+  const items = [
+    { ok: status.claude.loggedIn, label: 'Connect Claude Code', detail: 'the only account Shipcast needs', href: '#/connect' },
+    { ok: down.length === 0, label: 'Start the render services', detail: down.length ? `${down.join(', ')} not running — run \`npm start\`` : '', href: '#/connect' },
+    { ok: voice === 'kokoro', label: 'Install the natural voice (optional)', detail: 'one click, ~20 seconds, stays on this machine', href: '#/connect' },
+  ];
+  if (items.every((i) => i.ok)) return null;
+  return (
+    <div className="inspect-card" style={{ marginBottom: 22 }}>
+      <h3 style={{ fontSize: 16 }}>Finish setting up</h3>
+      <div style={{ display: 'grid', gap: 8 }}>
+        {items.map((i) => (
+          <a key={i.label} href={i.href} className="signal" style={{ fontSize: 14 }}>
+            <i className={`lamp ${i.ok ? 'on' : 'off'}`} />
+            <span>
+              <b>{i.label}</b>
+              {!i.ok && i.detail ? <span className="hint"> — {i.detail}</span> : null}
+            </span>
+          </a>
+        ))}
       </div>
     </div>
   );

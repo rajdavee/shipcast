@@ -42,6 +42,14 @@ export function SettingsPage() {
           </div>
           <p className="hint">The HyperFrames video formats build frames with helper agents. "Never" saves usage but makes long videos slower.</p>
         </div>
+        <div className="field" role="group" aria-label="Director's review">
+          <span>Director's review for videos</span>
+          <div className="seg">
+            <button aria-pressed={s.directorReview} onClick={() => save({ directorReview: true })}>On — Claude reviews the frames once</button>
+            <button aria-pressed={!s.directorReview} onClick={() => save({ directorReview: false })}>Off</button>
+          </div>
+          <p className="hint">After a video passes the automated checks, Claude looks at the rendered frames and fixes anything a human editor would (a weak hook, a zoom on the wrong spot). Costs one short extra turn.</p>
+        </div>
         <label className="field">
           <span>Time limit per deliverable (minutes)</span>
           <input className="input" type="number" min={5} max={240} value={s.stepTimeoutMinutes} onChange={(e) => setS({ ...s, stepTimeoutMinutes: Number(e.target.value) })} onBlur={() => save({ stepTimeoutMinutes: s.stepTimeoutMinutes })} style={{ maxWidth: 140 }} />
