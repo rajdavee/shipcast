@@ -1,4 +1,4 @@
-import { mkdir, writeFile, rm } from 'node:fs/promises';
+import { cp, mkdir, writeFile, rm } from 'node:fs/promises';
 import { catalogMarkdown, checkCopy, renderSpec, SPEC_FILE } from './specs.ts';
 import { readFile, readdir, rename, stat } from 'node:fs/promises';
 import { shortsFromStoryboard } from './shorts.ts';
@@ -15,6 +15,7 @@ import { cloneRepo, parseRepo } from './github.ts';
 import { matchOutputs } from './files.ts';
 import { installSkill, isSkillInstalled } from './skills.ts';
 import { ensureForRoles, hubPluginDir, rolesPrompt } from './skillhub.ts';
+import { readCampaignEnv, scrubSecrets } from './campaignenv.ts';
 import type { Campaign, Pack, Step } from './types.ts';
 
 export const WORKER_ID = `${hostname()}:${process.pid}`;
@@ -68,6 +69,8 @@ export async function recoverOrphans(): Promise<number> {
 /** Decide which step of a campaign should run next, and mark blocked steps. */
 export function pickStep(c: Campaign): Step | 'busy' | null {
   if (c.steps.some((s) => s.status === 'running')) return 'busy';
+  // A question to the user pauses the whole campaign: later steps usually depend on the answer.
+  if (c.steps.some((s) => s.status === 'needs-input')) return null;
   const brief = c.steps.find((s) => s.kind === 'brief');
   if (brief && brief.status !== 'done') return brief.status === 'queued' ? brief : null;
   return c.steps.find((s) => s.kind === 'pack' && s.status === 'queued') ?? null;
@@ -145,6 +148,7 @@ export function packPrompt(c: Campaign, pack: Pack, step: Step): string {
     tone: c.tone,
     notes: c.notes,
     sourceType: c.source.type,
+    plugin: PLUGIN_DIR,
     source: c.source.value,
     ref: c.source.ref ?? '',
   };
@@ -152,7 +156,7 @@ export function packPrompt(c: Campaign, pack: Pack, step: Step): string {
 
 ${campaignHeader(c)}
 
-Read ${join(campaignDir(c.id), 'brief')}/brief.md and brand.json first — research is already done and assets are in its assets/ folder; reuse them instead of re-fetching.
+Read ${join(campaignDir(c.id), 'brief')}/brief.md and brand.json first — research is already done and assets are in its assets/ folder; reuse them instead of re-fetching.${existsSync(join(campaignDir(c.id), 'brief', 'product-facts.md')) ? `\n\n**Real product UI** captured from the running app is in brief/assets/app/ (described in brief/assets/app/screens.json) — prefer it over website screenshots, and label it "Real product UI · sample data" where shown. **Claims:** only what brief/product-facts.md verifies; no invented customers, numbers, ratings or testimonials.` : ''}
 
 ${renderTemplate(pack.prompt, vars).trim()}`;
 }
@@ -193,6 +197,7 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
     let outputs: string[];
     let resume: string | undefined;
     let allowSubagents = false;
+    let appEnv: Record<string, string> | undefined;
     const note = step.pendingNote;
 
     if (step.kind === 'brief') {
@@ -222,6 +227,14 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
       }
       cwd = join(dir, 'deliverables', step.id);
       prompt = packPrompt(campaign, pack, step) + hubNote;
+      if (pack.context) {
+        const earlier = campaign.steps.filter((s) => s.kind === 'pack' && s.status === 'done' && s.id !== step.id);
+        if (earlier.length) prompt += `\n\n## Earlier steps in this campaign\n${earlier.map((s) => `- ${s.pack}: ${join(dir, 'deliverables', s.id, 'out')}/`).join('\n')}`;
+      }
+      if (pack.app) {
+        appEnv = await readCampaignEnv(id);
+        prompt += `\n\n## Environment and questions\nThe user's environment variables are already set in your shell: ${Object.keys(appEnv).join(', ') || '(none given)'}. Never print, echo or copy their values into any file under out/ — refer to them by name only.\nIf you hit something you genuinely cannot fix yourself (a missing secret or API key, credentials you need, a decision only the user can make), stop and write out/question.json: {"text": "one specific question", "why": "what failed, in one line", "fields": [{"key": "STRIPE_SECRET_KEY", "label": "Stripe test secret key", "secret": true}]} and end your turn with NEEDS_INPUT. Shipcast pauses, asks the user, and resumes this session with the answer. Fix everything you can first (install tools, start Docker, run a throwaway database, seed sample data, set safe local defaults).`;
+      }
       allowSubagents = !!pack.subagents && settings.subagents !== 'never';
       outputs = pack.outputs.map((g) => `out/${g}`).concat('out/NOTES.md');
     }
@@ -229,7 +242,10 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
     const specKind = pack?.spec;
     const renderOnly = !!step.renderOnly && !!specKind;
     if (note) {
-      if (step.sessionId) {
+      if (step.sessionId && note.startsWith('[answer] ')) {
+        resume = step.sessionId;
+        prompt = `The user answered your question.\n${note.slice(9)}\n\nContinue the task from where you stopped. Don't redo work that already succeeded.`;
+      } else if (step.sessionId) {
         resume = step.sessionId;
         prompt = `Revision request from the user: ${note}\n\nUpdate the deliverables in ./out/ to address it. Keep what already works; re-render anything affected. Then update out/NOTES.md.`;
       } else {
@@ -265,6 +281,7 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
         appendSystemPrompt: shipcastRules(campaign),
         extraArgs: settings.extraArgs,
         allowSubagents,
+        env: appEnv,
         onEvent: (e: StreamEvent) => {
           if (e.kind === 'init') updateStep(id, step.id, { sessionId: e.sessionId }).catch(() => {});
           else if (e.kind === 'text') log({ step: step.id, type: 'text', text: e.text });
@@ -358,6 +375,28 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
       if (!ok) why = res.result?.text || res.stderr.trim().split('\n').slice(-3).join(' ') || `claude exited with code ${res.code}`;
     }
 
+    // Claude asked the user something: pause here and wait for the answer.
+    const qFile = join(cwd, 'out', 'question.json');
+    if (existsSync(qFile) && !canceled && !timedOut) {
+      let q: any = null;
+      try {
+        q = JSON.parse(await readFile(qFile, 'utf8'));
+      } catch {}
+      await rm(qFile, { force: true });
+      if (q?.text) {
+        const question = {
+          text: String(q.text).slice(0, 400),
+          why: q.why ? String(q.why).slice(0, 400) : undefined,
+          fields: (Array.isArray(q.fields) ? q.fields : []).slice(0, 8).map((f: any) => ({ key: String(f.key ?? 'answer').replace(/[^\w]/g, '_').slice(0, 64), label: String(f.label ?? f.key ?? 'Answer').slice(0, 120), secret: !!f.secret, placeholder: f.placeholder ? String(f.placeholder).slice(0, 120) : undefined })),
+        };
+        if (!question.fields.length) question.fields.push({ key: 'answer', label: 'Your answer', secret: false, placeholder: undefined });
+        if (appEnv) await scrubSecrets(cwd, appEnv);
+        await updateStep(id, step.id, { status: 'needs-input', question, sessionId, phase: undefined, worker: undefined, pendingNote: undefined, costUsd: (step.costUsd ?? 0) + costUsd });
+        await log({ step: step.id, type: 'status', status: 'needs-input', text: `Needs your input: ${question.text}` });
+        return;
+      }
+    }
+
     // Spec formats: render through the services; hand problems back to the same session (≤ 2 fix rounds).
     let reviewed = false;
     if (ok && specKind && !canceled && !timedOut) {
@@ -429,6 +468,11 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
       }
     }
 
+    // Secrets never ship: scrub every value the user gave from this step's files.
+    if (appEnv || Object.keys(await readCampaignEnv(id)).length) {
+      const hits = await scrubSecrets(cwd, appEnv ?? (await readCampaignEnv(id)));
+      if (hits.length) await log({ step: step.id, type: 'log', text: `Removed secret values from ${hits.length} file(s)` });
+    }
     const files = await matchOutputs(cwd, outputs);
     const patch: Partial<Step> = {
       endedAt: new Date().toISOString(),
@@ -437,6 +481,7 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
       pendingNote: undefined,
       cancelRequested: undefined,
       renderOnly: undefined,
+      question: undefined,
       phase: undefined,
       worker: undefined,
       sessionId,
@@ -454,6 +499,14 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
       Object.assign(patch, { status: 'failed', error: (why || 'Claude finished but no deliverable files were found in out/.').slice(0, 600) });
     }
     await updateStep(id, step.id, patch);
+    // Captured product UI becomes campaign-wide material for every later step.
+    if (patch.status === 'done' && step.pack === 'app-capture') {
+      const brief = join(dir, 'brief');
+      await mkdir(join(brief, 'assets', 'app'), { recursive: true });
+      if (existsSync(join(cwd, 'out', 'screens'))) await cp(join(cwd, 'out', 'screens'), join(brief, 'assets', 'app'), { recursive: true });
+      for (const f of ['screens.json', 'product-facts.md']) if (existsSync(join(cwd, 'out', f))) await cp(join(cwd, 'out', f), f === 'screens.json' ? join(brief, 'assets', 'app', f) : join(brief, f));
+      await log({ step: step.id, type: 'log', text: 'Real product UI and verified facts added to the campaign brief' });
+    }
     if (resultText && patch.status === 'done') await log({ step: step.id, type: 'result', text: resultText.slice(0, 1500), costUsd });
     await log({ step: step.id, type: 'status', status: patch.status, text: patch.error ?? `${files.length} file(s)` });
   } catch (err) {

@@ -1,0 +1,27 @@
+{
+  "id": "app-capture",
+  "name": "Capture the product",
+  "tagline": "Logs in to your running app and captures real screens, mobile views and dashboard walkthroughs, plus the verified product facts.",
+  "category": "app",
+  "order": 91,
+  "estimate": "10\u201330 min",
+  "accent": "#0daa9a",
+  "app": true,
+  "context": true,
+  "timeoutMinutes": 60,
+  "sources": [
+    "github",
+    "local"
+  ],
+  "options": [],
+  "outputs": [
+    "screens/**",
+    "screens.json",
+    "product-facts.md"
+  ],
+  "skills": [],
+  "tools": [
+    "chrome",
+    "ffmpeg"
+  ]
+}

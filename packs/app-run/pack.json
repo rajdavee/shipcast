@@ -1,0 +1,25 @@
+{
+  "id": "app-run",
+  "name": "Run your app",
+  "tagline": "Sets your project up locally with your env vars, fixes what it can (databases, Docker, seed data), and asks you only for what it can't.",
+  "category": "app",
+  "order": 90,
+  "estimate": "10\u201360 min",
+  "accent": "#0daa9a",
+  "app": true,
+  "context": true,
+  "timeoutMinutes": 90,
+  "sources": [
+    "github",
+    "local"
+  ],
+  "options": [],
+  "outputs": [
+    "app.json",
+    "setup.md"
+  ],
+  "skills": [],
+  "tools": [
+    "git"
+  ]
+}

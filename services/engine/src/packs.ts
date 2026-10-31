@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { PACKS_DIR } from './paths.ts';
 import type { Pack } from './types.ts';
 
-const CATEGORIES = new Set(['video', 'motion', 'design', 'copy']);
+const CATEGORIES = new Set(['video', 'motion', 'design', 'copy', 'app']);
 
 export function validatePack(p: Partial<Pack>, where: string): string[] {
   const errs: string[] = [];

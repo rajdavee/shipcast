@@ -41,6 +41,9 @@ import {
   type Source,
   type Step,
   elevenVoices,
+  readCampaignEnv,
+  writeCampaignEnv,
+  parseEnvText,
   boardFor,
   loadRegistry,
   hubState,
@@ -355,7 +358,7 @@ router.post('/api/campaigns', async (req) => {
   const steps = [makeStep('brief')];
   for (const d of deliverables.slice(0, 20)) steps.push(makeStep('pack', d.pack, await packOptions(d.pack, d.options)));
   const fallbackName = source.type === 'url' ? new URL(source.value).hostname.replace(/^www\./, '') : source.type === 'github' ? source.value.split('/')[1] : source.type === 'local' ? basename(source.value) : 'Untitled campaign';
-  return createCampaign({
+  const created = await createCampaign({
     name: String(b.name || fallbackName).slice(0, 120),
     source,
     goal: String(b.goal ?? '').slice(0, 500),
@@ -364,6 +367,15 @@ router.post('/api/campaigns', async (req) => {
     notes: String(b.notes ?? '').slice(0, 4000),
     steps,
   });
+  // Env vars and a test login for running the app (stored with the campaign, never returned).
+  const env: Record<string, string> = typeof b.env === 'string' ? parseEnvText(b.env) : {};
+  if (b.login && typeof b.login === 'object') {
+    if (b.login.email) env.SHIPCAST_LOGIN_EMAIL = String(b.login.email).slice(0, 200);
+    if (b.login.password) env.SHIPCAST_LOGIN_PASSWORD = String(b.login.password).slice(0, 200);
+    if (b.login.url) env.SHIPCAST_APP_URL = String(b.login.url).slice(0, 300);
+  }
+  if (Object.keys(env).length) await writeCampaignEnv(created.id, env);
+  return created;
 });
 
 router.get('/api/campaigns/:id', (_q, _r, p) => mustCampaign(p.id));
@@ -392,6 +404,45 @@ async function mutateStep(id: string, stepId: string, fn: (s: Step, c: Campaign)
   });
   return campaign;
 }
+
+// A step paused with a question: store secret answers as env vars, resume the same session with the rest.
+router.post('/api/campaigns/:id/steps/:step/answer', async (req, _r, p) => {
+  const b = await readJson(req);
+  const values: Record<string, string> = b.values && typeof b.values === 'object' ? b.values : {};
+  const c = await mustCampaign(p.id);
+  const st = c.steps.find((x) => x.id === p.step);
+  if (!st || st.status !== 'needs-input' || !st.question) throw new HttpError(409, 'this step is not waiting for an answer');
+  const env: Record<string, string> = {};
+  const said: string[] = [];
+  for (const f of st.question.fields) {
+    const v = String(values[f.key] ?? '').slice(0, 4000);
+    if (!v.trim()) continue;
+    if (f.secret || /^[A-Z][A-Z0-9_]+$/.test(f.key)) {
+      env[f.key] = v;
+      said.push(`${f.label}: provided — it's now in your shell environment as ${f.key}`);
+    } else said.push(`${f.label}: ${v}`);
+  }
+  if (typeof b.note === 'string' && b.note.trim()) said.push(`Note from the user: ${b.note.trim().slice(0, 2000)}`);
+  if (!said.length) throw new HttpError(400, 'answer at least one field');
+  if (Object.keys(env).length) await writeCampaignEnv(p.id, env);
+  return mutateStep(p.id, p.step, (s) => {
+    s.status = 'queued';
+    s.pendingNote = `[answer] Question: ${st.question!.text}\n${said.join('\n')}`;
+    s.question = undefined;
+    s.error = undefined;
+  });
+});
+router.get('/api/campaigns/:id/env', async (_q, _r, p) => {
+  await mustCampaign(p.id);
+  return { keys: Object.keys(await readCampaignEnv(p.id)) };
+});
+router.put('/api/campaigns/:id/env', async (req, _r, p) => {
+  await mustCampaign(p.id);
+  const b = await readJson(req);
+  const patch: Record<string, string | null> = typeof b.text === 'string' ? parseEnvText(b.text) : {};
+  for (const k of Array.isArray(b.remove) ? b.remove : []) patch[String(k)] = null;
+  return { keys: await writeCampaignEnv(p.id, patch) };
+});
 
 router.post('/api/campaigns/:id/steps/:step/revise', async (req, _r, p) => {
   const { note } = await readJson(req);

@@ -25,3 +25,4 @@ export * from './brainstorm.ts';
 export * from './variety.ts';
 export * from './chatterbox.ts';
 export * from './skillhub.ts';
+export * from './campaignenv.ts';

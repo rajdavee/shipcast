@@ -8,7 +8,15 @@ export interface Source {
   ref?: string;
 }
 
-export type StepStatus = 'queued' | 'running' | 'done' | 'failed' | 'canceled' | 'blocked';
+export type StepStatus = 'queued' | 'running' | 'done' | 'failed' | 'canceled' | 'blocked' | 'needs-input';
+
+/** A question Claude asks the user when it can't continue on its own (e.g. a missing API key). */
+export interface StepQuestion {
+  text: string;
+  why?: string;
+  /** What the user should fill in. Secret fields (and UPPER_SNAKE keys) become campaign env vars. */
+  fields: { key: string; label: string; secret?: boolean; placeholder?: string }[];
+}
 
 export interface Revision {
   note: string;
@@ -37,6 +45,8 @@ export interface Step {
   phase?: string;
   /** Re-render the edited spec without running Claude. */
   renderOnly?: boolean;
+  /** Set while the step waits for the user (status 'needs-input'). */
+  question?: StepQuestion;
   worker?: string;
 }
 
@@ -84,7 +94,7 @@ export interface Pack {
   id: string;
   name: string;
   tagline: string;
-  category: 'video' | 'motion' | 'design' | 'copy';
+  category: 'video' | 'motion' | 'design' | 'copy' | 'app';
   /** Rough wall-clock time, shown in the UI. */
   estimate: string;
   /** Accent color used by the UI card. */
@@ -111,6 +121,10 @@ export interface Pack {
   order?: number;
   /** Long jobs (e.g. 10-minute videos) may need more than the global step timeout. */
   timeoutMinutes?: number;
+  /** Runs the user's app: gets the campaign's env vars in its shell, and may pause to ask questions. */
+  app?: boolean;
+  /** The prompt lists earlier steps' output folders (for multi-step campaigns). */
+  context?: boolean;
   prompt: string;
   dir: string;
 }
