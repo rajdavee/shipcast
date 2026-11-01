@@ -134,11 +134,15 @@ ${S} .pos{color:#34d399;font-weight:700}${S} .mut{opacity:.55}${S} b.acc{font-we
         const dim = imageSize(srcPath(f.image, c)) ?? { w: 1600, h: 1000 };
         const steps = parseSteps(f.steps, list);
         const kickH = f.kicker ? Math.round(46 * u) : 0;
-        const chipH = steps.some((s) => s.text || s.label) ? Math.round(112 * u) : 0;
+        const anyChip = steps.some((s) => s.text || s.label);
+        // Landscape with burned-in captions: chips share the top row with the kicker, so the
+        // screen gets the height the captions don't need.
+        const chipTop = anyChip && c.width > c.height * 1.2 && (c.captionBand ?? 0) > 0;
+        const chipH = anyChip && !chipTop ? Math.round(112 * u) : 0;
         const VX = pad.l;
-        const VY = pad.t + kickH;
+        const VY = pad.t + (chipTop ? Math.round(92 * u) : kickH);
         const VW = c.width - pad.l - pad.r;
-        const VH = c.height - VY - pad.b - chipH;
+        const VH = c.height - VY - pad.b - chipH - (chipTop ? Math.round(10 * u) : 0);
         const { w: iw, h: ih } = dim;
         // Overview: the whole screen when it fits, else full width from the top (tall pages).
         const tall = ih / iw > (VH / VW) * 1.9;
@@ -198,7 +202,7 @@ tl.fromTo("${S} .win",{rotation:0},{rotation:.001,duration:${c.duration},ease:"n
             b.markup +
             `${f.kicker ? `<div class="kick" style="left:${WX}px;top:${pad.t}px">${esc(f.kicker)}</div>` : ''}
 <div class="win" style="left:${WX}px;top:${WY}px;width:${WW}px;height:${WH}px"><div class="img" style="width:${iw}px;height:${ih}px"><img src="${img(f.image, c)}" alt=""></div><div class="hl"></div></div>
-<div class="chips" style="left:${pad.l}px;right:${pad.r}px;top:${WY + WH + Math.round(30 * u)}px">${steps.map((st, i) => (st.text || st.label ? `<div class="chip c${i}">${st.label ? `<span class="lab">${esc(st.label)}</span>` : ''}${st.text ? `<span class="txt">${R(st.text)}</span>` : ''}</div>` : '')).join('')}</div>
+<div class="chips${chipTop ? ' top' : ''}" style="left:${pad.l}px;right:${pad.r}px;top:${chipTop ? pad.t - Math.round(6 * u) : WY + WH + Math.round(30 * u)}px">${steps.map((st, i) => (st.text || st.label ? `<div class="chip c${i}">${st.label ? `<span class="lab">${esc(st.label)}</span>` : ''}${st.text ? `<span class="txt">${R(st.text)}</span>` : ''}</div>` : '')).join('')}</div>
 ${anyClick ? `<div class="cursor-wrap" style="position:absolute;inset:0">${cursorSvg(u)}</div>` : ''}`,
           css:
             b.css +
@@ -208,7 +212,7 @@ ${anyClick ? `<div class="cursor-wrap" style="position:absolute;inset:0">${curso
 ${S} .win{position:absolute;border-radius:${radius}px;overflow:hidden;background:${lightShot ? '#fff' : '#0d0f14'};box-shadow:0 ${Math.round(40 * u)}px ${Math.round(90 * u)}px -${Math.round(30 * u)}px rgba(0,0,0,.65),0 0 0 1px ${mode === 'dark' ? 'rgba(255,255,255,.12)' : 'rgba(15,23,42,.1)'}}
 ${S} .img{position:absolute;left:0;top:0;will-change:transform}${S} .img img{display:block;width:100%;height:100%}
 ${S} .hl{position:absolute;opacity:0;border-radius:${Math.round(10 * u)}px;border:${Math.max(2, Math.round(3.2 * u))}px solid ${accent};box-shadow:0 0 0 ${Math.round(5000 * u)}px rgba(8,10,14,.28),0 0 ${Math.round(28 * u)}px color-mix(in srgb,${accent} 55%,transparent)}
-${S} .chips{position:absolute;height:${Math.round(100 * u)}px}
+${S} .chips{position:absolute;height:${Math.round(100 * u)}px}${S} .chips.top .chip{margin:0 0 0 auto;max-width:62%}
 ${S} .chip{position:absolute;left:0;right:0;margin:0 auto;width:fit-content;top:0;opacity:0;display:flex;align-items:center;gap:${Math.round(16 * u)}px;white-space:${c.width > c.height * 1.2 ? 'nowrap' : 'normal'};max-width:100%;padding:${Math.round(14 * u)}px ${Math.round(24 * u)}px;border-radius:${Math.round(12 * u)}px;background:${mode === 'dark' ? 'rgba(18,20,26,.92)' : '#fff'};border:1px solid color-mix(in srgb,${accent} 55%,transparent);box-shadow:0 ${Math.round(14 * u)}px ${Math.round(30 * u)}px -${Math.round(16 * u)}px rgba(0,0,0,.5)}
 ${S} .chip .lab{font:600 ${Math.round(19 * u)}px/1 ${MONO};letter-spacing:.16em;text-transform:uppercase;color:${accent}}
 ${S} .chip .txt{font:500 ${Math.round(29 * u)}px/1.2 var(--font-body);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
@@ -249,13 +253,15 @@ ${S} .pos{color:#34d399;font-weight:700}${S} .mut{opacity:.55}`,
           .filter((x) => x.label || x.text)
           .slice(0, 8);
         const kickH = f.kicker ? Math.round(46 * u) : 0;
-        const chipH = chips.length ? Math.round(112 * u) : 0;
+        const chipTop = chips.length > 0 && c.width > c.height * 1.2 && (c.captionBand ?? 0) > 0;
+        const chipH = chips.length && !chipTop ? Math.round(112 * u) : 0;
+        const topH = chipTop ? Math.round(92 * u) : kickH;
         const VW = c.width - pad.l - pad.r;
-        const VH = c.height - pad.t - kickH - pad.b - chipH;
+        const VH = c.height - pad.t - topH - pad.b - chipH - (chipTop ? Math.round(10 * u) : 0);
         const WW = Math.round(Math.min(VW, VH * ar));
         const WH = Math.round(WW / ar);
         const WX = Math.round(pad.l + (VW - WW) / 2);
-        const WY = Math.round(pad.t + kickH + (VH - WH) / 2);
+        const WY = Math.round(pad.t + topH + (VH - WH) / 2);
         const Z = Math.min(Math.max(Number(f.zoom ?? 1.75), 1), 2.4);
         // Camera keyframes from the recorded actions: anticipate each click, pan between near ones, ease out for scrolls.
         const cam = (x: number, y: number, z: number) => {
@@ -289,13 +295,13 @@ ${S} .pos{color:#34d399;font-weight:700}${S} .mut{opacity:.55}`,
             b.markup +
             `${f.kicker ? `<div class="kick" style="left:${WX}px;top:${pad.t}px">${esc(f.kicker)}</div>` : ''}
 <div class="win" style="left:${WX}px;top:${WY}px;width:${WW}px;height:${WH}px"><div class="cam" style="width:${WW}px;height:${WH}px"><video id="${c.id}-rec" src="${img(f.video, c)}" muted playsinline data-start="0" data-duration="${c.duration}" data-media-start="${from}" data-has-audio="false" data-volume="0" data-track-index="0" style="width:100%;height:100%;object-fit:cover;display:block"></video></div></div>
-<div class="chips" style="left:${pad.l}px;right:${pad.r}px;top:${WY + WH + Math.round(30 * u)}px">${chips.map((ch, i) => `<div class="chip c${i}">${ch.label ? `<span class="lab">${esc(ch.label)}</span>` : ''}${ch.text ? `<span class="txt">${R(ch.text)}</span>` : ''}</div>`).join('')}</div>`,
+<div class="chips${chipTop ? ' top' : ''}" style="left:${pad.l}px;right:${pad.r}px;top:${chipTop ? pad.t - Math.round(6 * u) : WY + WH + Math.round(30 * u)}px">${chips.map((ch, i) => `<div class="chip c${i}">${ch.label ? `<span class="lab">${esc(ch.label)}</span>` : ''}${ch.text ? `<span class="txt">${R(ch.text)}</span>` : ''}</div>`).join('')}</div>`,
           css:
             b.css +
             `${S} .kick{position:absolute;font:600 ${Math.round(20 * u)}px/1 ${MONO};letter-spacing:.2em;text-transform:uppercase;color:${accent}}
 ${S} .win{position:absolute;border-radius:${Math.round(14 * u)}px;overflow:hidden;background:#000;box-shadow:0 ${Math.round(40 * u)}px ${Math.round(90 * u)}px -${Math.round(30 * u)}px rgba(0,0,0,.65),0 0 0 1px ${mode === 'dark' ? 'rgba(255,255,255,.12)' : 'rgba(15,23,42,.1)'}}
 ${S} .cam{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform}
-${S} .chips{position:absolute;height:${Math.round(100 * u)}px}
+${S} .chips{position:absolute;height:${Math.round(100 * u)}px}${S} .chips.top .chip{margin:0 0 0 auto;max-width:62%}
 ${S} .chip{position:absolute;left:0;right:0;margin:0 auto;width:fit-content;top:0;opacity:0;display:flex;align-items:center;gap:${Math.round(16 * u)}px;white-space:${c.width > c.height * 1.2 ? 'nowrap' : 'normal'};max-width:100%;padding:${Math.round(14 * u)}px ${Math.round(24 * u)}px;border-radius:${Math.round(12 * u)}px;background:${mode === 'dark' ? 'rgba(18,20,26,.92)' : '#fff'};border:1px solid color-mix(in srgb,${accent} 55%,transparent)}
 ${S} .chip .lab{font:600 ${Math.round(19 * u)}px/1 ${MONO};letter-spacing:.16em;text-transform:uppercase;color:${accent}}
 ${S} .chip .txt{font:500 ${Math.round(29 * u)}px/1.2 var(--font-body);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}${S} .pos{color:#34d399;font-weight:700}${S} b.acc{font-weight:700}`,
@@ -481,20 +487,30 @@ tl.fromTo("${S} .part",{scale:1},{scale:1.03,duration:${c.duration},ease:"none"}
         { id: 'theme', type: 'text', label: 'Ground (dark/light)', optional: true },
       ],
       build: (f, c) => {
-        const { u, vertical, pad, S } = big(c);
+        let { u, vertical, pad, S } = big(c);
         const mode = modeOf(f);
         const b = bg(c, mode);
         const accent = accentFor(c, mode);
         const rows = list(f.items).slice(0, 5).map(parts);
         const hi = Math.min(Math.max(Number(f.highlight) || 0, 0), rows.length);
         const arrowW = f.arrow && !vertical ? Math.round(240 * u) : 0;
-        const rowH = Math.round(Math.min(120, 520 / Math.max(rows.length, 1) + 10) * u);
+        let rowH = Math.round(Math.min(120, 520 / Math.max(rows.length, 1) + 10) * u);
         const tSize = fit(f.title, u, [[30, 62], [50, 52]], 46);
+        {
+          // Shrink to fit: big landscape type must never push the diagram off the frame.
+          const avail = c.height - pad.t - pad.b;
+          const est = (f.kicker ? 40 * u : 0) + (f.title ? tSize * 1.2 + 40 * u : 0) + rows.length * (rowH + 16 * u);
+          if (est > avail) {
+            rowH = Math.round((rowH * avail) / est);
+            u *= avail / est;
+          }
+        }
+        const tSizeF = fit(f.title, u, [[30, 60], [60, 50]], 44);
         const hiAt = Math.max(1.8, c.duration * 0.55);
         return {
           markup:
             b.markup +
-            `<div class="wrap" style="left:${pad.l}px;right:${pad.r}px;top:${pad.t}px;bottom:${pad.b}px">${head(f, c, tSize)}<div class="lad"><div class="rows" style="margin-right:${arrowW + Math.round(30 * u)}px">${rows
+            `<div class="wrap" style="left:${pad.l}px;right:${pad.r}px;top:${pad.t}px;bottom:${pad.b}px">${head(f, c, tSizeF)}<div class="lad"><div class="rows" style="margin-right:${arrowW + Math.round(30 * u)}px">${rows
               .map(
                 ([t, sub, tag], i) =>
                   `<div class="row card r${i}" style="height:${rowH}px"><i class="ring"></i><span class="n">${i + 1}</span><span class="tx"><b>${R(t)}</b>${sub ? `<small>${R(sub)}</small>` : ''}</span>${tag ? `<span class="tag">${esc(tag)}</span>` : ''}</div>`,
@@ -541,7 +557,7 @@ ${S} .arr span{position:absolute;left:${Math.round(40 * u)}px;top:0;font:650 ${M
         { id: 'theme', type: 'text', label: 'Ground (dark/light)', optional: true },
       ],
       build: (f, c) => {
-        const { u, pad, S } = big(c);
+        let { u, pad, S } = big(c);
         const mode = modeOf(f);
         const b = bg(c, mode);
         const accent = accentFor(c, mode);
@@ -549,11 +565,18 @@ ${S} .arr span{position:absolute;left:${Math.round(40 * u)}px;top:0;font:650 ${M
         const rows = list(f.rows).slice(0, 6).map((r) => r.split('|').map((x) => x.trim()));
         const hi = Math.min(Math.max(Number(f.highlight) || 0, 0), rows.length);
         const tSize = fit(f.title, u, [[30, 60], [60, 50]], 44);
+        {
+          // Shrink to fit: big landscape type must never push the diagram off the frame.
+          const avail = c.height - pad.t - pad.b;
+          const est = (f.kicker ? 40 * u : 0) + (f.title ? tSize * 1.2 + 40 * u : 0) + 60 * u + rows.reduce((a, r) => a + (r.some((x) => x.length > 28) ? 118 : 86), 0) * u + 40 * u;
+          if (est > avail) u *= avail / est;
+        }
+        const tSizeF = fit(f.title, u, [[30, 60], [60, 50]], 44);
         const hiAt = Math.max(2, c.duration * 0.6);
         return {
           markup:
             b.markup +
-            `<div class="wrap" style="left:${pad.l}px;right:${pad.r}px;top:${pad.t}px;bottom:${pad.b}px">${head(f, c, tSize)}<div class="tbl card"><div class="tr th">${cols.map((h) => `<span>${esc(h)}</span>`).join('')}</div>${rows
+            `<div class="wrap" style="left:${pad.l}px;right:${pad.r}px;top:${pad.t}px;bottom:${pad.b}px">${head(f, c, tSizeF)}<div class="tbl card"><div class="tr th">${cols.map((h) => `<span>${esc(h)}</span>`).join('')}</div>${rows
               .map((r, i) => `<div class="tr r${i}"><i class="ring"></i>${cols.map((_, j) => `<span>${R(r[j] ?? '')}</span>`).join('')}</div>`)
               .join('')}</div></div>`,
           css:
@@ -698,7 +721,7 @@ tl.fromTo("${S} .tw",{scale:1},{scale:1.025,duration:${c.duration},ease:"none",t
         { id: 'theme', type: 'text', label: 'Ground (dark/light)', optional: true },
       ],
       build: (f, c) => {
-        const { u, vertical, pad, S } = big(c);
+        let { u, vertical, pad, S } = big(c);
         const mode = modeOf(f);
         const b = bg(c, mode);
         const accent = accentFor(c, mode);
@@ -706,10 +729,17 @@ tl.fromTo("${S} .tw",{scale:1},{scale:1.025,duration:${c.duration},ease:"none",t
         const two = items.length > 5 && !vertical;
         const per = Math.min(0.32, (c.duration - 1.4) / Math.max(items.length, 1));
         const tSize = fit(f.title, u, [[30, 64], [50, 54]], 46);
+        {
+          // Shrink to fit: big landscape type must never push the diagram off the frame.
+          const avail = c.height - pad.t - pad.b;
+          const est = (f.kicker ? 40 * u : 0) + (f.title ? tSize * 1.2 + 40 * u : 0) + Math.ceil(items.length / (two ? 2 : 1)) * 60 * u;
+          if (est > avail) u *= avail / est;
+        }
+        const tSizeF = fit(f.title, u, [[30, 60], [60, 50]], 44);
         return {
           markup:
             b.markup +
-            `<div class="wrap" style="left:${pad.l}px;right:${pad.r}px;top:${pad.t}px;bottom:${pad.b}px">${head(f, c, tSize)}<div class="ck${two ? ' two' : ''}">${items
+            `<div class="wrap" style="left:${pad.l}px;right:${pad.r}px;top:${pad.t}px;bottom:${pad.b}px">${head(f, c, tSizeF)}<div class="ck${two ? ' two' : ''}">${items
               .map((t) => `<div class="it"><svg viewBox="0 0 24 24" width="${Math.round(40 * u)}" height="${Math.round(40 * u)}"><circle cx="12" cy="12" r="11" fill="${accent}" opacity=".18"/><path d="M7 12.5l3.2 3.2L17.5 8.5" fill="none" stroke="${accent}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"/></svg><span>${R(t)}</span></div>`)
               .join('')}</div></div>`,
           css:
@@ -741,7 +771,7 @@ tl.to("${S} .it path",{strokeDashoffset:0,duration:.35,ease:"power2.out",stagger
         { id: 'theme', type: 'text', label: 'Ground (dark/light)', optional: true },
       ],
       build: (f, c) => {
-        const { u, pad, S } = big(c);
+        let { u, pad, S } = big(c);
         const mode = modeOf(f);
         const b = bg(c, mode);
         const accent = accentFor(c, mode);
@@ -752,11 +782,18 @@ tl.to("${S} .it path",{strokeDashoffset:0,duration:.35,ease:"power2.out",stagger
         });
         const hi = Math.min(Math.max(Number(f.highlight) || 0, 0), cols.length);
         const tSize = fit(f.title, u, [[30, 60], [50, 50]], 44);
+        {
+          // Shrink to fit: big landscape type must never push the diagram off the frame.
+          const avail = c.height - pad.t - pad.b;
+          const est = (f.kicker ? 40 * u : 0) + (f.title ? tSize * 1.2 + 40 * u : 0) + 50 * u + rows.length * 66 * u;
+          if (est > avail) u *= avail / est;
+        }
+        const tSizeF = fit(f.title, u, [[30, 60], [60, 50]], 44);
         const grid = `grid-template-columns:2.2fr ${cols.map(() => '1fr').join(' ')}`;
         return {
           markup:
             b.markup +
-            `<div class="wrap" style="left:${pad.l}px;right:${pad.r}px;top:${pad.t}px;bottom:${pad.b}px">${head(f, c, tSize)}<div class="mx">${hi ? `<i class="col" style="left:calc((100% / ${2.2 + cols.length}) * ${2.2 + hi - 1});width:calc(100% / ${2.2 + cols.length})"></i>` : ''}<div class="mr mh" style="${grid}"><span></span>${cols.map((h) => `<span>${esc(h)}</span>`).join('')}</div>${rows
+            `<div class="wrap" style="left:${pad.l}px;right:${pad.r}px;top:${pad.t}px;bottom:${pad.b}px">${head(f, c, tSizeF)}<div class="mx">${hi ? `<i class="col" style="left:calc((100% / ${2.2 + cols.length}) * ${2.2 + hi - 1});width:calc(100% / ${2.2 + cols.length})"></i>` : ''}<div class="mr mh" style="${grid}"><span></span>${cols.map((h) => `<span>${esc(h)}</span>`).join('')}</div>${rows
               .map((r) => `<div class="mr" style="${grid}"><span class="lb">${R(r.label)}</span>${cols.map((_, j) => `<span class="cell">${r.marks[j] ? `<svg viewBox="0 0 24 24" width="${Math.round(34 * u)}" height="${Math.round(34 * u)}"><circle cx="12" cy="12" r="11" fill="${accent}"/><path d="M7 12.5l3.2 3.2L17.5 8.5" fill="none" stroke="${mode === 'dark' ? '#0b0c10' : '#fff'}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>` : '<i class="no"></i>'}</span>`).join('')}</div>`)
               .join('')}</div></div>`,
           css:

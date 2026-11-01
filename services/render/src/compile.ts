@@ -273,7 +273,7 @@ export async function compileStoryboard(story: Storyboard, opts: { dir: string; 
   const u = Math.min(width, height) / 1080;
   // Reels/Shorts UI covers the bottom of 9:16 only; 4:5 feeds keep captions in a lower third.
   const reelLike = height > width * 1.6;
-  const captionBand = words.length && style0 !== 'none' ? (reelLike ? Math.max(preset.safe.bottom, 560 * u) + 250 * u : Math.round(height * 0.08) + 170 * u) : 0;
+  const captionBand = words.length && style0 !== 'none' ? (reelLike ? Math.max(preset.safe.bottom, 560 * u) + 250 * u : width > height ? Math.round(height * 0.06) + 120 * u : Math.round(height * 0.08) + 170 * u) : 0;
   const hosts: string[] = [];
   // Logos for scenes that show real tools (same resolver and cache as the infographics).
   const iconNames = timeline.flatMap((e) => (e.sc.scene === 'logos' ? String(Array.isArray(e.sc.fields?.items) ? (e.sc.fields!.items as string[]).join('\n') : (e.sc.fields?.items ?? '')).split('\n').map((x) => x.trim()).filter(Boolean) : []));
