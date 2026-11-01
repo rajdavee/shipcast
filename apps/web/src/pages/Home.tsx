@@ -101,6 +101,8 @@ export function Home({ status, services, campaigns }: { status: Status | null; s
 
   async function makeFull() {
     if (!source || (source.type !== 'local' && source.type !== 'github')) return;
+    // Long background run: ask once so we can say when it needs them or is ready.
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') Notification.requestPermission().catch(() => {});
     setBusy(true);
     setError(null);
     try {

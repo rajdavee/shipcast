@@ -311,6 +311,8 @@ export function Campaign({ id }: { id: string }) {
 
       <p className="summary" aria-live="polite">{live && <i className="dot live" />}{summary}</p>
 
+      {campaign.steps.some((s) => s.pack === 'app-run' || s.pack === 'campaign-plan') && <CampaignProgress campaign={campaign} packMap={packMap} />}
+
       {campaign.steps.filter((s) => s.status === 'needs-input' && s.question).map((s) => (
         <NeedsInput key={s.id} campaign={campaign} step={s} packName={(packMap.get(s.pack!)?.name ?? 'This step')} onChange={setCampaign} />
       ))}
@@ -510,5 +512,97 @@ function AppBar({ id, busyStep, onChange }: { id: string; busyStep: boolean; onC
       </form>
     )}
     </>
+  );
+}
+
+/** Minutes a step usually takes, for a rough "time left" on long campaigns. */
+function estimateMin(s: Step, packMap: Map<string, Pack>): number {
+  if (s.kind === 'brief') return 5;
+  if (s.renderOnly) return 4;
+  const fixed: Record<string, number> = { 'app-run': 30, 'app-capture': 40, 'campaign-plan': 6, 'campaign-hub': 3, 'feature-explainer': 45, 'youtube-video': 45 };
+  if (s.pack && fixed[s.pack]) return fixed[s.pack];
+  return packMap.get(s.pack ?? '')?.category === 'video' ? 20 : 8;
+}
+
+const fmtLeft = (min: number) => {
+  if (min < 60) return `about ${Math.max(5, Math.round(min / 5) * 5)} min`;
+  const h = Math.floor(min / 60);
+  const m = Math.round((min % 60) / 10) * 10;
+  return `about ${h} h${m ? ` ${m} min` : ''}`;
+};
+
+/** The shape of a long campaign at a glance, with a rough time left; notifies the browser when it needs you or is done. */
+function CampaignProgress({ campaign, packMap }: { campaign: C; packMap: Map<string, Pack> }) {
+  const st = campaign.steps;
+  const assets = st.filter((s) => s.kind === 'pack' && !['app-run', 'app-capture', 'campaign-plan', 'campaign-hub'].includes(s.pack ?? ''));
+  const stage = (label: string, steps: Step[], extra?: string) => {
+    const state = !steps.length
+      ? 'wait'
+      : steps.some((s) => s.status === 'needs-input')
+        ? 'ask'
+        : steps.some((s) => s.status === 'running')
+          ? 'now'
+          : steps.every((s) => s.status === 'done')
+            ? 'done'
+            : steps.some((s) => s.status === 'failed')
+              ? 'fail'
+              : 'wait';
+    return { label, state, extra };
+  };
+  const doneAssets = assets.filter((s) => s.status === 'done').length;
+  const stages = [
+    stage('Research', st.filter((s) => s.kind === 'brief')),
+    stage('Run the app', st.filter((s) => s.pack === 'app-run')),
+    stage('Capture', st.filter((s) => s.pack === 'app-capture')),
+    stage('Plan', st.filter((s) => s.pack === 'campaign-plan')),
+    stage('Make the assets', assets, assets.length ? `${doneAssets} of ${assets.length}` : undefined),
+    stage('Package', st.filter((s) => s.pack === 'campaign-hub')),
+  ];
+  const now = Date.now();
+  let left = 0;
+  for (const s of st) {
+    if (s.status === 'queued' || s.status === 'blocked') left += estimateMin(s, packMap);
+    else if (s.status === 'running') left += Math.max(2, estimateMin(s, packMap) - (s.startedAt ? (now - Date.parse(s.startedAt)) / 60_000 : 0));
+  }
+  // Steps the plan will add, before it has run.
+  if (st.some((s) => s.pack === 'campaign-plan' && s.status !== 'done')) left += 90;
+  const waiting = st.some((s) => s.status === 'needs-input');
+
+  // Browser notifications for the moments that need the user.
+  const prev = useRef<string>('');
+  useEffect(() => {
+    const key = st.map((s) => `${s.id}:${s.status}`).join(',');
+    if (prev.current && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      const was = new Map(prev.current.split(',').map((x) => x.split(':') as [string, string]));
+      for (const s of st) {
+        if (was.get(s.id) === s.status) continue;
+        if (s.status === 'needs-input') new Notification(`${campaign.name} needs one thing from you`, { body: s.question?.text ?? 'Open Shipcast to answer.' });
+        if (s.pack === 'campaign-hub' && s.status === 'done') new Notification(`${campaign.name} is ready`, { body: 'Every asset is packaged in the campaign hub.' });
+      }
+    }
+    prev.current = key;
+  }, [st.map((s) => s.status).join(',')]);
+
+  const canAsk = typeof Notification !== 'undefined' && Notification.permission === 'default';
+  return (
+    <div className="progress-strip">
+      <ol>
+        {stages.map((x) => (
+          <li key={x.label} className={x.state}>
+            <i />
+            <span>{x.label}</span>
+            {x.extra && <small>{x.extra}</small>}
+          </li>
+        ))}
+      </ol>
+      <p>
+        {waiting ? 'Paused until you answer above.' : stages[5].state === 'done' ? 'Done.' : left > 0 ? `Runs in the background — ${fmtLeft(left)} left.` : ''}
+        {canAsk && (
+          <button className="linkish" onClick={() => Notification.requestPermission()}>
+            Notify me in this browser
+          </button>
+        )}
+      </p>
+    </div>
   );
 }
