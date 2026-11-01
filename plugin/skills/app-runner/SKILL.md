@@ -97,15 +97,23 @@ Write `out/app.json`:
 ```json
 { "url": "http://127.0.0.1:8091", "loginUrl": "/login", "login": { "email": "demo@example.test", "passwordFile": "work/app/.shipcast-login" },
   "stack": "Laravel 12 + Inertia/React, SQLite", "processes": [{ "name": "web", "pid": 1234, "cwd": "work/app", "log": "work/logs/web.log" }],
-  "stop": ["kill 1234", "docker rm -f shipcast-…-pg"], "mainPages": ["/dashboard", "/leads", "/reports"],
+  "start": ["docker start shipcast-…-pg", "mkdir -p work/pids && cd work/app && (nohup php artisan serve --port=8091 > ../logs/web.log 2>&1 & echo $! > ../pids/web.pid)"],
+  "stop": ["kill $(cat work/pids/*.pid) 2>/dev/null; true", "docker rm -f shipcast-…-pg"], "mainPages": ["/dashboard", "/leads", "/reports"],
   "sampleData": "what was seeded", "notes": "anything the capture step should know" }
 ```
 and `out/setup.md` (what you did, what failed and how you fixed it, what
 was disabled). Leave the app running for the next step.
 
-`stop` commands run from this step's folder (where `work/` and `out/` live), so
+`start` brings the app back after a reboot or a stop, without reinstalling:
+the exact commands, in order, each one returning straight away (background
+servers with `nohup … &`), safe to run twice. Write each server's PID to
+`work/pids/<name>.pid` so `stop` still works after a restart. Shipcast runs
+`start` itself before a later step if the app isn't answering, and from the
+campaign page's Start app button.
+
+`start` and `stop` commands run from this step's folder (where `work/` and `out/` live), so
 write paths like `work/app/docker-compose.yml`. `stop` lists only what *you* started; Shipcast runs it when the campaign is
-packaged. Stop by the PIDs you started (and their process groups) and by your
+packaged. Stop by the PIDs you started (read them from `work/pids/`) and by your
 own compose project name — never by port (`lsof -ti:<port> | xargs kill` can
 kill the user's own servers) and never with broad `pkill` patterns. If you used an app that was already running (yours to keep, not
 ours), set `"external": true` and leave `stop` empty.

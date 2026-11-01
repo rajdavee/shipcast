@@ -27,3 +27,4 @@ export * from './chatterbox.ts';
 export * from './skillhub.ts';
 export * from './campaignenv.ts';
 export * from './hub.ts';
+export * from './applife.ts';

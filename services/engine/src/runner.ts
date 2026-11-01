@@ -10,7 +10,8 @@ import { join } from 'node:path';
 import { campaignDir, PLUGIN_DIR } from './paths.ts';
 import { appendEvent, listCampaigns, newId, readCampaign, readSettings, updateCampaign, updateStep } from './store.ts';
 import { defaultOptions, getPack, loadPacks, renderTemplate } from './packs.ts';
-import { buildHub, notifyDesktop, stopApp } from './hub.ts';
+import { buildHub, notifyDesktop } from './hub.ts';
+import { appInfo, appUp, campaignIdle, startApp, stopApp } from './applife.ts';
 import { runClaude, type StreamEvent } from './claude.ts';
 import { cloneRepo, parseRepo } from './github.ts';
 import { matchOutputs } from './files.ts';
@@ -284,6 +285,16 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
       if (pack.context) {
         const earlier = campaign.steps.filter((s) => s.kind === 'pack' && s.status === 'done' && s.id !== step.id);
         if (earlier.length) prompt += `\n\n## Earlier steps in this campaign\n${earlier.map((s) => `- ${s.pack}: ${join(dir, 'deliverables', s.id, 'out')}/`).join('\n')}`;
+      }
+      if (pack.app && pack.id !== 'app-run' && !step.renderOnly) {
+        // After a sleep, reboot or stop the app may be gone: bring it back before Claude needs it.
+        const info = await appInfo(campaign);
+        if (info && !info.app.external && !(await appUp(info.app.url))) {
+          await log({ step: step.id, type: 'log', text: `The app isn't answering at ${info.app.url} — restarting it` });
+          const r = await startApp(campaign);
+          await log({ step: step.id, type: 'log', text: r.up ? 'App is back up' : `Couldn't restart the app (${r.log.slice(-1)[0] ?? ''}); Claude will try` });
+          if (!r.up) prompt += `\n\nNote: the app from the app step is not answering and Shipcast's restart failed. Start it again using that step's out/app.json \`start\` commands and out/setup.md before you continue.`;
+        }
       }
       if (pack.app) {
         appEnv = await readCampaignEnv(id);
@@ -585,6 +596,13 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
       if (existsSync(join(cwd, 'out', 'screens'))) await cp(join(cwd, 'out', 'screens'), join(brief, 'assets', 'app'), { recursive: true });
       for (const f of ['screens.json', 'product-facts.md']) if (existsSync(join(cwd, 'out', f))) await cp(join(cwd, 'out', f), f === 'screens.json' ? join(brief, 'assets', 'app', f) : join(brief, f));
       await log({ step: step.id, type: 'log', text: 'Real product UI and verified facts added to the campaign brief' });
+    }
+    // A campaign that stopped short (failed or cancelled, nothing left to do) shouldn't leave the app running.
+    if (patch.status === 'failed' || patch.status === 'canceled') {
+      const fresh = await readCampaign(id);
+      if (fresh && campaignIdle(fresh) && (await appInfo(fresh))) {
+        for (const l of await stopApp(fresh)) await log({ step: step.id, type: 'log', text: `App: ${l}` });
+      }
     }
     // A plan becomes real jobs: one per asset, then the hub.
     if (patch.status === 'done' && step.pack === 'campaign-plan') {

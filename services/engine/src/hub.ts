@@ -210,28 +210,6 @@ ${section('product', 'Real product UI (sample data)')}
   return { items: items.length, files: fileCount, zip: z.code === 0 && existsSync(zip) ? zip : undefined, folder };
 }
 
-/** Stop what app-run started (its out/app.json `stop` commands), best effort. */
-export async function stopApp(c: Campaign): Promise<string[]> {
-  const done: string[] = [];
-  for (const s of c.steps.filter((x) => x.pack === 'app-run')) {
-    const d = join(campaignDir(c.id), 'deliverables', s.id);
-    let app: any;
-    try {
-      app = JSON.parse(await readFile(join(d, 'out', 'app.json'), 'utf8'));
-    } catch {
-      continue;
-    }
-    if (app.external) continue;
-    const cmds = (Array.isArray(app.stop) ? app.stop : app.stop ? [app.stop] : []).map(String).slice(0, 10);
-    for (const cmd of cmds) {
-      // Stop commands run from the step's folder (the same place app-run worked from).
-      const r = await run('/bin/sh', ['-c', cmd], { cwd: d, timeoutMs: 180_000 }).catch((e) => ({ code: 1, stdout: '', stderr: String(e) }));
-      done.push(r.code === 0 ? `stopped: ${cmd.slice(0, 80)}` : `could not stop: ${cmd.slice(0, 80)} — ${(r.stderr || r.stdout || '').trim().split('\n').slice(-1)[0]?.slice(0, 160) ?? ''}`);
-    }
-  }
-  return done;
-}
-
 /** A desktop notification on this Mac (no-op elsewhere). */
 export async function notifyDesktop(title: string, message: string): Promise<void> {
   if (process.platform !== 'darwin' || process.env.SHIPCAST_NOTIFY === 'off') return;

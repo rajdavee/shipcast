@@ -162,6 +162,9 @@ export const api = {
   envKeys: (id: string) => call<{ keys: string[] }>('GET', `/api/campaigns/${id}/env`),
   saveEnv: (id: string, text: string) => call<{ keys: string[] }>('PUT', `/api/campaigns/${id}/env`, { text }),
   revise: (id: string, step: string, note: string) => call<Campaign>('POST', `/api/campaigns/${id}/steps/${step}/revise`, { note }),
+  app: (id: string) => call<AppState>('GET', `/api/campaigns/${id}/app`),
+  appStart: (id: string) => call<AppState & { log: string[] }>('POST', `/api/campaigns/${id}/app/start`),
+  appStop: (id: string) => call<AppState & { log: string[] }>('POST', `/api/campaigns/${id}/app/stop`),
   rerender: (id: string) => call<Campaign>('POST', `/api/campaigns/${id}/rerender`),
   retry: (id: string, step: string) => call<Campaign>('POST', `/api/campaigns/${id}/steps/${step}/retry`),
   cancel: (id: string, step: string) => call<Campaign>('POST', `/api/campaigns/${id}/steps/${step}/cancel`),
@@ -196,4 +199,12 @@ export function fmtDuration(ms?: number): string {
   const s = Math.round(ms / 1000);
   const m = Math.floor(s / 60);
   return `${String(m).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+}
+
+export interface AppState {
+  hasApp: boolean;
+  url?: string;
+  up: boolean;
+  external: boolean;
+  canStart: boolean;
 }

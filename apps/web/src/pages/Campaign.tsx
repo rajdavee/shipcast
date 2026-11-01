@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { api, fileUrl, fmtDuration, type Campaign as C, type CampaignEvent, type Pack, type Step } from '../api.ts';
+import { api, fileUrl, fmtDuration, type AppState, type Campaign as C, type CampaignEvent, type Pack, type Step } from '../api.ts';
 import { go, toast, useLoad } from '../hooks.ts';
 import { FORMATS, PLAIN, isStudio, relTime, shape } from '../formats.ts';
 import { Lightbox } from '../components/Lightbox.tsx';
@@ -308,6 +308,8 @@ export function Campaign({ id }: { id: string }) {
         );
       })}
 
+      {campaign.steps.some((s) => s.pack === 'app-run' && s.status === 'done') && <AppBar id={campaign.id} busyStep={campaign.steps.some((s) => s.status === 'running')} />}
+
       <BriefStrip campaign={campaign} step={brief} />
       {brief.status === 'failed' && (
         <div className="banner">
@@ -408,6 +410,48 @@ function AddMore({ packs, campaign, onClose, onAdd }: { packs: Pack[]; campaign:
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/** The user's app as the campaign left it: running or stopped, with Start / Stop. */
+function AppBar({ id, busyStep }: { id: string; busyStep: boolean }) {
+  const [st, setSt] = useState<AppState | null>(null);
+  const [busy, setBusy] = useState<'start' | 'stop' | null>(null);
+  useEffect(() => {
+    let on = true;
+    const tick = () => api.app(id).then((x) => on && setSt(x)).catch(() => {});
+    tick();
+    const t = setInterval(tick, 10_000);
+    return () => {
+      on = false;
+      clearInterval(t);
+    };
+  }, [id]);
+  if (!st?.hasApp || st.external) return null;
+  const act = async (k: 'start' | 'stop') => {
+    setBusy(k);
+    try {
+      const r = await (k === 'start' ? api.appStart(id) : api.appStop(id));
+      setSt(r);
+      toast(k === 'start' ? (r.up ? 'App is running' : `Couldn't start it: ${r.log.slice(-1)[0] ?? ''}`) : 'App stopped');
+    } catch (e) {
+      toast(String((e as Error).message));
+    } finally {
+      setBusy(null);
+    }
+  };
+  return (
+    <div className={`app-bar ${st.up ? 'up' : ''}`}>
+      <i className="dot" />
+      <span>
+        <b>Your app</b> {st.up ? <>running at <a href={st.url} target="_blank" rel="noreferrer">{st.url}</a></> : 'stopped'}
+      </span>
+      {st.up ? (
+        <button className="btn sm" disabled={!!busy || busyStep} title={busyStep ? 'A step is using it' : 'Stops the dev servers and Docker services Shipcast started'} onClick={() => act('stop')}>{busy === 'stop' ? 'Stopping…' : 'Stop'}</button>
+      ) : st.canStart ? (
+        <button className="btn sm" disabled={!!busy} onClick={() => act('start')}>{busy === 'start' ? 'Starting…' : 'Start'}</button>
+      ) : null}
     </div>
   );
 }

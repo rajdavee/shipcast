@@ -33,6 +33,10 @@ import {
   serviceHealth,
   SERVICE_PORTS,
   updateCampaign,
+  appStatus,
+  campaignIdle,
+  startApp,
+  stopApp,
   walk,
   writeSettings,
   WEB_DIST,
@@ -383,6 +387,8 @@ router.get('/api/campaigns/:id', (_q, _r, p) => mustCampaign(p.id));
 router.delete('/api/campaigns/:id', async (_q, _r, p) => {
   const c = await mustCampaign(p.id);
   if (c.steps.some((s) => s.status === 'running')) throw new HttpError(409, 'stop the running step first');
+  // Don't leave the user's app (dev servers, Docker services) running for a campaign that's gone.
+  await stopApp(c).catch(() => []);
   await deleteCampaign(p.id);
   return { ok: true };
 });
@@ -471,15 +477,34 @@ router.post('/api/campaigns/:id/steps/:step/retry', async (_q, _r, p) =>
   }),
 );
 
-router.post('/api/campaigns/:id/steps/:step/cancel', async (_q, _r, p) =>
-  mutateStep(p.id, p.step, (s) => {
+router.post('/api/campaigns/:id/steps/:step/cancel', async (_q, _r, p) => {
+  const c = await mutateStep(p.id, p.step, (s) => {
     if (s.status === 'running') s.cancelRequested = true;
-    else if (s.status === 'queued' || s.status === 'blocked') {
+    else if (s.status === 'queued' || s.status === 'blocked' || s.status === 'needs-input') {
       s.status = 'canceled';
       s.pendingNote = undefined;
+      s.question = undefined;
     }
-  }),
-);
+  });
+  if (campaignIdle(c)) await stopApp(c).catch(() => []);
+  return c;
+});
+
+// The user's app, as app-run left it.
+router.get('/api/campaigns/:id/app', async (_q, _r, p) => appStatus(await mustCampaign(p.id)));
+router.post('/api/campaigns/:id/app/start', async (_q, _r, p) => {
+  const c = await mustCampaign(p.id);
+  const r = await startApp(c);
+  await appendEvent(p.id, { step: 'brief', type: 'log', text: r.up ? 'App started' : `App didn't start: ${r.log.slice(-1)[0] ?? ''}` });
+  return { ...(await appStatus(c)), log: r.log };
+});
+router.post('/api/campaigns/:id/app/stop', async (_q, _r, p) => {
+  const c = await mustCampaign(p.id);
+  if (c.steps.some((s) => s.status === 'running' && s.pack && s.pack !== 'campaign-hub')) throw new HttpError(409, 'a step is using the app right now');
+  const log = await stopApp(c);
+  await appendEvent(p.id, { step: 'brief', type: 'log', text: `App stopped${log.length ? ` (${log.length} command(s))` : ''}` });
+  return { ...(await appStatus(c)), log };
+});
 
 router.delete('/api/campaigns/:id/steps/:step', async (_q, _r, p) =>
   mutateStep(p.id, p.step, (s, c) => {
