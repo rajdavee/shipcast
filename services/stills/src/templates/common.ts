@@ -77,6 +77,8 @@ export function fit(text: unknown, sizes: [number, number][], fallback: number):
 /** Real screens captured from the running app carry a small honest label, so copy never has to. */
 const UI_LABEL = 'Real product UI · sample data';
 function labelAppShots(body: string): string {
+  // The label is automatic on the screenshot, so drop it where it was written into the copy.
+  if (/\/assets\/app\//.test(body)) body = body.replace(/\s*[·•–—-]?\s*Real product UI\s*[·•,–—-]?\s*sample data\.?/gi, '');
   return body.replace(/(<img\b[^>]*\bsrc="[^"]*\/assets\/app\/[^"]*"[^>]*>)/g, `$1<span class="ui-label">${UI_LABEL}</span>`);
 }
 

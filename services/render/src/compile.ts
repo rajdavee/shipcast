@@ -291,6 +291,12 @@ export async function compileStoryboard(story: Storyboard, opts: { dir: string; 
     clips.push(`<video id="clip-${e.id}" src="${rel}" muted playsinline data-has-audio="false" data-volume="0" data-start="${e.start}" data-duration="${e.duration}" data-track-index="0" style="position:absolute;left:0;top:0;width:${width}px;height:${height}px;object-fit:cover"></video>`);
     credits.push(`${clip.credit} — ${clip.url}`);
   }
+  // "Real product UI · sample data" belongs in a kicker or chip, not tacked onto a headline.
+  const LABEL = /\s*[·•–—-]?\s*Real product UI(\s*[·•,–—-]?\s*sample data)?\.?\s*$/i;
+  for (const e of timeline) {
+    const f = e.sc.fields as Record<string, unknown> | undefined;
+    if (f) for (const k of ['title', 'headline', 'caption']) if (typeof f[k] === 'string' && LABEL.test(f[k] as string) && (f[k] as string).replace(LABEL, '').trim()) f[k] = (f[k] as string).replace(LABEL, '');
+  }
   for (const e of timeline) {
     const sctx: SceneCtx = { id: e.id, width, height, duration: e.duration, safe: preset.safe, brand: fallbackBrand, assetsDir: opts.brandDir, asset, icons, talk: voiced[e.i]?.words.map((w) => ({ text: w.text, start: +(w.start + VO_LEAD).toFixed(3), end: +(w.end + VO_LEAD).toFixed(3) })), captionBand: e.sc.scene === 'product' || e.sc.scene === 'scroll' ? 0 : captionBand };
     if (e.sc.scene) {

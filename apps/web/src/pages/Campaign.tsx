@@ -254,6 +254,19 @@ export function Campaign({ id }: { id: string }) {
               <button onClick={() => api.reveal(id)}>Open folder</button>
               <button onClick={() => upload.current?.click()}>Upload a clip or images</button>
               <button
+                title="Videos, carousels and posts re-render with today's engine — same scripts, no new Claude run"
+                onClick={async () => {
+                  try {
+                    setCampaign(await api.rerender(id));
+                    toast('Re-rendering everything with the latest engine');
+                  } catch (e) {
+                    toast(String((e as Error).message));
+                  }
+                }}
+              >
+                Re-render all with the latest engine
+              </button>
+              <button
                 className="danger"
                 onClick={async () => {
                   if (!confirm(`Delete "${campaign.name}" and all its files?`)) return;

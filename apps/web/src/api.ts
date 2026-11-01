@@ -162,6 +162,7 @@ export const api = {
   envKeys: (id: string) => call<{ keys: string[] }>('GET', `/api/campaigns/${id}/env`),
   saveEnv: (id: string, text: string) => call<{ keys: string[] }>('PUT', `/api/campaigns/${id}/env`, { text }),
   revise: (id: string, step: string, note: string) => call<Campaign>('POST', `/api/campaigns/${id}/steps/${step}/revise`, { note }),
+  rerender: (id: string) => call<Campaign>('POST', `/api/campaigns/${id}/rerender`),
   retry: (id: string, step: string) => call<Campaign>('POST', `/api/campaigns/${id}/steps/${step}/retry`),
   cancel: (id: string, step: string) => call<Campaign>('POST', `/api/campaigns/${id}/steps/${step}/cancel`),
   services: () => call<{ name: string; ok: boolean; queued?: number; running?: number; voice?: string }[]>('GET', '/api/services'),

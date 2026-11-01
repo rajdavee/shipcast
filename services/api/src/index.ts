@@ -499,6 +499,26 @@ async function specPath(id: string, stepId: string) {
   return { file: join(campaignDir(id), 'deliverables', stepId, 'out', SPEC_FILE[pack.spec]), kind: pack.spec, step };
 }
 
+/** Re-render every finished spec-based asset with the current engine (no new Claude run), then rebuild the hub. */
+router.post('/api/campaigns/:id/rerender', async (_q, _r, p) => {
+  const c = await mustCampaign(p.id);
+  const ids: string[] = [];
+  for (const s of c.steps) {
+    if (s.kind !== 'pack' || s.status !== 'done' || !s.pack) continue;
+    const pack = await getPack(s.pack);
+    if (pack?.spec && existsSync(join(campaignDir(p.id), 'deliverables', s.id, 'out', SPEC_FILE[pack.spec]))) ids.push(s.id);
+  }
+  if (!ids.length) throw new HttpError(400, 'nothing to re-render yet');
+  const { campaign } = await updateCampaign(p.id, (x) => {
+    for (const s of x.steps) {
+      if (ids.includes(s.id)) Object.assign(s, { status: 'queued', renderOnly: true, error: undefined });
+      else if (s.pack === 'campaign-hub' && s.status !== 'running') Object.assign(s, { status: 'queued', error: undefined });
+    }
+  });
+  await appendEvent(p.id, { step: 'brief', type: 'log', text: `Re-rendering ${ids.length} asset(s) with the latest engine` });
+  return campaign;
+});
+
 router.get('/api/campaigns/:id/steps/:step/spec', async (_q, _r, p) => {
   const { file, kind } = await specPath(p.id, p.step);
   if (!existsSync(file)) throw new HttpError(404, 'no spec yet — the format has not run');
