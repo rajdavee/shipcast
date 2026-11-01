@@ -74,7 +74,14 @@ export function fit(text: unknown, sizes: [number, number][], fallback: number):
   return fallback;
 }
 
+/** Real screens captured from the running app carry a small honest label, so copy never has to. */
+const UI_LABEL = 'Real product UI · sample data';
+function labelAppShots(body: string): string {
+  return body.replace(/(<img\b[^>]*\bsrc="[^"]*\/assets\/app\/[^"]*"[^>]*>)/g, `$1<span class="ui-label">${UI_LABEL}</span>`);
+}
+
 export function page(body: string, ctx: RenderCtx, themeCss: string, extraCss = ''): string {
+  body = labelAppShots(body);
   return `<!doctype html><html><head><meta charset="utf-8">
 ${fontLinks(ctx.brand)}
 <style>
@@ -83,6 +90,8 @@ ${brandCss(ctx.brand)}
 html,body{width:${ctx.width}px;height:${ctx.height}px;overflow:hidden}
 body{font-family:var(--font-body);-webkit-font-smoothing:antialiased;text-rendering:geometricPrecision;font-kerning:normal;font-feature-settings:"ss01","cv11"}
 img{display:block;max-width:100%}
+:has(> .ui-label){position:relative}
+.ui-label{position:absolute;right:14px;bottom:14px;z-index:5;font:600 15px/1 var(--font-body);letter-spacing:.02em;padding:7px 11px;border-radius:999px;background:rgba(10,12,16,.72);color:#fff;backdrop-filter:blur(6px);white-space:nowrap}
 ${themeCss}
 ${extraCss}
 </style></head><body>${body}</body></html>`;

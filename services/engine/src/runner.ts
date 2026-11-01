@@ -208,7 +208,7 @@ export function packPrompt(c: Campaign, pack: Pack, step: Step): string {
 
 ${campaignHeader(c)}
 
-Read ${join(campaignDir(c.id), 'brief')}/brief.md and brand.json first — research is already done and assets are in its assets/ folder; reuse them instead of re-fetching.${existsSync(join(campaignDir(c.id), 'brief', 'product-facts.md')) ? `\n\n**Real product UI** captured from the running app is in brief/assets/app/ (described in brief/assets/app/screens.json) — prefer it over website screenshots, and label it "Real product UI · sample data" where shown. **Claims:** only what brief/product-facts.md verifies; no invented customers, numbers, ratings or testimonials.` : ''}
+Read ${join(campaignDir(c.id), 'brief')}/brief.md and brand.json first — research is already done and assets are in its assets/ folder; reuse them instead of re-fetching.${existsSync(join(campaignDir(c.id), 'brief', 'product-facts.md')) ? `\n\n**Real product UI** captured from the running app is in brief/assets/app/ (described in brief/assets/app/screens.json) — prefer it over website screenshots. Slides, posts and cards label these screens "Real product UI · sample data" automatically, so never write that phrase into body copy; in a video, put it once in a kicker (e.g. the first real-UI scene). **Claims:** only what brief/product-facts.md verifies; no invented customers, numbers, ratings or testimonials.` : ''}
 
 ${existsSync(join(campaignDir(c.id), 'brief', 'CAMPAIGN-BRIEF.md')) ? `\n\nThis piece is part of a bigger campaign: read brief/CAMPAIGN-BRIEF.md (the line, the pillars, verified facts, naming) and stay on it.` : ''}
 
