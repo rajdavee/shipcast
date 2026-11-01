@@ -1,0 +1,23 @@
+{
+  "id": "product-tour",
+  "name": "Product Tour",
+  "tagline": "A music-led promo where your workflow plays out beat by beat — forms filling, options picked, checks passing, real screens and click-throughs — from the messy before to the CTA.",
+  "category": "video",
+  "order": 3,
+  "estimate": "10–25 min",
+  "accent": "#2563eb",
+  "spec": "storyboard",
+  "app": true,
+  "context": true,
+  "timeoutMinutes": 90,
+  "options": [
+    { "key": "length", "label": "Length", "type": "select", "choices": ["45 s", "75 s", "2 min"], "default": "75 s" },
+    { "key": "preset", "label": "Format", "type": "select", "choices": ["youtube", "linkedin-video", "square-video", "vertical"], "default": "youtube" },
+    { "key": "voice", "label": "Voiceover", "type": "select", "choices": ["none", "af_heart", "am_michael", "af_nova", "bm_george"], "default": "none" },
+    { "key": "angle", "label": "Angle", "type": "text", "default": "", "placeholder": "Blank = the workflow that best shows what it does" }
+  ],
+  "outputs": ["video.mp4", "video.jpg", "video.srt", "video.vtt", "storyboard.json", "*.md"],
+  "skills": [],
+  "tools": ["chrome"],
+  "roles": ["copy", "design-taste"]
+}
