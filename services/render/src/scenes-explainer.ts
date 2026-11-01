@@ -208,10 +208,10 @@ ${anyClick ? `<div class="cursor-wrap" style="position:absolute;inset:0">${curso
 ${S} .win{position:absolute;border-radius:${radius}px;overflow:hidden;background:${lightShot ? '#fff' : '#0d0f14'};box-shadow:0 ${Math.round(40 * u)}px ${Math.round(90 * u)}px -${Math.round(30 * u)}px rgba(0,0,0,.65),0 0 0 1px ${mode === 'dark' ? 'rgba(255,255,255,.12)' : 'rgba(15,23,42,.1)'}}
 ${S} .img{position:absolute;left:0;top:0;will-change:transform}${S} .img img{display:block;width:100%;height:100%}
 ${S} .hl{position:absolute;opacity:0;border-radius:${Math.round(10 * u)}px;border:${Math.max(2, Math.round(3.2 * u))}px solid ${accent};box-shadow:0 0 0 ${Math.round(5000 * u)}px rgba(8,10,14,.28),0 0 ${Math.round(28 * u)}px color-mix(in srgb,${accent} 55%,transparent)}
-${S} .chips{position:absolute;height:${Math.round(70 * u)}px}
-${S} .chip{position:absolute;left:0;right:0;margin:0 auto;width:fit-content;top:0;opacity:0;display:flex;align-items:center;gap:${Math.round(16 * u)}px;white-space:nowrap;max-width:100%;padding:${Math.round(14 * u)}px ${Math.round(24 * u)}px;border-radius:${Math.round(12 * u)}px;background:${mode === 'dark' ? 'rgba(18,20,26,.92)' : '#fff'};border:1px solid color-mix(in srgb,${accent} 55%,transparent);box-shadow:0 ${Math.round(14 * u)}px ${Math.round(30 * u)}px -${Math.round(16 * u)}px rgba(0,0,0,.5)}
+${S} .chips{position:absolute;height:${Math.round(100 * u)}px}
+${S} .chip{position:absolute;left:0;right:0;margin:0 auto;width:fit-content;top:0;opacity:0;display:flex;align-items:center;gap:${Math.round(16 * u)}px;white-space:${c.width > c.height * 1.2 ? 'nowrap' : 'normal'};max-width:100%;padding:${Math.round(14 * u)}px ${Math.round(24 * u)}px;border-radius:${Math.round(12 * u)}px;background:${mode === 'dark' ? 'rgba(18,20,26,.92)' : '#fff'};border:1px solid color-mix(in srgb,${accent} 55%,transparent);box-shadow:0 ${Math.round(14 * u)}px ${Math.round(30 * u)}px -${Math.round(16 * u)}px rgba(0,0,0,.5)}
 ${S} .chip .lab{font:600 ${Math.round(19 * u)}px/1 ${MONO};letter-spacing:.16em;text-transform:uppercase;color:${accent}}
-${S} .chip .txt{font:500 ${Math.round(29 * u)}px/1.2 var(--font-body);overflow:hidden;text-overflow:ellipsis}
+${S} .chip .txt{font:500 ${Math.round(29 * u)}px/1.2 var(--font-body);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 ${S} .pos{color:#34d399;font-weight:700}${S} .mut{opacity:.55}`,
           js,
         };
@@ -295,10 +295,10 @@ ${S} .pos{color:#34d399;font-weight:700}${S} .mut{opacity:.55}`,
             `${S} .kick{position:absolute;font:600 ${Math.round(20 * u)}px/1 ${MONO};letter-spacing:.2em;text-transform:uppercase;color:${accent}}
 ${S} .win{position:absolute;border-radius:${Math.round(14 * u)}px;overflow:hidden;background:#000;box-shadow:0 ${Math.round(40 * u)}px ${Math.round(90 * u)}px -${Math.round(30 * u)}px rgba(0,0,0,.65),0 0 0 1px ${mode === 'dark' ? 'rgba(255,255,255,.12)' : 'rgba(15,23,42,.1)'}}
 ${S} .cam{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform}
-${S} .chips{position:absolute;height:${Math.round(70 * u)}px}
-${S} .chip{position:absolute;left:0;right:0;margin:0 auto;width:fit-content;top:0;opacity:0;display:flex;align-items:center;gap:${Math.round(16 * u)}px;white-space:nowrap;max-width:100%;padding:${Math.round(14 * u)}px ${Math.round(24 * u)}px;border-radius:${Math.round(12 * u)}px;background:${mode === 'dark' ? 'rgba(18,20,26,.92)' : '#fff'};border:1px solid color-mix(in srgb,${accent} 55%,transparent)}
+${S} .chips{position:absolute;height:${Math.round(100 * u)}px}
+${S} .chip{position:absolute;left:0;right:0;margin:0 auto;width:fit-content;top:0;opacity:0;display:flex;align-items:center;gap:${Math.round(16 * u)}px;white-space:${c.width > c.height * 1.2 ? 'nowrap' : 'normal'};max-width:100%;padding:${Math.round(14 * u)}px ${Math.round(24 * u)}px;border-radius:${Math.round(12 * u)}px;background:${mode === 'dark' ? 'rgba(18,20,26,.92)' : '#fff'};border:1px solid color-mix(in srgb,${accent} 55%,transparent)}
 ${S} .chip .lab{font:600 ${Math.round(19 * u)}px/1 ${MONO};letter-spacing:.16em;text-transform:uppercase;color:${accent}}
-${S} .chip .txt{font:500 ${Math.round(29 * u)}px/1.2 var(--font-body)}${S} .pos{color:#34d399;font-weight:700}${S} b.acc{font-weight:700}`,
+${S} .chip .txt{font:500 ${Math.round(29 * u)}px/1.2 var(--font-body);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}${S} .pos{color:#34d399;font-weight:700}${S} b.acc{font-weight:700}`,
           js:
             js +
             has(`${S} .kick`, `tl.fromTo("${S} .kick",{opacity:0,x:-14},{opacity:1,x:0,duration:.6,ease:"expo.out"},.1);`) +
