@@ -88,7 +88,7 @@ export function buildCaptions(words: Word[], style: CaptionStyle, opts: { id: st
   const accent = sec && sec !== brand.colors.primary && luminance(sec) > 0.55 ? sec : '#FFD84D';
   const onAccent = onColor(accent);
   // Caption band: above the platform UI on vertical, lower third on landscape.
-  const bottom = vertical ? Math.max(safe.bottom, 560 * u) : Math.round(height * 0.1);
+  const bottom = height > width * 1.6 ? Math.max(safe.bottom, 560 * u) : Math.round(height * (vertical ? 0.08 : 0.1));
   const size = Math.round((style === 'bold' || style === 'highlight' ? (vertical ? 86 : 72) : style === 'emoji' ? (vertical ? 80 : 66) : style === 'clean' ? (vertical ? 58 : 48) : vertical ? 70 : 58) * u);
   const keys = cues.map(keyIndex);
   const emojiOf = (cue: Word[]) => {
