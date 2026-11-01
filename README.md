@@ -74,6 +74,8 @@ Shipcast makes all of it from one URL, on your own machine.
 
 You need **Node 22.18+**, **FFmpeg**, and **Claude Code** signed in
 (`claude auth login`). GitHub CLI is optional (private repos, PR videos).
+For full campaigns from your app, Docker (colima or Docker Desktop) lets
+Shipcast give apps a throwaway database.
 
 ```bash
 git clone https://github.com/rajdavee/shipcast
@@ -85,13 +87,17 @@ npm start            # → http://localhost:4317
 
 Then:
 
-1. **Paste** a website, `owner/repo`, or a few sentences about your product.
-2. **Pick a goal** — Launch kit, Social pack or Video only — and press *Make it*.
-   (*Customize* lets you choose individual formats and options.)
-3. **Watch it come together**: Shipcast shows what it learned (colors, logo,
-   screenshots), then each result appears as it's ready.
-4. **Open any result** to preview, download, edit it, or just type what to
-   change ("punchier hook", "slower on the chart").
+1. **Paste** a website, `owner/repo`, a local folder, or a few sentences about your product.
+2. **Pick what to make** from the formats, or open **Full campaign from your app**
+   to have Shipcast run your project, capture it and make everything (add env
+   vars and a test login there if you have them).
+3. **Brainstorm (optional)** — a few quick questions and three directions; sketch
+   the video on the drawing board before anything renders.
+4. **Watch it come together**: what Shipcast learned (colors, logo, screenshots),
+   a progress strip for long runs, and each result as it's ready. If it needs a
+   key or a decision, it pauses and asks you right there.
+5. **Open any result** to preview, download, edit it, or type what to change
+   ("punchier hook", "slower on the chart").
 
 If something isn't connected, the **Setup** page tells you exactly what to do.
 

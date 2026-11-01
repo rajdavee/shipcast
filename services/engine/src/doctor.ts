@@ -48,13 +48,15 @@ async function bin(id: string, label: string, required: boolean, hint: string, v
 }
 
 export async function doctor(): Promise<Check[]> {
-  const [claude, gh, git, ffmpeg, whisper, kokoro] = await Promise.all([
+  const [claude, gh, git, ffmpeg, whisper, kokoro, docker, zip] = await Promise.all([
     claudeAuth(),
     githubStatus(),
     bin('git', 'git', true, 'Install git', ['--version']),
     bin('ffmpeg', 'FFmpeg', true, 'brew install ffmpeg  ·  apt install ffmpeg  ·  winget install ffmpeg'),
     bin('whisper-cli', 'whisper.cpp (captions)', false, 'brew install whisper-cpp — word-timed captions offline', ['--help']),
     voiceReady(),
+    dockerCheck(),
+    bin('zip', 'zip (campaign hub download)', false, 'brew install zip  ·  apt install zip', ['-v']),
   ]);
   const [major, minor] = process.versions.node.split('.').map(Number);
   const chrome = findChrome();
@@ -104,5 +106,16 @@ export async function doctor(): Promise<Check[]> {
       hint: 'Free, natural local voiceover. Installs into ~/.shipcast/voice.',
       fix: 'voice',
     },
+    docker,
+    zip,
   ];
+}
+
+/** Full campaigns run apps that need a database or other services; Docker gives them a throwaway one. */
+async function dockerCheck(): Promise<Check> {
+  const base = { id: 'docker', label: 'Docker (full campaigns)', required: false };
+  if (!(await which('docker'))) return { ...base, ok: false, detail: 'not installed — apps that need Postgres, MySQL or Redis will ask you', hint: 'brew install colima docker && colima start  ·  or Docker Desktop' };
+  const info = await run('docker', ['info', '--format', '{{.ServerVersion}}'], { timeoutMs: 15_000 });
+  if (info.code === 0) return { ...base, ok: true, detail: `engine ${info.stdout.trim()}` };
+  return { ...base, ok: false, detail: 'installed, engine not running (Shipcast starts colima when it can)', hint: 'colima start  ·  or open Docker Desktop' };
 }
