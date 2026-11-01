@@ -34,6 +34,8 @@ import {
   SERVICE_PORTS,
   updateCampaign,
   appStatus,
+  campaignSize,
+  tidyCampaign,
   campaignIdle,
   startApp,
   stopApp,
@@ -488,6 +490,16 @@ router.post('/api/campaigns/:id/steps/:step/cancel', async (_q, _r, p) => {
   });
   if (campaignIdle(c)) await stopApp(c).catch(() => []);
   return c;
+});
+
+router.get('/api/campaigns/:id/size', async (_q, _r, p) => campaignSize(await mustCampaign(p.id)));
+router.post('/api/campaigns/:id/cleanup', async (req, _r, p) => {
+  const c = await mustCampaign(p.id);
+  if (c.steps.some((s) => s.status === 'running')) throw new HttpError(409, 'wait for the running step to finish');
+  const b = await readJson(req).catch(() => ({}));
+  const r = await tidyCampaign(c, { app: !!b.app });
+  await appendEvent(p.id, { step: 'brief', type: 'log', text: `Freed ${(r.freed / 1e9).toFixed(1)} GB` });
+  return { ...r, ...(await campaignSize(c)) };
 });
 
 // The user's app, as app-run left it.

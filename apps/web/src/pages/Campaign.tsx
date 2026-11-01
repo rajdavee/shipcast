@@ -275,6 +275,22 @@ export function Campaign({ id }: { id: string }) {
                 Re-render all with the latest engine
               </button>
               <button
+                onClick={async () => {
+                  try {
+                    const gb = (n: number) => `${(n / 1e9).toFixed(1)} GB`;
+                    const sz = await api.size(id);
+                    if (!confirm(`This project uses ${gb(sz.bytes)}. Remove render leftovers and scratch files? Every finished video, slide and post stays, and you can still re-render.`)) return;
+                    const app = sz.appBytes > 50e6 && confirm(`Also delete the copy of your app (${gb(sz.appBytes)})? It stops the app; capturing new screens later would set it up again.`);
+                    const r = await api.cleanup(id, app);
+                    toast(`Freed ${gb(r.freed)} · now ${gb(r.bytes)}`);
+                  } catch (e) {
+                    toast(String((e as Error).message));
+                  }
+                }}
+              >
+                Free up disk space…
+              </button>
+              <button
                 className="danger"
                 onClick={async () => {
                   if (!confirm(`Delete "${campaign.name}" and all its files?`)) return;

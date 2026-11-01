@@ -1,4 +1,5 @@
-import { readFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { readdir, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { spawnCollect } from './exec.ts';
 import { readCampaignEnv } from './campaignenv.ts';
@@ -85,5 +86,47 @@ export const campaignIdle = (c: Campaign) => !c.steps.some((s) => s.status === '
 export async function appStatus(c: Campaign): Promise<{ hasApp: boolean; url?: string; up: boolean; external: boolean; canStart: boolean }> {
   const info = await appInfo(c);
   if (!info) return { hasApp: false, up: false, external: false, canStart: false };
-  return { hasApp: true, url: info.app.url, up: await appUp(info.app.url), external: !!info.app.external, canStart: list(info.app.start).length > 0 };
+  return { hasApp: true, url: info.app.url, up: await appUp(info.app.url), external: !!info.app.external, canStart: list(info.app.start).length > 0 && existsSync(join(info.dir, 'work', 'app')) };
+}
+
+async function du(path: string): Promise<number> {
+  if (!existsSync(path)) return 0;
+  const r = await spawnCollect('du', ['-sk', path], { timeoutMs: 120_000 });
+  return (Number(r.stdout.trim().split(/\s+/)[0]) || 0) * 1024;
+}
+
+/** Disk used by the campaign, and how much of it is the copy of the user's app. */
+export async function campaignSize(c: Campaign): Promise<{ bytes: number; appBytes: number }> {
+  const info = await appInfo(c);
+  return { bytes: await du(campaignDir(c.id)), appBytes: info ? await du(join(info.dir, 'work')) : 0 };
+}
+
+/**
+ * Drop what's only needed while making: render projects, chapter caches and
+ * scratch folders. Finished files stay; specs stay, so re-rendering still works.
+ * With `app`, also stop the app and delete its copy (re-capturing then needs setup again).
+ */
+export async function tidyCampaign(c: Campaign, opts: { app?: boolean } = {}): Promise<{ freed: number; log: string[] }> {
+  const before = await du(campaignDir(c.id));
+  const log: string[] = [];
+  const info = await appInfo(c);
+  const root = join(campaignDir(c.id), 'deliverables');
+  for (const id of await readdir(root).catch(() => [] as string[])) {
+    const d = join(root, id);
+    const isApp = info?.dir === d;
+    for (const sub of ['out/project', 'out/chapters', 'out/preview']) await rm(join(d, sub), { recursive: true, force: true });
+    if (!isApp) {
+      // Keep notes Claude wrote for itself (model.md and friends); drop everything heavy.
+      for (const e of await readdir(join(d, 'work'), { withFileTypes: true }).catch(() => [])) {
+        if (e.isFile() && /\.(md|json)$/.test(e.name)) continue;
+        await rm(join(d, 'work', e.name), { recursive: true, force: true });
+      }
+    }
+  }
+  if (opts.app && info && !info.app.external) {
+    log.push(...(await stopApp(c)));
+    await rm(join(info.dir, 'work'), { recursive: true, force: true });
+    log.push('removed the app copy');
+  }
+  return { freed: Math.max(0, before - (await du(campaignDir(c.id)))), log };
 }

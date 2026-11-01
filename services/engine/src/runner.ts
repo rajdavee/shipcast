@@ -11,7 +11,7 @@ import { campaignDir, PLUGIN_DIR } from './paths.ts';
 import { appendEvent, listCampaigns, newId, readCampaign, readSettings, updateCampaign, updateStep } from './store.ts';
 import { defaultOptions, getPack, loadPacks, renderTemplate } from './packs.ts';
 import { buildHub, notifyDesktop } from './hub.ts';
-import { appInfo, appUp, campaignIdle, startApp, stopApp } from './applife.ts';
+import { appInfo, appUp, campaignIdle, startApp, stopApp, tidyCampaign } from './applife.ts';
 import { parseUsageReset, setUsagePause, usagePause } from './usage.ts';
 import { runClaude, type StreamEvent } from './claude.ts';
 import { cloneRepo, parseRepo } from './github.ts';
@@ -452,6 +452,8 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
         const r = await buildHub(fresh, join(cwd, 'out'));
         await log({ step: step.id, type: 'log', text: `Campaign hub: ${r.items} assets, ${r.files} files${r.zip ? ' + zip' : ''}` });
         for (const l of await stopApp(fresh)) await log({ step: step.id, type: 'log', text: `App: ${l}` });
+        const tidy = await tidyCampaign(fresh).catch(() => ({ freed: 0, log: [] as string[] }));
+        if (tidy.freed > 50e6) await log({ step: step.id, type: 'log', text: `Cleaned up ${(tidy.freed / 1e9).toFixed(1)} GB of render files` });
         const failed = fresh.steps.filter((s) => s.status === 'failed').length;
         await notifyDesktop(`${campaign.name} campaign is ready`, `${r.items} assets packaged${failed ? `, ${failed} need a look` : ''}. Open Shipcast to review.`);
         if (!r.items) {
