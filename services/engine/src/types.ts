@@ -47,6 +47,10 @@ export interface Step {
   renderOnly?: boolean;
   /** Set while the step waits for the user (status 'needs-input'). */
   question?: StepQuestion;
+  /** Automatic retries used after transient failures (network, API overload). */
+  autoRetries?: number;
+  /** Don't start before this time (ISO), used to space out retries. */
+  notBefore?: string;
   worker?: string;
 }
 

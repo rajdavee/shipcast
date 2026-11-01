@@ -52,7 +52,7 @@ export async function catalogMarkdown(kind: SpecKind): Promise<string> {
       `Presets: ${c.presets.map((p: any) => `\`${p.id}\` (${p.width}×${p.height})`).join(', ')}`,
       `Caption styles: ${Object.entries(c.captions).map(([k, v]) => `\`${k}\` — ${v}`).join('; ')}`,
       'Voices: `af_heart` `af_nova` `af_sky` (US female) · `am_adam` `am_michael` (US male) · `bf_emma` `bf_isabella` (UK female) · `bm_george` (UK male)',
-      'Transitions (how a scene enters): `cut` `flash` `wipe` `fade` `zoom` — wipes/zooms get a whoosh, flashes an impact.',
+      'Transitions (how a scene enters): `cut` `flash` `wipe` `fade` `zoom` `blur` (a motion-blurred whip — the slickest UI-to-UI cut) `push` (the next scene slides the last one away) — wipes/zooms/blurs/pushes get a whoosh, flashes an impact.',
       'Music: `{"mood": "uplifting|tech|chill|energetic|cinematic|playful"}` (original score generated per video, cuts land on the beat), `{"file": "<absolute path>"}` for a user track, or `null` for none. Default: uplifting.',
       '',
       '## Scenes',

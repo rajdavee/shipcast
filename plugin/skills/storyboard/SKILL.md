@@ -51,7 +51,7 @@ back to you to fix.
 8. **Use the high-energy scenes.** Every video needs at least one moment of pure motion, not just text and screenshots:
    `kinetic` (2–4 huge lines slam in on the beat — great hook or punchline), `logos` (the real tools your audience juggles burst in and collapse into your product — great for "replaces", "works with", integrations), `stack3d` (features or steps as a 3D card stack). Pick the one that fits the story; don't use all three in a short video.
    For tutorials, explainers for beginners and friendly stories, a `character` presenter (a brand-coloured mascot that talks in a speech bubble, mouth synced to the voice, with poses `explain`, `wave`, `point`, `think`, `celebrate`) carries the narration between product shots — open with `wave`, use `point` before a screenshot, `celebrate` at the payoff. Pick one mascot `look` for the whole video to match the brand: `blob` (friendly), `bot` (dev tools, AI), `orb` (calm, premium), `note` (productivity, notes, planning).
-9. **Vary the rhythm.** Alternate dark/light/brand scenes (title → statement → product → stat …) and vary transitions: `wipe` for momentum, `flash` for a beat drop, `fade` before the outro, `zoom` into a reveal, `cut` for punch.
+9. **Vary the rhythm.** Alternate dark/light/brand scenes (title → statement → product → stat …) and vary transitions: `blur` between UI scenes (a motion-blurred whip), `push` to move along a sequence, `wipe` for momentum, `flash` for a beat drop, `fade` before the outro, `zoom` into a reveal, `cut` for punch.
 
 ## Formats
 

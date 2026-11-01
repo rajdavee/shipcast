@@ -8,7 +8,7 @@ import { parseSteps } from './scenes-explainer.ts';
 import { MOODS, type Mood } from '@shipcast/media';
 import { buildCaptions, CAPTION_STYLES, type CaptionStyle, type Word } from './captions.ts';
 
-export type Transition = 'cut' | 'flash' | 'wipe' | 'fade' | 'zoom';
+export type Transition = 'cut' | 'flash' | 'wipe' | 'fade' | 'zoom' | 'blur' | 'push';
 
 export interface StoryScene {
   /** Shipcast scene id (see SCENES) … */
@@ -236,7 +236,7 @@ export async function compileStoryboard(story: Storyboard, opts: { dir: string; 
     const sfx: { kind: string; at: number; gain?: number }[] = [];
     for (const e of timeline.slice(1)) {
       const kind = e.sc.transition ?? 'wipe';
-      if (kind === 'wipe' || kind === 'zoom') sfx.push({ kind: 'whoosh', at: e.start, gain: 0.35 });
+      if (kind === 'wipe' || kind === 'zoom' || kind === 'blur' || kind === 'push') sfx.push({ kind: 'whoosh', at: e.start, gain: kind === 'blur' ? 0.28 : 0.35 });
       if (kind === 'flash') sfx.push({ kind: 'impact', at: e.start, gain: 0.4 });
     }
     for (const e of timeline) if (e.sc.scene === 'stat') sfx.push({ kind: 'pop', at: e.start + 0.12, gain: 0.3 });
@@ -324,10 +324,12 @@ export async function compileStoryboard(story: Storyboard, opts: { dir: string; 
   // 7. Transitions (overlays on the root timeline, centred on each cut).
   const tx: string[] = [];
   const txJs: string[] = [];
-  for (const e of timeline.slice(1)) {
+  for (const [k, e] of timeline.slice(1).entries()) {
     const kind = e.sc.transition ?? 'wipe';
     if (kind === 'cut') continue;
     const at = e.start;
+    const prev = `#host-${timeline[k].id}`;
+    const next = `#host-${e.id}`;
     const id = `tx-${e.id}`;
     const f = (n: number) => n.toFixed(3);
     // Every overlay starts hidden at t=0 and uses explicit from→to pairs, so
@@ -341,6 +343,12 @@ export async function compileStoryboard(story: Storyboard, opts: { dir: string; 
     } else if (kind === 'fade') {
       tx.push(`<div class="sc-tx dip" id="${id}"></div>`);
       txJs.push(`tl.set("#${id}",{opacity:0},0);tl.fromTo("#${id}",{opacity:0},{opacity:1,duration:.22,ease:"power1.in",immediateRender:false},${f(at - 0.22)});tl.fromTo("#${id}",{opacity:1},{opacity:0,duration:.3,ease:"power1.out",immediateRender:false},${f(at)});`);
+    } else if (kind === 'blur') {
+      // A whip: the outgoing scene smears off, the next one lands out of the same blur.
+      const d = Math.round(width * 0.09);
+      txJs.push(`tl.fromTo("${prev}",{x:0,filter:"blur(0px)"},{x:${-d},filter:"blur(28px)",duration:.22,ease:"power3.in",immediateRender:false},${f(at - 0.22)});tl.fromTo("${next}",{x:${d},filter:"blur(28px)"},{x:0,filter:"blur(0px)",duration:.34,ease:"power3.out",immediateRender:false},${f(at)});`);
+    } else if (kind === 'push') {
+      txJs.push(`tl.fromTo("${prev}",{xPercent:0},{xPercent:-100,duration:.42,ease:"power3.inOut",immediateRender:false},${f(at - 0.21)});tl.fromTo("${next}",{xPercent:100},{xPercent:0,duration:.42,ease:"power3.inOut",immediateRender:false},${f(at - 0.21)});`);
     } else if (kind === 'zoom') {
       tx.push(`<div class="sc-tx zoom" id="${id}"></div>`);
       txJs.push(`tl.set("#${id}",{scale:0,opacity:1},0);tl.fromTo("#${id}",{scale:0,opacity:1},{scale:3,duration:.36,ease:"power3.in",immediateRender:false},${f(at - 0.3)});tl.fromTo("#${id}",{opacity:1},{opacity:0,duration:.2,immediateRender:false},${f(at + 0.06)});tl.set("#${id}",{scale:0},${f(at + 0.3)});`);

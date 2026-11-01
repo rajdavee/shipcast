@@ -68,13 +68,16 @@ export async function recoverOrphans(): Promise<number> {
 }
 
 /** Decide which step of a campaign should run next, and mark blocked steps. */
+const TRANSIENT = /ENOTFOUND|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|Can't reach the API|socket hang up|overloaded|\b529\b|\b503\b|rate.?limit/i;
+
 export function pickStep(c: Campaign): Step | 'busy' | null {
   if (c.steps.some((s) => s.status === 'running')) return 'busy';
   // A question to the user pauses the whole campaign: later steps usually depend on the answer.
   if (c.steps.some((s) => s.status === 'needs-input')) return null;
   const brief = c.steps.find((s) => s.kind === 'brief');
-  if (brief && brief.status !== 'done') return brief.status === 'queued' ? brief : null;
-  const queued = c.steps.filter((s) => s.kind === 'pack' && s.status === 'queued');
+  if (brief && brief.status !== 'done') return brief.status === 'queued' && !(brief.notBefore && Date.parse(brief.notBefore) > Date.now()) ? brief : null;
+  const now = Date.now();
+  const queued = c.steps.filter((s) => s.kind === 'pack' && s.status === 'queued' && !(s.notBefore && Date.parse(s.notBefore) > now));
   // The campaign hub packages everything, so it always goes last.
   return queued.find((s) => s.pack !== 'campaign-hub') ?? queued[0] ?? null;
 }
@@ -553,6 +556,7 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
       cancelRequested: undefined,
       renderOnly: undefined,
       question: undefined,
+      notBefore: undefined,
       phase: undefined,
       worker: undefined,
       sessionId,
@@ -566,6 +570,10 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
       Object.assign(patch, { status: 'failed', error: `Stopped after ${Math.max(settings.stepTimeoutMinutes, pack?.timeoutMinutes ?? 0)} minutes` });
     } else if (ok && (step.kind === 'brief' ? files.includes('brief.md') : files.some((f) => f !== 'out/NOTES.md' && !f.endsWith('.json')))) {
       Object.assign(patch, { status: 'done' });
+    } else if (TRANSIENT.test(why) && (step.autoRetries ?? 0) < 2) {
+      // Long unattended runs shouldn't die on a network blip: try again shortly, from a clean slate.
+      Object.assign(patch, { status: 'queued', autoRetries: (step.autoRetries ?? 0) + 1, sessionId: undefined, notBefore: new Date(Date.now() + 60_000 * ((step.autoRetries ?? 0) + 1)).toISOString() });
+      await log({ step: step.id, type: 'log', text: `Connection problem (${why.slice(0, 120)}) — retrying in ${(step.autoRetries ?? 0) + 1} min` });
     } else {
       Object.assign(patch, { status: 'failed', error: (why || 'Claude finished but no deliverable files were found in out/.').slice(0, 600) });
     }

@@ -464,6 +464,8 @@ router.post('/api/campaigns/:id/steps/:step/retry', async (_q, _r, p) =>
     s.error = undefined;
     s.pendingNote = undefined;
     s.sessionId = undefined;
+    s.autoRetries = undefined;
+    s.notBefore = undefined;
     // Retrying the brief unblocks everything that was waiting on it.
     if (s.kind === 'brief') for (const x of c.steps) if (x.status === 'blocked') x.status = 'queued';
   }),
