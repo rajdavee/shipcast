@@ -19,7 +19,7 @@ body{background:radial-gradient(1200px 800px at 80% 50%,color-mix(in srgb,var(--
 .shot img{width:100%;height:100%;object-fit:cover;object-position:top left}
 .ring{position:absolute;border:12px solid var(--accent);border-radius:50%;box-shadow:0 0 0 6px rgba(0,0,0,.25)}
 .arrow{position:absolute;width:190px;height:190px;color:var(--accent);filter:drop-shadow(0 8px 0 rgba(0,0,0,.3))}
-.tag{position:absolute;left:64px;top:56px;display:flex;align-items:center;gap:16px;font:800 30px/1 var(--font-body);background:var(--fg);color:var(--bg);padding:14px 22px;border-radius:14px}
+.tag{position:absolute;left:64px;top:56px;display:flex;align-items:center;gap:16px;font:800 30px/1 var(--font-body);background:#fff;color:#111;padding:14px 22px;border-radius:14px;box-shadow:0 10px 30px -12px rgba(0,0,0,.35)}
 .tag .logo{height:34px}
 .num{font:900 360px/.8 var(--font-display);letter-spacing:-.07em;color:var(--accent);text-shadow:0 10px 0 rgba(0,0,0,.25)}
 .vs{position:absolute;inset:0;display:grid;grid-template-columns:1fr 1fr}
