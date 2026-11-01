@@ -111,8 +111,8 @@ ${S} .pos{color:#34d399;font-weight:700}${S} .mut{opacity:.55}${S} b.acc{font-we
   const modeOf = (f: Record<string, any>): 'dark' | 'light' => (String(f.theme ?? '').toLowerCase() === 'light' ? 'light' : 'dark');
   const box = (S: string, mode: 'dark' | 'light', u: number) =>
     mode === 'dark'
-      ? `${S} .card{background:linear-gradient(180deg,rgba(255,255,255,.085),rgba(255,255,255,.05));border:1px solid rgba(255,255,255,.14);border-radius:${Math.round(16 * u)}px;box-shadow:0 ${Math.round(20 * u)}px ${Math.round(50 * u)}px -${Math.round(24 * u)}px rgba(0,0,0,.6)}`
-      : `${S} .card{background:#fff;border:1px solid rgba(15,23,42,.09);border-radius:${Math.round(16 * u)}px;box-shadow:0 ${Math.round(18 * u)}px ${Math.round(40 * u)}px -${Math.round(22 * u)}px rgba(15,23,42,.25)}`;
+      ? `${S} .card{box-sizing:border-box;background:linear-gradient(180deg,rgba(255,255,255,.085),rgba(255,255,255,.05));border:1px solid rgba(255,255,255,.14);border-radius:${Math.round(16 * u)}px;box-shadow:0 ${Math.round(20 * u)}px ${Math.round(50 * u)}px -${Math.round(24 * u)}px rgba(0,0,0,.6)}`
+      : `${S} .card{box-sizing:border-box;background:#fff;border:1px solid rgba(15,23,42,.09);border-radius:${Math.round(16 * u)}px;box-shadow:0 ${Math.round(18 * u)}px ${Math.round(40 * u)}px -${Math.round(22 * u)}px rgba(15,23,42,.25)}`;
 
   return [
     {
@@ -394,16 +394,19 @@ tl.fromTo("${S} .pile",{x:0},{x:${Math.round(8 * u)},duration:.05,repeat:5,yoyo:
         let js = b.js + `tl.set("${S} .tick",{scale:0},0);` + wordIn(S, '.ttl', 0.05) + `tl.fromTo("${S} .ck",{opacity:0,y:${Math.round(30 * u)}},{opacity:1,y:0,duration:.6,ease:"expo.out",stagger:.1},.3);tl.fromTo("${S} .rl",{scaleX:0},{scaleX:1,duration:.8,ease:"power3.inOut"},.5);tl.fromTo("${S} .stem",{scaleY:0},{scaleY:1,duration:.4,ease:"power3.out",stagger:.08},.9);`;
         js += `tl.fromTo("${S} .tok",{x:${pad.l - 40 * u},opacity:0},{x:${pad.l},opacity:1,duration:.25,ease:"power2.out"},${(start - 0.3).toFixed(2)});`;
         const last = stop || n;
+        // Keep the pill inside the frame: estimate its width from the text.
+        const pillW = String(f.token ?? '').replace(/[*+~]/g, '').length * 30 * u * 0.56 + 48 * u;
+        const px = (x: number) => Math.min(x, c.width - pad.r - pillW);
         for (let i = 0; i < last; i++) {
           const t = start + i * per;
-          js += `tl.to("${S} .tok",{x:${(cx(i) - 120 * u).toFixed(1)},duration:${(per * 0.6).toFixed(2)},ease:"power2.inOut"},${t.toFixed(2)});`;
+          js += `tl.to("${S} .tok",{x:${px(cx(i) - 120 * u).toFixed(1)},duration:${(per * 0.6).toFixed(2)},ease:"power2.inOut"},${t.toFixed(2)});`;
           if (stop && i === stop - 1) {
             js += `tl.to("${S} .c${i} .ring.bad",{opacity:1,duration:.25},${(t + per * 0.6).toFixed(2)});tl.to("${S} .tok",{rotation:-3,duration:.06,repeat:5,yoyo:true,ease:"none"},${(t + per * 0.6).toFixed(2)});tl.to("${S} .tok",{backgroundColor:"#fee2e2",borderColor:"#ef4444",color:"#b91c1c",duration:.2},${(t + per * 0.6).toFixed(2)});tl.fromTo("${S} .stopx",{opacity:0,y:${Math.round(10 * u)}},{opacity:1,y:0,duration:.4,ease:"expo.out"},${(t + per * 0.7).toFixed(2)});`;
           } else {
             js += `tl.to("${S} .c${i} .ring.ok",{opacity:1,duration:.25},${(t + per * 0.6).toFixed(2)});tl.fromTo("${S} .c${i} .tick",{scale:0},{scale:1,duration:.35,ease:"back.out(3)"},${(t + per * 0.6).toFixed(2)});`;
           }
         }
-        if (!stop) js += `tl.to("${S} .tok",{x:${c.width - pad.r - 220 * u},duration:.6,ease:"power2.in"},${(start + n * per).toFixed(2)});tl.to("${S} .tok",{backgroundColor:"#dcfce7",borderColor:"#22c55e",color:"#15803d",duration:.2},${(start + n * per + 0.5).toFixed(2)});`;
+        if (!stop) js += `tl.to("${S} .tok",{x:${px(c.width - pad.r - 220 * u).toFixed(1)},duration:.6,ease:"power2.in"},${(start + n * per).toFixed(2)});tl.to("${S} .tok",{backgroundColor:"#dcfce7",borderColor:"#22c55e",color:"#15803d",duration:.2},${(start + n * per + 0.5).toFixed(2)});`;
         return {
           markup:
             b.markup +
