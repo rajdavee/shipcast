@@ -252,9 +252,23 @@ export function serviceUrl(name: ServiceName): string {
 }
 
 /** Submit a job and wait for it. Throws with the job's error on failure. */
+/** fetch that rides out a service restart: connection errors are retried for up to `forMs`. */
+async function fetchRetry(url: string, init: RequestInit | undefined, forMs: number): Promise<Response> {
+  const t0 = Date.now();
+  for (;;) {
+    try {
+      return await fetch(url, init);
+    } catch (e) {
+      if (Date.now() - t0 > forMs) throw e;
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+  }
+}
+
 export async function callService<O = any>(name: ServiceName, kind: string, input: unknown, { timeoutMs = 3_600_000 } = {}): Promise<O> {
   const base = serviceUrl(name);
-  const res = await fetch(`${base}/jobs`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind, input }) }).catch(() => {
+  // Jobs are persisted and resumed by the service, so a restart mid-call is survivable.
+  const res = await fetchRetry(`${base}/jobs`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind, input }) }, 90_000).catch(() => {
     throw new Error(`The ${name} service isn't reachable at ${base}. Start it with \`shipcast start\` or \`npm run service:${name}\`.`);
   });
   let job = (await res.json()) as Job<unknown, O> & { error?: string };
@@ -262,7 +276,7 @@ export async function callService<O = any>(name: ServiceName, kind: string, inpu
   const t0 = Date.now();
   while (job.status === 'queued' || job.status === 'running') {
     if (Date.now() - t0 > timeoutMs) throw new Error(`${name}/${kind} timed out`);
-    job = (await (await fetch(`${base}/jobs/${job.id}/wait`)).json()) as Job<unknown, O>;
+    job = (await (await fetchRetry(`${base}/jobs/${job.id}/wait`, undefined, 120_000)).json()) as Job<unknown, O>;
   }
   if (job.status === 'failed') throw new Error(`${name}/${kind}: ${job.error}`);
   return job.output as O;
