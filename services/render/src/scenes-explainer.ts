@@ -299,6 +299,132 @@ ${S} .chip .txt{font:500 ${Math.round(29 * u)}px/1.2 var(--font-body)}${S} .pos{
       },
     },
     {
+      id: 'chaos',
+      label: 'The messy before → alert',
+      use: 'Promo opener for the pain: 3–5 small rebuilt tool windows (a spreadsheet, a scraper, a sender, an inbox) pile up and jitter, then a full-width alert slams across (red) — the moment it breaks. Real pain from the brief only.',
+      minSeconds: 3.5,
+      fields: [
+        { id: 'windows', type: 'list', label: 'Windows', help: 'One per line: "Title — row; row; row" (3–5 windows, ≤ 3 short rows)' },
+        { id: 'alert', type: 'text', label: 'Alert', max: 60, help: '"Your account has been restricted — All campaigns have stopped"' },
+        { id: 'theme', type: 'text', label: 'Ground (light/dark)', optional: true },
+      ],
+      build: (f, c) => {
+        const { u, S } = frame(c);
+        const mode = String(f.theme ?? 'light') === 'dark' ? 'dark' : 'light';
+        const b = bg(c, mode);
+        const wins = list(f.windows).slice(0, 5).map((l) => {
+          const [t, rows] = parts(l);
+          return { t, rows: String(rows ?? '').split(';').map((x) => x.trim()).filter(Boolean).slice(0, 3) };
+        });
+        const [at, asub] = parts(String(f.alert ?? ''));
+        // Deterministic scatter: a loose pile around the centre.
+        const vert = c.height > c.width;
+        const spots = vert
+          ? [[0.06, 0.12, -3], [0.3, 0.27, 2.5], [0.08, 0.45, -1.5], [0.32, 0.6, 3], [0.1, 0.74, 2]]
+          : [[0.05, 0.1, -3], [0.52, 0.16, 2.5], [0.1, 0.5, -1.5], [0.56, 0.58, 3], [0.3, 0.33, 2]];
+        const ww = Math.round(c.width * (vert ? 0.62 : 0.4));
+        const slam = Math.max(2, c.duration * 0.55);
+        return {
+          markup:
+            b.markup +
+            `<div class="pile">${wins
+              .map(
+                (w, i) =>
+                  `<div class="mw card m${i}" style="left:${Math.round(spots[i][0] * c.width)}px;top:${Math.round(spots[i][1] * c.height)}px;width:${ww}px;transform:rotate(${spots[i][2]}deg)"><div class="tb"><i></i><i></i><i></i><b>${esc(w.t)}</b></div>${w.rows.map((r) => `<div class="rw">${R(r)}</div>`).join('')}</div>`,
+              )
+              .join('')}</div><div class="alert"><svg viewBox="0 0 24 24" width="${Math.round(54 * u)}" height="${Math.round(54 * u)}"><rect x="5" y="10" width="14" height="11" rx="2" fill="none" stroke="#fff" stroke-width="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3" fill="none" stroke="#fff" stroke-width="2"/></svg><div><b>${esc(at)}</b>${asub ? `<small>${esc(asub)}</small>` : ''}</div></div>`,
+          css:
+            b.css +
+            box(S, mode, u) +
+            `${S} .pile{position:absolute;inset:0}${S} .mw{position:absolute;padding-bottom:${Math.round(10 * u)}px;overflow:hidden}
+${S} .tb{display:flex;align-items:center;gap:${Math.round(7 * u)}px;padding:${Math.round(12 * u)}px ${Math.round(16 * u)}px;border-bottom:1px solid ${mode === 'dark' ? 'rgba(255,255,255,.08)' : 'rgba(15,23,42,.07)'};font-size:${Math.round(25 * u)}px}
+${S} .tb i{width:${Math.round(11 * u)}px;height:${Math.round(11 * u)}px;border-radius:50%;background:${mode === 'dark' ? '#3a3e4a' : '#d4d8df'}}${S} .tb b{margin-left:${Math.round(8 * u)}px;font-weight:600;opacity:.75}
+${S} .rw{padding:${Math.round(14 * u)}px ${Math.round(22 * u)}px;font:500 ${Math.round(28 * u)}px/1.25 ${MONO};opacity:.8;border-bottom:1px solid ${mode === 'dark' ? 'rgba(255,255,255,.05)' : 'rgba(15,23,42,.05)'}}
+${S} .alert{position:absolute;left:0;right:0;top:${Math.round(c.height * 0.4)}px;display:flex;align-items:center;justify-content:center;gap:${Math.round(26 * u)}px;padding:${Math.round(40 * u)}px;background:#c0392b;color:#fff;box-shadow:0 ${Math.round(30 * u)}px ${Math.round(80 * u)}px -${Math.round(20 * u)}px rgba(120,20,10,.6)}
+${S} .alert div{display:flex;flex-direction:column;gap:${Math.round(8 * u)}px}${S} .alert b{font:700 ${Math.round(64 * u)}px/1.05 var(--font-display);letter-spacing:-.02em}${S} .alert small{font-size:${Math.round(24 * u)}px;opacity:.85}`,
+          js:
+            b.js +
+            `tl.fromTo("${S} .mw",{opacity:0,y:${Math.round(60 * u)},scale:.9},{opacity:1,y:0,scale:1,duration:.55,ease:"back.out(1.6)",stagger:.22},.05);
+tl.to("${S} .mw",{x:"+=${Math.round(6 * u)}",duration:.07,repeat:${Math.max(4, Math.round((slam - 1.4) / 0.07))},yoyo:true,ease:"none",stagger:{each:.03,from:"random"}},1.3);
+tl.to("${S} .mw",{opacity:.35,filter:"blur(3px)",duration:.3},${(slam - 0.05).toFixed(2)});
+tl.fromTo("${S} .alert",{scaleY:0,opacity:0},{scaleY:1,opacity:1,duration:.32,ease:"expo.out"},${slam.toFixed(2)});
+tl.fromTo("${S} .alert div,${S} .alert svg",{x:-${Math.round(30 * u)},opacity:0},{x:0,opacity:1,duration:.45,ease:"expo.out",stagger:.06},${(slam + 0.12).toFixed(2)});
+tl.fromTo("${S} .pile",{x:0},{x:${Math.round(8 * u)},duration:.05,repeat:5,yoyo:true,ease:"none"},${slam.toFixed(2)});`,
+        };
+      },
+    },
+    {
+      id: 'rail',
+      label: 'Checks rail: an action passes (or is stopped)',
+      use: 'A safety or approval engine in motion: 3–5 checkpoint cards sit on a rail; one action (a pill like "Connection request → Priya") travels along it and each checkpoint ticks green. Optionally one checkpoint stops it (red, "Stopped · no retry"). Great for limits, approvals, guardrails, compliance.',
+      minSeconds: 4.5,
+      fields: [
+        { id: 'title', type: 'text', label: 'Headline', optional: true, max: 50, help: 'Wrap the key words in *stars*' },
+        { id: 'checks', type: 'list', label: 'Checkpoints', help: 'One per line: "Name — big value — small line" (3–5)' },
+        { id: 'token', type: 'text', label: 'The action', max: 40 },
+        { id: 'stop', type: 'number', label: 'Stopped at (1-based, 0 = passes)', optional: true },
+        { id: 'stopText', type: 'text', label: 'Stop label', optional: true, max: 30 },
+        { id: 'theme', type: 'text', label: 'Ground (light/dark)', optional: true },
+      ],
+      build: (f, c) => {
+        const { u, pad, S } = frame(c);
+        const mode = String(f.theme ?? 'light') === 'dark' ? 'dark' : 'light';
+        const b = bg(c, mode);
+        const checks = list(f.checks).slice(0, 5).map(parts);
+        const n = Math.max(checks.length, 1);
+        const stop = Math.min(Math.max(Number(f.stop) || 0, 0), n);
+        const W = c.width - pad.l - pad.r;
+        const gap = Math.round(22 * u);
+        const cw = (W - gap * (n - 1)) / n;
+        const tSize = fit(f.title, u, [[30, 70], [50, 58]], 50);
+        const headH = f.title ? tSize * 1.3 + 50 * u : 0;
+        const ch = Math.round(Math.min(430 * u, (c.height - pad.t - pad.b - headH) * 0.56));
+        const groupH = headH + ch + 70 * u + 90 * u;
+        const gTop = pad.t + Math.max(0, (c.height - pad.t - pad.b - groupH) / 2);
+        const top = gTop + headH;
+        const railY = top + ch + Math.round(70 * u);
+        const cx = (i: number) => pad.l + i * (cw + gap) + cw / 2;
+        const start = 1.3;
+        const per = Math.min(0.9, (c.duration - start - 1.2) / (stop || n));
+        let js = b.js + `tl.set("${S} .tick",{scale:0},0);` + wordIn(S, '.ttl', 0.05) + `tl.fromTo("${S} .ck",{opacity:0,y:${Math.round(30 * u)}},{opacity:1,y:0,duration:.6,ease:"expo.out",stagger:.1},.3);tl.fromTo("${S} .rl",{scaleX:0},{scaleX:1,duration:.8,ease:"power3.inOut"},.5);tl.fromTo("${S} .stem",{scaleY:0},{scaleY:1,duration:.4,ease:"power3.out",stagger:.08},.9);`;
+        js += `tl.fromTo("${S} .tok",{x:${pad.l - 40 * u},opacity:0},{x:${pad.l},opacity:1,duration:.25,ease:"power2.out"},${(start - 0.3).toFixed(2)});`;
+        const last = stop || n;
+        for (let i = 0; i < last; i++) {
+          const t = start + i * per;
+          js += `tl.to("${S} .tok",{x:${(cx(i) - 120 * u).toFixed(1)},duration:${(per * 0.6).toFixed(2)},ease:"power2.inOut"},${t.toFixed(2)});`;
+          if (stop && i === stop - 1) {
+            js += `tl.to("${S} .c${i} .ring.bad",{opacity:1,duration:.25},${(t + per * 0.6).toFixed(2)});tl.to("${S} .tok",{rotation:-3,duration:.06,repeat:5,yoyo:true,ease:"none"},${(t + per * 0.6).toFixed(2)});tl.to("${S} .tok",{backgroundColor:"#fee2e2",borderColor:"#ef4444",color:"#b91c1c",duration:.2},${(t + per * 0.6).toFixed(2)});tl.fromTo("${S} .stopx",{opacity:0,y:${Math.round(10 * u)}},{opacity:1,y:0,duration:.4,ease:"expo.out"},${(t + per * 0.7).toFixed(2)});`;
+          } else {
+            js += `tl.to("${S} .c${i} .ring.ok",{opacity:1,duration:.25},${(t + per * 0.6).toFixed(2)});tl.fromTo("${S} .c${i} .tick",{scale:0},{scale:1,duration:.35,ease:"back.out(3)"},${(t + per * 0.6).toFixed(2)});`;
+          }
+        }
+        if (!stop) js += `tl.to("${S} .tok",{x:${c.width - pad.r - 220 * u},duration:.6,ease:"power2.in"},${(start + n * per).toFixed(2)});tl.to("${S} .tok",{backgroundColor:"#dcfce7",borderColor:"#22c55e",color:"#15803d",duration:.2},${(start + n * per + 0.5).toFixed(2)});`;
+        return {
+          markup:
+            b.markup +
+            `${f.title ? `<h2 class="ttl" style="left:${pad.l}px;top:${gTop}px;font-size:${tSize}px">${words(f.title)}</h2>` : ''}
+${checks.map(([name, val, sub], i) => `<div class="ck card c${i}" style="left:${pad.l + i * (cw + gap)}px;top:${top}px;width:${cw}px;height:${ch}px"><i class="ring ok"></i><i class="ring bad"></i><span class="nm">${esc(name)}</span><b>${R(val ?? '')}</b>${sub ? `<small>${R(sub)}</small>` : ''}<span class="tick"><svg viewBox="0 0 24 24"><path d="M6.5 12.5l3.5 3.5L17.5 8.5" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div><i class="stem" style="left:${cx(i)}px;top:${top + ch}px;height:${railY - top - ch}px"></i>`).join('')}
+<i class="rl" style="left:${pad.l}px;right:${pad.r}px;top:${railY}px"></i>
+<div class="tok" style="top:${railY - 30 * u}px">${R(f.token ?? '')}</div>
+${stop ? `<div class="stopx" style="left:${cx(stop - 1) - 160 * u}px;top:${railY + 50 * u}px">${esc(f.stopText || 'Stopped · no retry')}</div>` : ''}`,
+          css:
+            b.css +
+            headCss(S) +
+            box(S, mode, u) +
+            `${S} .ttl{position:absolute}
+${S} .ck{position:absolute;padding:${Math.round(24 * u)}px;display:flex;flex-direction:column;gap:${Math.round(8 * u)}px}
+${S} .nm{font-size:${Math.round(27 * u)}px;opacity:.6}${S} .ck b{font:750 ${Math.round(62 * u)}px/1.05 var(--font-display);letter-spacing:-.02em;margin-top:auto}${S} .ck small{font-size:${Math.round(22 * u)}px;opacity:.55}
+${S} .ring{position:absolute;inset:-1px;border-radius:inherit;opacity:0;border:${Math.max(2, Math.round(2.5 * u))}px solid #22c55e}${S} .ring.bad{border-color:#ef4444;background:rgba(239,68,68,.06)}
+${S} .tick{position:absolute;right:${Math.round(18 * u)}px;top:${Math.round(18 * u)}px;width:${Math.round(34 * u)}px;height:${Math.round(34 * u)}px;border-radius:50%;background:#22c55e;display:grid;place-items:center}${S} .tick svg{width:70%;height:70%}
+${S} .stem{position:absolute;width:${Math.max(2, Math.round(2 * u))}px;background:color-mix(in srgb,var(--brand-primary) 55%,transparent);transform-origin:50% 0}
+${S} .rl{position:absolute;height:${Math.max(2, Math.round(3 * u))}px;background:color-mix(in srgb,var(--brand-primary) 70%,transparent);transform-origin:0 50%}
+${S} .tok{position:absolute;left:0;opacity:0;padding:${Math.round(14 * u)}px ${Math.round(22 * u)}px;border-radius:${Math.round(14 * u)}px;font:600 ${Math.round(30 * u)}px/1 var(--font-body);background:${mode === 'dark' ? '#1b1e26' : '#fff'};border:${Math.max(2, Math.round(2 * u))}px solid var(--brand-primary);box-shadow:0 ${Math.round(14 * u)}px ${Math.round(30 * u)}px -${Math.round(12 * u)}px rgba(0,0,0,.3);white-space:nowrap}
+${S} .stopx{position:absolute;width:${Math.round(320 * u)}px;text-align:center;font:700 ${Math.round(26 * u)}px/1 var(--font-body);color:#dc2626;opacity:0}`,
+          js,
+        };
+      },
+    },
+    {
       id: 'part',
       label: 'Part card (minimal)',
       use: 'A calm section opener for explainers: "PART 2" in small mono, the part title, a short accent rule. Use it between the parts of a feature video instead of the big chapter card.',
@@ -735,13 +861,13 @@ ${cursorSvg(u)}`,
 ${S} .op{position:absolute;padding:${Math.round(24 * u)}px;display:flex;flex-direction:column;gap:${Math.round(8 * u)}px}
 ${S} .ic{width:${Math.round(34 * u)}px;height:${Math.round(34 * u)}px;border-radius:${Math.round(9 * u)}px;background:color-mix(in srgb,var(--brand-primary) 18%,transparent);margin-bottom:${Math.round(8 * u)}px}
 ${S} .op b{font:700 ${Math.round(29 * u)}px/1.15 var(--font-display)}${S} .op small{font-size:${Math.round(20 * u)}px;opacity:.6;line-height:1.3}
-${S} .chk{position:absolute;right:${Math.round(16 * u)}px;top:${Math.round(16 * u)}px;width:${Math.round(34 * u)}px;height:${Math.round(34 * u)}px;border-radius:50%;background:var(--brand-primary);display:grid;place-items:center;transform:scale(0)}${S} .chk svg{width:70%;height:70%}
+${S} .chk{position:absolute;right:${Math.round(16 * u)}px;top:${Math.round(16 * u)}px;width:${Math.round(34 * u)}px;height:${Math.round(34 * u)}px;border-radius:50%;background:var(--brand-primary);display:grid;place-items:center}${S} .chk svg{width:70%;height:70%}
 ${S} .op .ring{position:absolute;inset:-1px;border-radius:inherit;opacity:0;border:${Math.max(2, Math.round(2.5 * u))}px solid var(--brand-primary);box-shadow:0 0 0 ${Math.max(2, Math.round(2.5 * u))}px var(--brand-primary),0 ${Math.round(18 * u)}px ${Math.round(40 * u)}px -${Math.round(20 * u)}px color-mix(in srgb,var(--brand-primary) 60%,transparent)}`,
           js:
             b.js +
             wordIn(S, '.ttl', 0.05) +
             has(`${S} .st`, `tl.fromTo("${S} .st",{opacity:0},{opacity:.6,duration:.6},.4);`) +
-            `tl.fromTo("${S} .op",{opacity:0,y:${Math.round(30 * u)}},{opacity:1,y:0,duration:.7,ease:"expo.out",stagger:.09},.45);
+            `tl.set("${S} .chk",{scale:0},0);tl.fromTo("${S} .op",{opacity:0,y:${Math.round(30 * u)}},{opacity:1,y:0,duration:.7,ease:"expo.out",stagger:.09},.45);
 tl.fromTo("${S} .cursor",{x:${c.width * 0.88},y:${c.height * 0.92},opacity:0},{x:${(gx(pick - 1) + cw * 0.55).toFixed(1)},y:${(gy(pick - 1) + ch * 0.55).toFixed(1)},opacity:1,duration:1.1,ease:"power3.inOut"},${(clickAt - 1.1).toFixed(2)});` +
             clickJs(S, clickAt) +
             `tl.to("${S} .o${pick - 1} .ring",{opacity:1,duration:.3,ease:"power2.out"},${(clickAt + 0.05).toFixed(2)});

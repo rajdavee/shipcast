@@ -345,8 +345,9 @@ export async function compileStoryboard(story: Storyboard, opts: { dir: string; 
       txJs.push(`tl.set("#${id}",{opacity:0},0);tl.fromTo("#${id}",{opacity:0},{opacity:1,duration:.22,ease:"power1.in",immediateRender:false},${f(at - 0.22)});tl.fromTo("#${id}",{opacity:1},{opacity:0,duration:.3,ease:"power1.out",immediateRender:false},${f(at)});`);
     } else if (kind === 'blur') {
       // A whip: the outgoing scene smears off, the next one lands out of the same blur.
-      const d = Math.round(width * 0.09);
-      txJs.push(`tl.fromTo("${prev}",{x:0,filter:"blur(0px)"},{x:${-d},filter:"blur(28px)",duration:.22,ease:"power3.in",immediateRender:false},${f(at - 0.22)});tl.fromTo("${next}",{x:${d},filter:"blur(28px)"},{x:0,filter:"blur(0px)",duration:.34,ease:"power3.out",immediateRender:false},${f(at)});`);
+      // Scaled up while it moves so no edge of the frame ever shows.
+      const d = Math.round(width * 0.05);
+      txJs.push(`tl.fromTo("${prev}",{x:0,scale:1,filter:"blur(0px)"},{x:${-d},scale:1.12,filter:"blur(28px)",duration:.22,ease:"power3.in",immediateRender:false},${f(at - 0.22)});tl.fromTo("${next}",{x:${d},scale:1.12,filter:"blur(28px)"},{x:0,scale:1,filter:"blur(0px)",duration:.34,ease:"power3.out",immediateRender:false},${f(at)});`);
     } else if (kind === 'push') {
       txJs.push(`tl.fromTo("${prev}",{xPercent:0},{xPercent:-100,duration:.42,ease:"power3.inOut",immediateRender:false},${f(at - 0.21)});tl.fromTo("${next}",{xPercent:100},{xPercent:0,duration:.42,ease:"power3.inOut",immediateRender:false},${f(at - 0.21)});`);
     } else if (kind === 'zoom') {
