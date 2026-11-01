@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { assertInHome, chatterboxSpeak, createService, elevenSpeak, engineEnv, finishVideo, getPreset, measureLoudness, probe, run, SERVICE_PORTS, voiceReady } from '@shipcast/engine';
+import { assertInHome, chatterboxSpeak, createService, elevenSpeak, engineEnv, finishVideo, getPreset, measureLoudness, probe, run, SERVICE_PORTS, npxRun, voiceReady } from '@shipcast/engine';
 import { alignScript, buildCues, toSrt, toVtt, type Word } from './align.ts';
 import { addSfx, makeMusic, MOODS, toWav, type Mood, type Sfx } from './synth.ts';
 
@@ -11,21 +11,9 @@ export * from './synth.ts';
 export const VOICES = ['af_heart', 'af_nova', 'af_sky', 'am_adam', 'am_michael', 'bf_emma', 'bf_isabella', 'bm_george'] as const;
 
 async function hf(args: string[], timeoutMs = 600_000) {
-  // engineEnv() points HyperFrames at Shipcast's managed Python (Kokoro).
-  const env = { ...process.env, ...engineEnv() };
-  const { spawn } = await import('node:child_process');
-  return new Promise<{ code: number; stdout: string; stderr: string }>((resolve) => {
-    const c = spawn('npx', ['-y', 'hyperframes', ...args], { env, stdio: ['ignore', 'pipe', 'pipe'] });
-    let stdout = '';
-    let stderr = '';
-    c.stdout.on('data', (d) => (stdout = (stdout + d).slice(-200_000)));
-    c.stderr.on('data', (d) => (stderr = (stderr + d).slice(-20_000)));
-    const t = setTimeout(() => c.kill('SIGTERM'), timeoutMs);
-    c.on('close', (code) => {
-      clearTimeout(t);
-      resolve({ code: code ?? 1, stdout, stderr });
-    });
-  });
+  // engineEnv() points HyperFrames at Shipcast's managed Python (Kokoro). Prefer the cached
+  // package so a registry hiccup can't stall speech.
+  return npxRun(['hyperframes', ...args], { env: { ...process.env, ...engineEnv() }, timeoutMs, cap: 400_000 });
 }
 
 const lastJson = (s: string) => {
@@ -102,7 +90,7 @@ export function createMediaService() {
           }
         }
         let engine = 'kokoro';
-        const r = await hf(['tts', text, '-v', voice, '-s', String(speed), '-o', wav, '--json']);
+        const r = await hf(['tts', text, '-v', voice, '-s', String(speed), '-o', wav, '--json'], 240_000);
         if (!lastJson(r.stdout)?.ok) {
           // Fallback: the OS voice, so a run never dies for lack of Kokoro.
           engine = 'system';

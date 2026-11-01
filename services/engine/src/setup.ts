@@ -58,7 +58,7 @@ export const SETUPS = {
   chrome: {
     label: 'Headless Chrome',
     async run(): Promise<{ ok: boolean; log: string }> {
-      const r = await run('npx', ['-y', 'hyperframes', 'browser', 'ensure'], { timeoutMs: 900_000 });
+      const r = await run('npx', ['-y', '--prefer-offline', 'hyperframes', 'browser', 'ensure'], { timeoutMs: 900_000 });
       return { ok: r.code === 0, log: (r.stdout + r.stderr).slice(-3000) };
     },
   },

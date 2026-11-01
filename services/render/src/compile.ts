@@ -298,9 +298,9 @@ export async function compileStoryboard(story: Storyboard, opts: { dir: string; 
       await writeFile(join(dir, 'compositions', `${e.id}.html`), subcomp(e.id, width, height, part, punchesFor(e)));
       hosts.push(`<div id="host-${e.id}" data-composition-id="${e.id}" data-composition-src="compositions/${e.id}.html" data-start="${e.start}" data-duration="${e.duration}" data-track-index="1" data-width="${width}" data-height="${height}"></div>`);
     } else if (e.sc.block) {
-      const r = await run('npx', ['-y', 'hyperframes', 'add', e.sc.block, '--no-clipboard'], { cwd: dir, timeoutMs: 180_000 });
+      const r = await run('npx', ['-y', '--prefer-offline', 'hyperframes', 'add', e.sc.block, '--no-clipboard'], { cwd: dir, timeoutMs: 180_000 });
       if (!existsSync(join(dir, 'compositions', `${e.sc.block}.html`))) {
-        const r2 = r.code === 0 ? r : await run('npx', ['-y', 'hyperframes', 'add', e.sc.block], { cwd: dir, timeoutMs: 180_000 });
+        const r2 = r.code === 0 ? r : await run('npx', ['-y', '--prefer-offline', 'hyperframes', 'add', e.sc.block], { cwd: dir, timeoutMs: 180_000 });
         if (!existsSync(join(dir, 'compositions', `${e.sc.block}.html`))) throw new Error(`could not add registry block ${e.sc.block}: ${(r2.stderr || r2.stdout).slice(-200)}`);
       }
       const vals = esc(JSON.stringify(e.sc.variables ?? {}));

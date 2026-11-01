@@ -2,7 +2,7 @@ import { copyFile, mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
-import { assertInHome, callService, contactSheet, createService, home, PRESETS, presetForSize, run, SERVICE_PORTS, engineEnv, chatterboxReady, findBroll, getSecret, readSettings } from '@shipcast/engine';
+import { assertInHome, callService, contactSheet, createService, home, PRESETS, presetForSize, run, SERVICE_PORTS, npxRun, engineEnv, chatterboxReady, findBroll, getSecret, readSettings } from '@shipcast/engine';
 import { SCENES } from './scenes.ts';
 import { CAPTION_STYLES } from './captions.ts';
 import { compileStoryboard, validateStoryboard, type Storyboard } from './compile.ts';
@@ -47,19 +47,7 @@ async function hfRender(args: string[], cwd: string) {
 }
 
 async function hf(args: string[], cwd: string, timeoutMs = 1_800_000) {
-  const { spawn } = await import('node:child_process');
-  return new Promise<{ code: number; stdout: string; stderr: string }>((resolve) => {
-    const c = spawn('npx', ['-y', 'hyperframes', ...args], { cwd, env: { ...process.env, ...engineEnv() }, stdio: ['ignore', 'pipe', 'pipe'] });
-    let stdout = '';
-    let stderr = '';
-    c.stdout.on('data', (d) => (stdout = (stdout + d).slice(-100_000)));
-    c.stderr.on('data', (d) => (stderr = (stderr + d).slice(-40_000)));
-    const t = setTimeout(() => c.kill('SIGTERM'), timeoutMs);
-    c.on('close', (code) => {
-      clearTimeout(t);
-      resolve({ code: code ?? 1, stdout, stderr });
-    });
-  });
+  return npxRun(['hyperframes', ...args], { cwd, env: { ...process.env, ...engineEnv() }, timeoutMs, cap: 200_000 });
 }
 
 /**

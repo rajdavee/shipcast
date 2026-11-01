@@ -125,7 +125,7 @@ export function checkCaptions(srt: string): Report {
 
 /** HyperFrames' own runtime checks (layout overflow, contrast, motion) on a composition folder. */
 export async function checkComposition(dir: string): Promise<Report> {
-  const r = await run('npx', ['-y', 'hyperframes', 'check', dir, '--json', '--samples', '9', '--at-transitions'], { timeoutMs: 600_000 });
+  const r = await run('npx', ['-y', '--prefer-offline', 'hyperframes', 'check', dir, '--json', '--samples', '9', '--at-transitions'], { timeoutMs: 600_000 });
   let parsed: any = null;
   try {
     parsed = JSON.parse(r.stdout.slice(r.stdout.indexOf('{')));
