@@ -678,6 +678,9 @@ tl.fromTo("${S} .dot",{scale:.4},{scale:1,duration:.5,ease:"back.out(2.2)",stagg
         const kidY = vertical ? H * 0.58 : H * 0.6;
         const rootH = Math.round(150 * u);
         const xs = kids.map((_, i) => (W / kids.length) * (i + 0.5));
+        // Branch values must fit their card: size by the longest one and the card width.
+        const longest = Math.max(4, ...kids.map(([, v]) => String(v ?? '').replace(/[*+~]/g, '').length));
+        const valSize = Math.round(Math.min(50 * u, (kidW - 52 * u) / (longest * 0.56)));
         const paths = xs.map((x) => `M${W / 2},${rootY + rootH} C${W / 2},${(rootY + rootH + kidY) / 2} ${x},${(rootY + rootH + kidY) / 2} ${x},${kidY}`);
         return {
           markup:
@@ -697,7 +700,7 @@ ${S} .root img{width:${Math.round(150 * u)}px;height:100%;object-fit:cover;borde
 ${S} .root div{display:flex;flex-direction:column;gap:${Math.round(6 * u)}px;min-width:0}${S} .rk{font:600 ${Math.round(15 * u)}px/1 ${MONO};letter-spacing:.16em;text-transform:uppercase;color:${accent}}
 ${S} .root b{font:700 ${Math.round(36 * u)}px/1.1 var(--font-display)}${S} .root small{font-size:${Math.round(20 * u)}px;opacity:.6}
 ${S} .kid{position:absolute;display:flex;flex-direction:column;align-items:flex-start;gap:${Math.round(8 * u)}px;padding:${Math.round(22 * u)}px ${Math.round(26 * u)}px}
-${S} .who{font-size:${Math.round(22 * u)}px;opacity:.75}${S} .kid b{font:800 ${Math.round(50 * u)}px/1 var(--font-display);letter-spacing:-.02em;color:#34d399}${S} .kid b .acc{color:inherit}
+${S} .who{font-size:${Math.round(22 * u)}px;opacity:.75}${S} .kid b{font:800 ${valSize}px/1.05 var(--font-display);letter-spacing:-.02em;color:#34d399;overflow-wrap:anywhere;max-width:100%}${S} .kid b .acc{color:inherit}
 ${S} .tag{font:600 ${Math.round(15 * u)}px/1 ${MONO};letter-spacing:.06em;padding:${Math.round(7 * u)}px ${Math.round(11 * u)}px;border-radius:${Math.round(8 * u)}px;background:color-mix(in srgb,${accent} 18%,transparent);color:${accent}}`,
           js:
             b.js +
