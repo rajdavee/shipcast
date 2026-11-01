@@ -142,7 +142,10 @@ ${S} .pos{color:#34d399;font-weight:700}${S} .mut{opacity:.55}${S} b.acc{font-we
         const { w: iw, h: ih } = dim;
         // Overview: the whole screen when it fits, else full width from the top (tall pages).
         const tall = ih / iw > (VH / VW) * 1.9;
-        const s0 = tall ? VW / iw : Math.min(VW / iw, VH / ih);
+        // Tall frames (4:5, 9:16): never shrink a wide screen to a sliver — show it at a readable
+        // scale in a window that fills the space, and let the camera pan.
+        const narrow = c.height >= c.width * 1.1;
+        const s0 = tall ? VW / iw : narrow ? Math.min(VH / ih, (VW / iw) * 2.2) : Math.min(VW / iw, VH / ih);
         const WW = Math.round(Math.min(VW, iw * s0));
         const WH = Math.round(Math.min(VH, ih * s0));
         const WX = Math.round(VX + (VW - WW) / 2);
@@ -153,7 +156,7 @@ ${S} .pos{color:#34d399;font-weight:700}${S} .mut{opacity:.55}${S} b.acc{font-we
           const bw = st.w * iw;
           const bh = st.h * ih;
           // Fill ~2/3 of the window with the region, but keep context around small targets.
-          let s = Math.min((WW * 0.66) / bw, (WH * 0.56) / bh, s0 * 2.1);
+          let s = Math.min((WW * 0.66) / bw, (WH * 0.56) / bh, s0 * (narrow ? 1.7 : 2.1));
           s = Math.max(s, s0 * 1.08);
           if (st.zoom) s = s0 * Math.min(Math.max(st.zoom, 1), 3);
           const cx = (st.x + st.w / 2) * iw;
@@ -345,7 +348,7 @@ ${S} .chip .txt{font:500 ${Math.round(29 * u)}px/1.2 var(--font-body)}${S} .pos{
 ${S} .tb{display:flex;align-items:center;gap:${Math.round(7 * u)}px;padding:${Math.round(12 * u)}px ${Math.round(16 * u)}px;border-bottom:1px solid ${mode === 'dark' ? 'rgba(255,255,255,.08)' : 'rgba(15,23,42,.07)'};font-size:${Math.round(25 * u)}px}
 ${S} .tb i{width:${Math.round(11 * u)}px;height:${Math.round(11 * u)}px;border-radius:50%;background:${mode === 'dark' ? '#3a3e4a' : '#d4d8df'}}${S} .tb b{margin-left:${Math.round(8 * u)}px;font-weight:600;opacity:.75}
 ${S} .rw{padding:${Math.round(14 * u)}px ${Math.round(22 * u)}px;font:500 ${Math.round(28 * u)}px/1.25 ${MONO};opacity:.8;border-bottom:1px solid ${mode === 'dark' ? 'rgba(255,255,255,.05)' : 'rgba(15,23,42,.05)'}}
-${S} .alert{position:absolute;left:0;right:0;top:${Math.round(c.height * 0.4)}px;display:flex;align-items:center;justify-content:center;gap:${Math.round(26 * u)}px;padding:${Math.round(40 * u)}px;background:#c0392b;color:#fff;box-shadow:0 ${Math.round(30 * u)}px ${Math.round(80 * u)}px -${Math.round(20 * u)}px rgba(120,20,10,.6)}
+${S} .alert{position:absolute;left:0;right:0;top:${Math.round(Math.min(c.height * 0.4, c.height - Math.max(c.captionBand ?? 0, frame(c).pad.b) - 260 * u))}px;display:flex;align-items:center;justify-content:center;gap:${Math.round(26 * u)}px;padding:${Math.round(40 * u)}px;background:#c0392b;color:#fff;box-shadow:0 ${Math.round(30 * u)}px ${Math.round(80 * u)}px -${Math.round(20 * u)}px rgba(120,20,10,.6)}
 ${S} .alert div{display:flex;flex-direction:column;gap:${Math.round(8 * u)}px}${S} .alert b{font:700 ${Math.round(64 * u)}px/1.05 var(--font-display);letter-spacing:-.02em}${S} .alert small{font-size:${Math.round(24 * u)}px;opacity:.85}`,
           js:
             b.js +
