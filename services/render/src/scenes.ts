@@ -70,9 +70,15 @@ function words(text: unknown, cls = 'w'): string {
         .filter(Boolean)
         .map((w) => ({ w, accent }));
     });
-  // Punctuation that followed an accented phrase ("*finished*.") hugs the previous word.
-  return tokens
-    .map(({ w, accent }, i) => `${i && !/^[.,!?;:…)%]+$/.test(w) ? ' ' : ''}<span class="${cls}-m"><span class="${cls}${accent ? ' acc' : ''}">${w}</span></span>`)
+  // Punctuation that followed an accented phrase ("*finished*.") hugs the previous word, inside the
+  // same unbreakable box so it can never wrap onto a line of its own.
+  const merged: { w: string; accent: boolean; tail: string }[] = [];
+  for (const t of tokens) {
+    if (merged.length && /^[.,!?;:…)%]+$/.test(t.w)) merged[merged.length - 1].tail += t.w;
+    else merged.push({ ...t, tail: '' });
+  }
+  return merged
+    .map(({ w, accent, tail }, i) => `${i ? ' ' : ''}<span class="${cls}-m"><span class="${cls}${accent ? ' acc' : ''}">${w}${tail}</span></span>`)
     .join('');
 }
 
@@ -176,7 +182,8 @@ export const SCENES: SceneDef[] = [
       const { u, vertical, S } = frame(c);
       const b = bg(c, 'light');
       const size = fit(f.text, u, vertical ? [[30, 120], [60, 96], [110, 78]] : [[30, 128], [60, 104], [110, 84]], 70);
-      const html = esc(f.text).replace(/\*([^*]+)\*/g, '<mark><span class="t">$1</span><span class="hl" aria-hidden="true">$1</span></mark>');
+      // Punctuation right after the phrase stays on its line (never a lone "," at the start of the next).
+      const html = esc(f.text).replace(/\*([^*]+)\*([.,!?;:…)%]*)/g, '<span style="white-space:nowrap"><mark><span class="t">$1</span><span class="hl" aria-hidden="true">$1</span></mark>$2</span>');
       return {
         markup: b.markup + stage(c, `<h2 style="font-size:${size}px">${html}</h2>`),
         css: b.css + headCss(S) + `${S} mark{position:relative;display:inline-block;background:none;color:inherit;padding:0 .08em}

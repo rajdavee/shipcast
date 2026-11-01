@@ -96,6 +96,11 @@ tl.fromTo("${S} .ripple",{scale:.3,opacity:.9},{scale:1.8,opacity:0,duration:.6,
 export function explainerScenes(k: Kit): SceneDef[] {
   const { frame, bg, words, fit, img, headCss, has, wordIn, list, esc, readableOnDark } = k;
   const R = (s: unknown) => rich(esc, s);
+  /** Diagrams sit on a big landscape frame with little else in it: run their type larger there. */
+  const big = (c: SceneCtx) => {
+    const fr = frame(c);
+    return { ...fr, u: fr.u * (c.width > c.height * 1.2 ? 1.3 : 1.08) };
+  };
   /** Mono kicker + heading used by every diagram scene. */
   const head = (f: Record<string, any>, c: SceneCtx, size: number) => `${f.kicker ? `<div class="kick">${esc(f.kicker)}</div>` : ''}${f.title ? `<h2 class="ttl" style="font-size:${size}px">${words(f.title)}</h2>` : ''}`;
   const headStyles = (S: string, u: number, accent: string) => `${S} .kick{font:600 ${Math.round(21 * u)}px/1 ${MONO};letter-spacing:.2em;text-transform:uppercase;color:${accent};margin-bottom:${Math.round(18 * u)}px}
@@ -470,7 +475,7 @@ tl.fromTo("${S} .part",{scale:1},{scale:1.03,duration:${c.duration},ease:"none"}
         { id: 'theme', type: 'text', label: 'Ground (dark/light)', optional: true },
       ],
       build: (f, c) => {
-        const { u, vertical, pad, S } = frame(c);
+        const { u, vertical, pad, S } = big(c);
         const mode = modeOf(f);
         const b = bg(c, mode);
         const accent = accentFor(c, mode);
@@ -530,7 +535,7 @@ ${S} .arr span{position:absolute;left:${Math.round(40 * u)}px;top:0;font:650 ${M
         { id: 'theme', type: 'text', label: 'Ground (dark/light)', optional: true },
       ],
       build: (f, c) => {
-        const { u, pad, S } = frame(c);
+        const { u, pad, S } = big(c);
         const mode = modeOf(f);
         const b = bg(c, mode);
         const accent = accentFor(c, mode);
@@ -578,7 +583,7 @@ tl.fromTo("${S} .tr:not(.th)",{opacity:0,y:${Math.round(14 * u)}},{opacity:1,y:0
         { id: 'theme', type: 'text', label: 'Ground (dark/light)', optional: true },
       ],
       build: (f, c) => {
-        const { u, vertical, pad, S } = frame(c);
+        const { u, vertical, pad, S } = big(c);
         const mode = modeOf(f);
         const b = bg(c, mode);
         const accent = accentFor(c, mode);
@@ -624,12 +629,13 @@ tl.fromTo("${S} .dot",{scale:.4},{scale:1,duration:.5,ease:"back.out(2.2)",stagg
       fields: [
         { id: 'kicker', type: 'text', label: 'Kicker', optional: true, max: 40 },
         { id: 'root', type: 'text', label: 'Root', help: '"Title — small line"' },
+        { id: 'rootLabel', type: 'text', label: 'Root label', optional: true, max: 30, help: 'Tiny mono label above the root, e.g. "One shared record"' },
         { id: 'image', type: 'image', label: 'Root thumbnail', optional: true },
         { id: 'items', type: 'list', label: 'Branches', help: 'One per line: "Who — *value* — tag"' },
         { id: 'theme', type: 'text', label: 'Ground (dark/light)', optional: true },
       ],
       build: (f, c) => {
-        const { u, vertical, pad, S } = frame(c);
+        const { u, vertical, pad, S } = big(c);
         const mode = modeOf(f);
         const b = bg(c, mode);
         const accent = accentFor(c, mode);
@@ -649,7 +655,7 @@ tl.fromTo("${S} .dot",{scale:.4},{scale:1,duration:.5,ease:"back.out(2.2)",stagg
             b.markup +
             `${f.kicker ? `<div class="kick" style="position:absolute;left:${pad.l}px;top:${pad.t}px">${esc(f.kicker)}</div>` : ''}<div class="tw" style="left:${pad.l}px;top:${pad.t + (f.kicker ? 50 * u : 0)}px;width:${W}px;height:${H}px">
 <svg class="ln" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${paths.map((d) => `<path d="${d}" fill="none" stroke="${accent}" stroke-width="${Math.max(2, 2.6 * u)}" stroke-opacity=".75" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"/>`).join('')}</svg>
-<div class="root card" style="left:${(W - rootW) / 2}px;top:${rootY}px;width:${rootW}px;height:${rootH}px">${f.image ? `<img src="${img(f.image, c)}" alt="">` : ''}<div><span class="rk">${esc(c.brand.name)} · shared record</span><b>${R(rt)}</b>${rsub ? `<small>${R(rsub)}</small>` : ''}</div></div>
+<div class="root card" style="left:${(W - rootW) / 2}px;top:${rootY}px;width:${rootW}px;height:${rootH}px">${f.image ? `<img src="${img(f.image, c)}" alt="">` : ''}<div>${f.rootLabel ? `<span class="rk">${esc(f.rootLabel)}</span>` : ''}<b>${R(rt)}</b>${rsub ? `<small>${R(rsub)}</small>` : ''}</div></div>
 ${kids.map(([who, val, tag], i) => `<div class="kid card k${i}" style="left:${xs[i] - kidW / 2}px;top:${kidY}px;width:${kidW}px"><span class="who">${R(who)}</span><b>${R(val ?? '')}</b>${tag ? `<span class="tag">${esc(tag)}</span>` : ''}</div>`).join('')}</div>`,
           css:
             b.css +
@@ -686,7 +692,7 @@ tl.fromTo("${S} .tw",{scale:1},{scale:1.025,duration:${c.duration},ease:"none",t
         { id: 'theme', type: 'text', label: 'Ground (dark/light)', optional: true },
       ],
       build: (f, c) => {
-        const { u, vertical, pad, S } = frame(c);
+        const { u, vertical, pad, S } = big(c);
         const mode = modeOf(f);
         const b = bg(c, mode);
         const accent = accentFor(c, mode);
@@ -729,7 +735,7 @@ tl.to("${S} .it path",{strokeDashoffset:0,duration:.35,ease:"power2.out",stagger
         { id: 'theme', type: 'text', label: 'Ground (dark/light)', optional: true },
       ],
       build: (f, c) => {
-        const { u, pad, S } = frame(c);
+        const { u, pad, S } = big(c);
         const mode = modeOf(f);
         const b = bg(c, mode);
         const accent = accentFor(c, mode);

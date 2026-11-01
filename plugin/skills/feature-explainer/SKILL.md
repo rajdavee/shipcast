@@ -114,7 +114,11 @@ Set `"chapterCards": "part"` so parts open with the calm "PART 2" card, and
   workspace.
 
 **Look**
-- Default ground is dark with the brand accent (calm, editorial). Music: a
+- Default ground is dark with the brand accent (calm, editorial). Keep the
+  whole video on that one ground: `statement`, `title` and `stat` switch to a
+  light or brand ground, so in an explainer say those lines with a `part`
+  card, a diagram or a walkthrough chip instead. The `outro` is the one
+  brand-coloured moment. Music: a
   low bed (`"mood": "chill"` or `"cinematic"`, `"gainDb": -24`) — the voice
   leads. Captions `"none"` unless the prompt asks (chips already carry the
   words); keep `clean` for social cut-downs.
