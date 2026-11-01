@@ -224,8 +224,9 @@ export async function stopApp(c: Campaign): Promise<string[]> {
     if (app.external) continue;
     const cmds = (Array.isArray(app.stop) ? app.stop : app.stop ? [app.stop] : []).map(String).slice(0, 10);
     for (const cmd of cmds) {
-      const r = await run('/bin/sh', ['-c', cmd], { cwd: join(d, 'work', 'app'), timeoutMs: 120_000 }).catch(() => ({ code: 1 }));
-      done.push(`${r.code === 0 ? 'stopped' : 'could not stop'}: ${cmd.slice(0, 80)}`);
+      // Stop commands run from the step's folder (the same place app-run worked from).
+      const r = await run('/bin/sh', ['-c', cmd], { cwd: d, timeoutMs: 180_000 }).catch((e) => ({ code: 1, stdout: '', stderr: String(e) }));
+      done.push(r.code === 0 ? `stopped: ${cmd.slice(0, 80)}` : `could not stop: ${cmd.slice(0, 80)} — ${(r.stderr || r.stdout || '').trim().split('\n').slice(-1)[0]?.slice(0, 160) ?? ''}`);
     }
   }
   return done;

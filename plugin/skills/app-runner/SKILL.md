@@ -103,7 +103,8 @@ Write `out/app.json`:
 and `out/setup.md` (what you did, what failed and how you fixed it, what
 was disabled). Leave the app running for the next step.
 
-`stop` lists only what *you* started; Shipcast runs it when the campaign is
+`stop` commands run from this step's folder (where `work/` and `out/` live), so
+write paths like `work/app/docker-compose.yml`. `stop` lists only what *you* started; Shipcast runs it when the campaign is
 packaged. Stop by the PIDs you started (and their process groups) and by your
 own compose project name — never by port (`lsof -ti:<port> | xargs kill` can
 kill the user's own servers) and never with broad `pkill` patterns. If you used an app that was already running (yours to keep, not
