@@ -111,7 +111,7 @@ ${S} .pos{color:#34d399;font-weight:700}${S} .mut{opacity:.55}${S} b.acc{font-we
   const modeOf = (f: Record<string, any>): 'dark' | 'light' => (String(f.theme ?? '').toLowerCase() === 'light' ? 'light' : 'dark');
   const box = (S: string, mode: 'dark' | 'light', u: number) =>
     mode === 'dark'
-      ? `${S} .card{background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.1);border-radius:${Math.round(16 * u)}px}`
+      ? `${S} .card{background:linear-gradient(180deg,rgba(255,255,255,.085),rgba(255,255,255,.05));border:1px solid rgba(255,255,255,.14);border-radius:${Math.round(16 * u)}px;box-shadow:0 ${Math.round(20 * u)}px ${Math.round(50 * u)}px -${Math.round(24 * u)}px rgba(0,0,0,.6)}`
       : `${S} .card{background:#fff;border:1px solid rgba(15,23,42,.09);border-radius:${Math.round(16 * u)}px;box-shadow:0 ${Math.round(18 * u)}px ${Math.round(40 * u)}px -${Math.round(22 * u)}px rgba(15,23,42,.25)}`;
 
   return [
@@ -314,7 +314,7 @@ ${S} .chip .txt{font:500 ${Math.round(29 * u)}px/1.2 var(--font-body)}${S} .pos{
         { id: 'theme', type: 'text', label: 'Ground (light/dark)', optional: true },
       ],
       build: (f, c) => {
-        const { u, S } = frame(c);
+        const { u, S } = big(c);
         const mode = String(f.theme ?? 'light') === 'dark' ? 'dark' : 'light';
         const b = bg(c, mode);
         const wins = list(f.windows).slice(0, 5).map((l) => {
@@ -372,7 +372,7 @@ tl.fromTo("${S} .pile",{x:0},{x:${Math.round(8 * u)},duration:.05,repeat:5,yoyo:
         { id: 'theme', type: 'text', label: 'Ground (light/dark)', optional: true },
       ],
       build: (f, c) => {
-        const { u, pad, S } = frame(c);
+        const { u, pad, S } = big(c);
         const mode = String(f.theme ?? 'light') === 'dark' ? 'dark' : 'light';
         const b = bg(c, mode);
         const checks = list(f.checks).slice(0, 5).map(parts);
@@ -782,7 +782,7 @@ tl.fromTo("${S} .cell svg",{scale:0},{scale:1,duration:.4,ease:"back.out(2.4)",s
         { id: 'theme', type: 'text', label: 'Ground (light/dark)', optional: true },
       ],
       build: (f, c) => {
-        const { u, vertical, pad, S } = frame(c);
+        const { u, vertical, pad, S } = big(c);
         const mode = String(f.theme ?? 'light') === 'dark' ? 'dark' : 'light';
         const b = bg(c, mode);
         const accent = accentFor(c, mode);
@@ -834,7 +834,7 @@ tl.fromTo("${S} .frm",{rotation:0},{rotation:.001,duration:${c.duration},ease:"n
         { id: 'theme', type: 'text', label: 'Ground (light/dark)', optional: true },
       ],
       build: (f, c) => {
-        const { u, vertical, pad, S } = frame(c);
+        const { u, vertical, pad, S } = big(c);
         const mode = String(f.theme ?? 'light') === 'dark' ? 'dark' : 'light';
         const b = bg(c, mode);
         const accent = accentFor(c, mode);
