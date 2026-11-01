@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.0.0 — 2026-11-02
+
+Ready to leave running: long campaigns look after themselves, your app and your disk.
+
+- **Your app has a lifecycle** — app setup records how to start and stop it (with PID files). Shipcast restarts it before any step that needs it (after a sleep or reboot), stops it when a campaign is packaged, deleted, or stops short after a failure or cancel, and the campaign page has a *Your app* bar with Start and Stop.
+- **Claude usage limits pause, not fail** — the reset time is read from the limit message; steps that need Claude wait (renders and packaging keep going) and the interrupted session resumes by itself. The card shows when.
+- **Unlock more** — keys the app step couldn't get are listed with what they unlock; add one later and Shipcast wires it in, restarts the app and captures again.
+- **Safety check before running a project** — known worm loaders (`global['!']`, `global.i=`), eval of decoded data, code hidden past long whitespace in configs, install hooks that download code and auto-run VS Code tasks pause the app step until you type RUN.
+- **Disk** — render leftovers are cleared after the hub; *Free up disk space…* shows the size and can drop the app copy.
+- **Progress for long runs** — a stage strip (research → run the app → capture → plan → assets n of m → package), a time-left estimate, and browser notifications when it needs you or is ready.
+- **Re-render all with the latest engine** — every finished video, carousel and post re-renders from its spec, chapters included, then the hub rebuilds.
+- **Engine** — explainers with captions keep chips in the top row and diagrams shrink to fit; 4:5 videos keep captions in a lower third; long chips wrap; tree values and wrapped headlines fit; captions step aside for the outro; dark logos sit on white chips everywhere; service calls ride out restarts; stuck child processes are killed by group; npx heals a broken cache.
+- **Doctor** checks Docker and zip for full campaigns. 45 tests cover the full-campaign flows end to end.
+
 ## 0.9.0 — 2026-11-01
 
 Point it at your app and walk away: a full campaign, explained on the real product.

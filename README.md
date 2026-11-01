@@ -160,6 +160,32 @@ Copy is checked against platform limits (LinkedIn's "see more" fold, X's 280,
 YouTube's 60-character titles) and a list of AI clichés. Problems go back to
 Claude with the fix hint; you see what passed.
 
+## A real run: Umami, from repo to campaign
+
+We pointed Shipcast at [`umami-software/umami`](https://github.com/umami-software/umami)
+(MIT) from the Home page — *Full campaign from your app*, size Focused, no env
+vars — and left it. It cloned the repo, ran Next.js 16 with a throwaway
+PostgreSQL in Docker (pinning the repo's pnpm without touching the system),
+seeded 90 days of fictional traffic for two sites, kept a small script sending
+live visits so Realtime has something to show, logged in, and captured 67
+screens and filmed flows with exact element positions. Then it planned the
+campaign — *"The complete picture of your website, without the cookie banner"* —
+made seven assets, packaged them in an offline hub, and stopped the database it
+started.
+
+<p align="center">
+  <a href="docs/assets/umami-launch.mp4"><img src="docs/assets/umami-launch.jpg" alt="Umami launch film made by Shipcast: the real dashboard with sample data" width="900" /></a><br />
+  <sub>▶ <a href="docs/assets/umami-launch.mp4">Launch film (46 s)</a> — real UI, a filmed realtime flow that zooms on each click, captions, an original score.</sub>
+</p>
+<p align="center">
+  <img src="docs/assets/umami-explainer.jpg" alt="Frames from the 3½-minute feature explainer: walkthroughs with highlights and caption chips, a filter tree, funnel table, flows and the revenue report" width="900" /><br />
+  <sub>Frames from the 3½-minute <b>Feature Explainer</b> ("From pageview to paid"): every rule checked in Umami's code first.</sub>
+</p>
+<p align="center">
+  <img src="docs/assets/umami-hub.jpg" alt="The offline campaign hub: launch film, explainer, reel, carousels, posts, copy and a posting calendar" width="640" /><br />
+  <sub>The campaign hub — one folder that plays offline, plus a zip.</sub>
+</p>
+
 ## How it works
 
 ```
@@ -193,7 +219,9 @@ changed), with sample data only. Env values live in the campaign's
 `secrets.env` (mode 600), are passed to Claude's shell, never shown again in
 the UI, and are scrubbed from every output file. Claude stops at any
 confirmation that would send, delete or pay for real, and the hub step stops
-the processes it started.
+the processes it started. Before anything runs, the project is scanned for
+known malicious loaders and install hooks; a hit pauses the run until you type
+RUN.
 
 ## Development
 
