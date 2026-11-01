@@ -13,6 +13,7 @@ import { defaultOptions, getPack, loadPacks, renderTemplate } from './packs.ts';
 import { buildHub, notifyDesktop } from './hub.ts';
 import { appInfo, appUp, campaignIdle, startApp, stopApp, tidyCampaign } from './applife.ts';
 import { parseUsageReset, setUsagePause, usagePause } from './usage.ts';
+import { scanSource } from './scan.ts';
 import { runClaude, type StreamEvent } from './claude.ts';
 import { cloneRepo, parseRepo } from './github.ts';
 import { matchOutputs } from './files.ts';
@@ -292,6 +293,24 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
       if (pack.context) {
         const earlier = campaign.steps.filter((s) => s.kind === 'pack' && s.status === 'done' && s.id !== step.id);
         if (earlier.length) prompt += `\n\n## Earlier steps in this campaign\n${earlier.map((s) => `- ${s.pack}: ${join(dir, 'deliverables', s.id, 'out')}/`).join('\n')}`;
+      }
+      if (pack.id === 'app-run' && !(note && /run it anyway: *RUN *$/im.test(note))) {
+        // Installing and running a project executes its code: look for known loaders first.
+        const root = campaign.source.type === 'local' ? campaign.source.value : join(dir, 'source');
+        const found = await scanSource(root).catch(() => []);
+        if (found.length) {
+          const where = found.slice(0, 4).map((x) => `${x.file}:${x.line} — ${x.why}`).join('; ');
+          await log({ step: step.id, type: 'log', text: `Safety check found ${found.length} suspicious pattern(s): ${where}` });
+          await updateStep(id, step.id, {
+            status: 'needs-input',
+            phase: undefined,
+            worker: undefined,
+            pendingNote: undefined,
+            question: { text: `Shipcast found code in this project that looks malicious. Running the app would execute it on this computer. Type RUN to continue anyway, or cancel and clean the repo first.`, why: where.slice(0, 400), fields: [{ key: 'confirm', label: 'Type RUN to run it anyway', secret: false, placeholder: 'RUN' }] },
+          });
+          await notifyDesktop(`${campaign.name}: safety check`, 'Suspicious code found — Shipcast is waiting for you.');
+          return;
+        }
       }
       if (pack.app && pack.id !== 'app-run' && !step.renderOnly) {
         // After a sleep, reboot or stop the app may be gone: bring it back before Claude needs it.

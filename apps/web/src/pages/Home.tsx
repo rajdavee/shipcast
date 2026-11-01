@@ -193,7 +193,7 @@ export function Home({ status, services, campaigns }: { status: Status | null; s
                   </button>
                 ))}
               </div>
-              <p className="hint">Your repo is copied first — the original folder is never changed. Nothing is published or uploaded; if something can't be fixed locally (a missing key, a login), Shipcast pauses and asks you here.</p>
+              <p className="hint">Your repo is copied first — the original folder is never changed — and checked for known malicious code before anything runs. Installs and dev servers run on this computer, so only use projects you trust. Nothing is published or uploaded; if something can't be fixed locally (a missing key, a login), Shipcast pauses and asks you here.</p>
               <div className="row-actions" style={{ justifyContent: 'flex-end' }}>
                 <button className="btn primary lg" disabled={busy || !claudeReady} onClick={makeFull}>{busy ? 'Starting…' : 'Start the full campaign'}</button>
               </div>
