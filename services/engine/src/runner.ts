@@ -68,7 +68,7 @@ export async function recoverOrphans(): Promise<number> {
 }
 
 /** Decide which step of a campaign should run next, and mark blocked steps. */
-const TRANSIENT = /ENOTFOUND|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|Can't reach the API|socket hang up|overloaded|\b529\b|\b503\b|rate.?limit/i;
+const TRANSIENT = /fetch failed|ENOTFOUND|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|Can't reach the API|socket hang up|overloaded|\b529\b|\b503\b|rate.?limit/i;
 
 export function pickStep(c: Campaign): Step | 'busy' | null {
   if (c.steps.some((s) => s.status === 'running')) return 'busy';
