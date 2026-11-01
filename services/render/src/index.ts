@@ -1,5 +1,5 @@
 import { copyFile, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { assertInHome, callService, contactSheet, createService, home, PRESETS, presetForSize, run, SERVICE_PORTS, npxRun, engineEnv, chatterboxReady, findBroll, getSecret, readSettings } from '@shipcast/engine';
@@ -134,6 +134,17 @@ const ts = (sec: number) => {
  * master pass go over the whole thing. Also writes YouTube chapter
  * timestamps and a full SRT.
  */
+/** Fingerprint of the scene engine, so cached chapters re-render when the engine changes. */
+const ENGINE_REV = (() => {
+  const h = createHash('sha256');
+  for (const f of ['compile.ts', 'scenes.ts', 'scenes-explainer.ts', 'captions.ts']) {
+    try {
+      h.update(readFileSync(new URL(`./${f}`, import.meta.url)));
+    } catch {}
+  }
+  return h.digest('hex').slice(0, 12);
+})();
+
 async function renderChapters(story: Storyboard, dir: string, brandDir: string | undefined, name: string, quality: string, progress: (f: number, m?: string) => void) {
   const chapters = story.chapters!;
   const parts: { video: string; audio: string; duration: number; title: string; start: number }[] = [];
@@ -150,7 +161,7 @@ async function renderChapters(story: Storyboard, dir: string, brandDir: string |
       scenes: [...(card ? [story.chapterCards === 'part' ? { scene: 'part', fields: { label: `Part ${chapters.slice(0, i + 1).filter((c, k) => c.card ?? k > 0).length}`, title: ch.title }, transition: 'fade' as const } : { scene: 'chapter', fields: { number: i + 1, title: ch.title, total: chapters.length }, transition: 'fade' as const }] : []), ...ch.scenes],
     };
     const cdir = join(dir, 'chapters', String(i + 1).padStart(2, '0'));
-    const hash = createHash('sha256').update(JSON.stringify([sub, brandDir ?? '', quality])).digest('hex').slice(0, 20);
+    const hash = createHash('sha256').update(JSON.stringify([sub, brandDir ?? '', quality, ENGINE_REV])).digest('hex').slice(0, 20);
     const video = join(cdir, 'video.mp4');
     const audio = join(cdir, 'audio.wav');
     const meta = join(cdir, 'chapter.json');
