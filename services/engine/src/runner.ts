@@ -12,6 +12,7 @@ import { appendEvent, listCampaigns, newId, readCampaign, readSettings, updateCa
 import { defaultOptions, getPack, loadPacks, renderTemplate } from './packs.ts';
 import { buildHub, notifyDesktop } from './hub.ts';
 import { appInfo, appUp, campaignIdle, startApp, stopApp } from './applife.ts';
+import { parseUsageReset, setUsagePause, usagePause } from './usage.ts';
 import { runClaude, type StreamEvent } from './claude.ts';
 import { cloneRepo, parseRepo } from './github.ts';
 import { matchOutputs } from './files.ts';
@@ -71,14 +72,19 @@ export async function recoverOrphans(): Promise<number> {
 /** Decide which step of a campaign should run next, and mark blocked steps. */
 const TRANSIENT = /fetch failed|ENOTFOUND|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|Can't reach the API|socket hang up|overloaded|\b529\b|\b503\b|rate.?limit/i;
 
-export function pickStep(c: Campaign): Step | 'busy' | null {
+/** Steps that run without Claude (renders from a spec, packaging, captions, shorts). */
+const NO_CLAUDE = new Set(['campaign-hub', 'captions', 'shorts', 'caption-video']);
+const needsClaude = (s: Step) => !(s.renderOnly || (s.pack && NO_CLAUDE.has(s.pack)));
+
+export function pickStep(c: Campaign, claudeOk = true): Step | 'busy' | null {
   if (c.steps.some((s) => s.status === 'running')) return 'busy';
   // A question to the user pauses the whole campaign: later steps usually depend on the answer.
   if (c.steps.some((s) => s.status === 'needs-input')) return null;
   const brief = c.steps.find((s) => s.kind === 'brief');
-  if (brief && brief.status !== 'done') return brief.status === 'queued' && !(brief.notBefore && Date.parse(brief.notBefore) > Date.now()) ? brief : null;
+  if (brief && brief.status !== 'done') return claudeOk && brief.status === 'queued' && !(brief.notBefore && Date.parse(brief.notBefore) > Date.now()) ? brief : null;
   const now = Date.now();
-  const queued = c.steps.filter((s) => s.kind === 'pack' && s.status === 'queued' && !(s.notBefore && Date.parse(s.notBefore) > now));
+  // While Claude's usage window is exhausted, only steps that don't need Claude run.
+  const queued = c.steps.filter((s) => s.kind === 'pack' && s.status === 'queued' && !(s.notBefore && Date.parse(s.notBefore) > now) && (claudeOk || !needsClaude(s)));
   // The campaign hub packages everything, so it always goes last.
   return queued.find((s) => s.pack !== 'campaign-hub') ?? queued[0] ?? null;
 }
@@ -132,6 +138,7 @@ async function expandPlan(campaignId: string, planDir: string): Promise<number> 
 /** Atomically claim the next runnable step across all campaigns (oldest campaign first). */
 export async function claimNext(): Promise<{ campaign: Campaign; step: Step } | null> {
   const all = (await listCampaigns()).reverse();
+  const paused = await usagePause();
   for (const c of all) {
     const brief = c.steps.find((s) => s.kind === 'brief');
     if (brief && (brief.status === 'failed' || brief.status === 'canceled')) {
@@ -143,7 +150,7 @@ export async function claimNext(): Promise<{ campaign: Campaign; step: Step } | 
       }
       continue;
     }
-    const pick = pickStep(c);
+    const pick = pickStep(c, !paused);
     if (!pick || pick === 'busy') continue;
     const { result } = await updateCampaign(c.id, (x) => {
       const s = x.steps.find((y) => y.id === pick.id);
@@ -308,7 +315,10 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
     const specKind = pack?.spec;
     const renderOnly = !!step.renderOnly && !!specKind;
     if (note) {
-      if (step.sessionId && note.startsWith('[answer] ')) {
+      if (step.sessionId && note.startsWith('[resume] ')) {
+        resume = step.sessionId;
+        prompt = `You were interrupted by a usage limit; the window has reset. Continue the task from exactly where you stopped. Don't redo work that already succeeded — check out/ and work/ first.`;
+      } else if (step.sessionId && note.startsWith('[answer] ')) {
         resume = step.sessionId;
         prompt = `The user answered your question.\n${note.slice(9)}\n\nContinue the task from where you stopped. Don't redo work that already succeeded.`;
       } else if (step.sessionId) {
@@ -581,6 +591,14 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
       Object.assign(patch, { status: 'failed', error: `Stopped after ${Math.max(settings.stepTimeoutMinutes, pack?.timeoutMinutes ?? 0)} minutes` });
     } else if (ok && (step.kind === 'brief' ? files.includes('brief.md') : files.some((f) => f !== 'out/NOTES.md' && !f.endsWith('.json')))) {
       Object.assign(patch, { status: 'done' });
+    } else if (parseUsageReset(why) !== null && !canceled) {
+      // Claude's plan limit: pause every Claude step until the window resets, then pick up this session.
+      const until = parseUsageReset(why)!;
+      await setUsagePause(until, why);
+      const at = new Date(until + 60_000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+      Object.assign(patch, { status: 'queued', notBefore: new Date(until + 60_000).toISOString(), pendingNote: sessionId ? note ?? '[resume] usage limit' : note, sessionId: sessionId ?? step.sessionId });
+      await log({ step: step.id, type: 'log', text: `Claude's usage limit reached — waiting until ${at}, then continuing where it stopped` });
+      await notifyDesktop(`${campaign.name} is waiting for Claude`, `Usage limit reached. It carries on by itself at ${at}.`);
     } else if (TRANSIENT.test(why) && (step.autoRetries ?? 0) < 2) {
       // Long unattended runs shouldn't die on a network blip: try again shortly, from a clean slate.
       Object.assign(patch, { status: 'queued', autoRetries: (step.autoRetries ?? 0) + 1, sessionId: undefined, notBefore: new Date(Date.now() + 60_000 * ((step.autoRetries ?? 0) + 1)).toISOString() });

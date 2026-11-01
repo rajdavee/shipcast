@@ -15,6 +15,7 @@ export interface Step {
   kind: 'brief' | 'pack';
   pack?: string;
   question?: StepQuestion;
+  notBefore?: string;
   options: Record<string, string>;
   status: StepStatus;
   startedAt?: string;

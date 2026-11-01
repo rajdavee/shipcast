@@ -115,7 +115,15 @@ function ResultCard({ campaign, step, pack, now, onOpen, onRetry }: { campaign: 
             <span className="tnum">{fmtDuration(elapsed)}</span>
           </div>
         )}
-        {step.status === 'queued' && <div className="waiting">{step.renderOnly ? 'Re-rendering soon' : 'Up next'}</div>}
+        {step.status === 'queued' && (
+          <div className="waiting">
+            {step.notBefore && Date.parse(step.notBefore) > now
+              ? `${step.pendingNote?.startsWith('[resume]') ? 'Waiting for Claude' : 'Retrying'} · resumes ${new Date(step.notBefore).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+              : step.renderOnly
+                ? 'Re-rendering soon'
+                : 'Up next'}
+          </div>
+        )}
         {step.status === 'blocked' && <div className="waiting">Starts after research</div>}
         {step.status === 'needs-input' && <div className="waiting ask-wait">Waiting for your answer above</div>}
         {step.status === 'canceled' && <div className="waiting">Stopped</div>}
