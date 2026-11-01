@@ -97,10 +97,10 @@ const CARD_CSS = `
 .c .wordmark{font:800 40px/1 var(--font-display);letter-spacing:-.03em}
 .c h1{font-family:var(--font-display);font-weight:800;letter-spacing:-.04em;line-height:1;text-wrap:balance}
 .c p{font-family:var(--font-body);color:var(--muted);text-wrap:pretty}
-.c .frame{border-radius:18px;overflow:hidden;background:var(--card);box-shadow:0 40px 80px -30px rgba(0,0,0,.55),0 0 0 1px var(--rule)}
+.c .frame{display:flex;flex-direction:column;border-radius:18px;overflow:hidden;background:var(--card);box-shadow:0 40px 80px -30px rgba(0,0,0,.55),0 0 0 1px var(--rule)}
 .c .frame .bar{height:36px;display:flex;align-items:center;gap:8px;padding:0 14px;background:color-mix(in srgb,var(--fg) 7%,transparent)}
 .c .frame .bar i{width:11px;height:11px;border-radius:50%;background:color-mix(in srgb,var(--fg) 25%,transparent)}
-.c .frame img{width:100%;height:100%;object-fit:cover;object-position:top left}
+.c .frame .bar{flex:none}.c .frame img{width:100%;flex:1;min-height:0;height:auto;object-fit:cover;object-position:top left}
 .c .pill{display:inline-flex;align-items:center;gap:10px;border-radius:999px;padding:12px 22px;font:700 24px/1 var(--font-body);background:var(--accent);color:var(--bg)}
 .c .chip{display:inline-flex;border:2px solid var(--rule);border-radius:999px;padding:10px 18px;font:600 22px/1 var(--font-body);color:var(--fg)}
 .c .url{font:600 24px/1 var(--font-mono);color:var(--muted)}
