@@ -58,6 +58,13 @@ with a campaign-specific name, e.g.
 Third-party services (payments, email, SMS, AI APIs): use test/sandbox modes
 or disable the feature; only ask the user if a core flow can't work without it.
 
+Docker gotchas: with colima, bind mounts only see the folders the VM shares
+(usually your home folder). If a mounted file shows up as an empty directory
+inside the container, pipe its contents in (`docker exec -i … psql < file`)
+or inline it (compose `configs: content:`). Never touch containers, volumes or
+compose projects you didn't create — if a name clashes with the user's own,
+rename yours (`-p shipcast-<campaign>`).
+
 ## 4 · Diagnose → fix → retry
 
 Run, read the error, fix, retry — up to ~8 rounds. Typical fixes: missing env
@@ -66,7 +73,11 @@ URLs), missing extension/tool (install it), migration order, seeders, port
 clashes, build steps. Log each problem and fix in `out/setup.md`.
 
 **Ask the user (out/question.json → NEEDS_INPUT) only when** a value must come
-from them: a real third-party key with no test mode that a core screen needs,
+from them: a real third-party key with no test mode that the product's
+**headline feature** needs (if the product *is* an AI builder, its AI key is
+core — ask; if AI is a side feature, use a placeholder and list it under
+"Disabled"). Decide by asking: would a campaign about this product be hollow
+without it? Also ask for
 private registry/credentials, a login you can't create, or a choice between
 two very different ways to run it. Ask one specific question with exact
 field keys (use the env var name as `key` for secrets).
@@ -93,5 +104,7 @@ and `out/setup.md` (what you did, what failed and how you fixed it, what
 was disabled). Leave the app running for the next step.
 
 `stop` lists only what *you* started; Shipcast runs it when the campaign is
-packaged. If you used an app that was already running (yours to keep, not
+packaged. Stop by the PIDs you started (and their process groups) and by your
+own compose project name — never by port (`lsof -ti:<port> | xargs kill` can
+kill the user's own servers) and never with broad `pkill` patterns. If you used an app that was already running (yours to keep, not
 ours), set `"external": true` and leave `stop` empty.
