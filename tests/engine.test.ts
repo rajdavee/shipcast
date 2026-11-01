@@ -61,3 +61,51 @@ test('every bundled pack is valid and renders without leftover tags', async () =
     for (const s of p.skills) assert.match(s.source, /^[\w.-]+\/[\w.-]+$/);
   }
 });
+
+test('parseUsageReset reads Claude usage-limit messages and ignores other errors', async () => {
+  const { parseUsageReset } = await import('@shipcast/engine');
+  const now = new Date('2026-11-01T10:00:00').getTime();
+  assert.equal(parseUsageReset('API Error: overloaded', now), null);
+  assert.equal(parseUsageReset('Claude AI usage limit reached|1793541600', now), 1793541600 * 1000);
+  const pm = new Date(parseUsageReset('5-hour limit reached ∙ resets 3pm', now)!);
+  assert.equal(pm.getHours(), 15);
+  const am = new Date(parseUsageReset('Your limit will reset at 9:30 AM', now)!);
+  assert.ok(am.getTime() > now && am.getHours() === 9 && am.getMinutes() === 30, 'next 9:30, tomorrow');
+  assert.equal(parseUsageReset('usage limit reached|1000000000', now), now + 5 * 60_000, 'a past reset still waits a little');
+});
+
+test('pickStep: brief first, questions pause, hub last, and only non-Claude steps while limited', async () => {
+  const { pickStep } = await import('@shipcast/engine');
+  const s = (id: string, extra: Record<string, unknown> = {}) => ({ id, kind: 'pack', pack: id, options: {}, status: 'queued', outputs: [], revisions: [], ...extra }) as any;
+  const brief = { id: 'brief', kind: 'brief', options: {}, status: 'done', outputs: [], revisions: [] } as any;
+  const c = (steps: any[]) => ({ id: 'c', steps }) as any;
+  assert.equal((pickStep(c([brief, s('campaign-hub'), s('reel')])) as any).id, 'reel');
+  assert.equal(pickStep(c([brief, s('reel'), s('x', { status: 'needs-input' })])), null);
+  assert.equal(pickStep(c([brief, s('reel', { notBefore: new Date(Date.now() + 60_000).toISOString() })])), null);
+  assert.equal(pickStep(c([brief, s('reel')]), false), null, 'Claude step waits during a usage pause');
+  assert.equal((pickStep(c([brief, s('reel'), s('carousel', { renderOnly: true })]), false) as any).id, 'carousel', 're-renders keep going');
+  assert.equal(pickStep(c([{ ...brief, status: 'queued' }]), false), null);
+});
+
+test('spawnCollect settles even when a child ignores SIGTERM, and kills its group', async () => {
+  const { spawnCollect } = await import('@shipcast/engine');
+  const t0 = Date.now();
+  const r = await spawnCollect('bash', ['-c', 'trap "" TERM; (trap "" TERM; sleep 60) & sleep 60'], { timeoutMs: 300 });
+  assert.notEqual(r.code, 0);
+  assert.ok(Date.now() - t0 < 12_000);
+  assert.equal((await spawnCollect('echo', ['hi'])).stdout.trim(), 'hi');
+});
+
+test('campaign env: .env text parses, writes are private, and scrubSecrets redacts values', async () => {
+  const { parseEnvText, scrubSecrets } = await import('@shipcast/engine');
+  assert.deepEqual(parseEnvText('# c\nA=1\nexport B="two words"\nC=\'x=y\'\n bad line\n'), { A: '1', B: 'two words', C: 'x=y' });
+  const { mkdtempSync, writeFileSync, readFileSync, mkdirSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const d = mkdtempSync(join(tmpdir(), 'scrub-'));
+  mkdirSync(join(d, 'out'));
+  writeFileSync(join(d, 'out', 'log.md'), 'key sk_test_abcdef1234 and short 123');
+  await scrubSecrets(d, { KEY: 'sk_test_abcdef1234', SHORT: '123' });
+  const t = readFileSync(join(d, 'out', 'log.md'), 'utf8');
+  assert.ok(!t.includes('sk_test_abcdef1234') && t.includes('123'), 'long values redacted, tiny ones left alone');
+});
