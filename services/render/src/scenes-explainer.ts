@@ -892,7 +892,9 @@ tl.fromTo("${S} .frm",{rotation:0},{rotation:.001,duration:${c.duration},ease:"n
         const gap = Math.round(22 * u);
         const cw = (W - gap * (cols - 1)) / cols;
         const ch = Math.round(170 * u);
-        const headH = tSize * 1.1 + (f.subtitle ? 50 * u : 0) + 44 * u;
+        // The headline can wrap on narrow frames: reserve every line it will take.
+        const lines = Math.max(1, Math.ceil((String(f.title ?? '').replace(/\*/g, '').length * tSize * 0.52) / W));
+        const headH = lines * tSize * 1.08 + (f.subtitle ? 50 * u : 0) + 44 * u;
         const rowsN = Math.ceil(items.length / cols);
         const top = pad.t + (c.height - pad.t - pad.b - headH - rowsN * ch - (rowsN - 1) * gap) / 2;
         const gx = (i: number) => pad.l + (i % cols) * (cw + gap);
