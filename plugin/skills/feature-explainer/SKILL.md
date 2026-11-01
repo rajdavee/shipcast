@@ -10,8 +10,8 @@ Read `shipcast:storyboard` first (format, fields, voice rules) and
 and the craft of a great product explainer: the video a customer-success lead
 would send instead of a 40-minute call.
 
-The viewer arrives with one question ("how do AI credits work?", "which
-commission does an agent get?"). They leave able to answer it themselves and
+The viewer arrives with one question ("how do approvals work?", "which
+spending limit applies to me?"). They leave able to answer it themselves and
 knowing exactly where to click. Clarity beats hype. Calm confidence beats
 energy.
 
@@ -22,8 +22,8 @@ energy.
    config, validation rules, permission checks). Explainers die on vagueness;
    the code tells you the real rules, limits, defaults, roles and edge cases.
 2. Write `work/model.md` for yourself: the feature in 5–8 bullet rules
-   ("allowance resets on the 1st; purchased credits never expire; the most
-   specific commission wins: property > project > agent > standard"), the
+   ("the allowance resets on the 1st; top-ups never expire; the most
+   specific limit wins: person > team > workspace default"), the
    roles involved and what each can see or do, one worked example with real
    sample-data numbers, and 2–3 edge cases the code protects against.
 3. List the screens and flows you need to *show* each rule. Look at every
@@ -50,11 +50,11 @@ energy.
    control", "Platform settings"). Each part is mostly real UI:
    `walkthrough` scenes on screenshots (2–4 steps each, one idea per step)
    and `recording` scenes for actions (buying, creating, approving,
-   filtering). Open each part with the role in the kicker (`AGENCY ADMIN ·
+   filtering). Open each part with the role in the kicker (`TEAM ADMIN ·
    BILLING`).
 4. **A real-world example** told as a mini story with the actual screens:
-   "Harbour Realty runs out mid-build → their admin tops up → the
-   platform grants 250 with a reason".
+   "a team hits its limit mid-month → their admin raises it → finance
+   approves with a reason".
 5. **Protection and edge cases** — what's locked, validated, audited
    (`checklist`, `table`, or a `walkthrough` on the audit log).
 6. **Who does what** — a `matrix` of roles × abilities when roles matter.
@@ -73,10 +73,10 @@ Set `"chapterCards": "part"` so parts open with the calm "PART 2" card, and
   element), never a guess you haven't checked against the picture.
 - Order steps the way an eye reads the screen: top-left → bottom-right, or
   the order a user would act. Max 4 steps; split into two scenes otherwise.
-- Chip LABEL = where or what, in 1–3 words (`TOOLTIP`, `AUTO TOP-UP`,
-  `PURCHASE HISTORY`, `STEP 2`). Chip text = what to notice, with the value
-  that matters wrapped in `*stars*` (`Cost before you click *≈1 credit · 500
-  remaining*`). Use `+$45,000+` for a positive/green figure. Quote UI labels
+- Chip LABEL = where or what, in 1–3 words (`TOOLTIP`, `AUTO-APPROVE`,
+  `SPEND HISTORY`, `STEP 2`). Chip text = what to notice, with the value
+  that matters wrapped in `*stars*` (`Shown before you submit *$500 left
+  this month*`). Use `+$1,200+` for a positive/green figure. Quote UI labels
   exactly as they appear on screen.
 - `click` only where the viewer would actually click.
 - Give each step ≥ 2.5 s of screen time; a 3-step walkthrough is ~9–11 s.
@@ -99,12 +99,12 @@ Set `"chapterCards": "part"` so parts open with the calm "PART 2" card, and
   before you click."
 - One sentence per walkthrough step, said while that step is on screen.
   Name the exact button or column.
-- Cause → effect: "Because the property rate is the most specific, Blake
-  gets forty-five thousand on Lot 12."
+- Cause → effect: "Because Sam's personal limit is the most specific, she
+  can spend five hundred on travel this month."
 - Never: "simply", "just", "seamless", "powerful", "robust", "leverage",
   "game-changer", "in today's world".
 - Say numbers the way people say them ("thirty thousand dollars", "five
-  hundred credits").
+  hundred a month").
 
 **Truth**
 - Only rules you verified in code or on screen; only numbers from the sample
@@ -133,9 +133,9 @@ you may capture more with the capture tool (path in the prompt):
   "steps": [
     { "goto": "/login" }, { "fill": "input[type=email]", "env": "SHIPCAST_LOGIN_EMAIL" },
     { "fill": "input[type=password]", "env": "SHIPCAST_LOGIN_PASSWORD" }, { "click": "button[type=submit]" },
-    { "goto": "/settings/ai-credits" },
-    { "shot": "credits", "marks": { "buy": "text=Buy credits", "auto": "text=Auto top-up", "history": "text=Purchase history" } },
-    { "record": "buy-credits", "actions": [ { "click": "input[name=credits]" }, { "type": "1200" }, { "wait": 800 }, { "move": "text=Buy" }, { "wait": 1200 } ] }
+    { "goto": "/settings/limits" },
+    { "shot": "limits", "marks": { "set": "text=Set limit", "approvals": "text=Approvals", "history": "text=Spend history" } },
+    { "record": "raise-limit", "actions": [ { "click": "input[name=amount]" }, { "type": "1200" }, { "wait": 800 }, { "move": "text=Save" }, { "wait": 1200 } ] }
   ] }
 ```
 

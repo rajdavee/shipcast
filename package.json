@@ -1,6 +1,6 @@
 {
   "name": "shipcast",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "private": true,
   "description": "Local-first studio that turns a URL or a GitHub repo into a full launch campaign \u2014 videos, motion graphics, carousels, thumbnails and copy \u2014 using your own Claude Code login.",
   "type": "module",

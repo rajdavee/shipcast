@@ -43,6 +43,24 @@ Shipcast makes all of it from one URL, on your own machine.
   logos), what they do. Claude researches the journey; you get a looping GIF,
   an MP4 and the post text.
 - **Skill Hub — the best community skills, mixed per job.** Shipcast pulls specialist Claude skills from their own repos (pinned commits, licence-checked, installed into Shipcast only): HyperFrames and GSAP for motion, taste-skill and Anthropic's creative skills for design, diagram-design for diagrams, marketingskills and humanizer for copy, ffmpeg-skill for post-production and more. Each format asks for roles (motion, design taste, copy…) and the hub assigns the strongest enabled skill — browse and override them on the Skills page. The list lives in `skills/registry.json`.
+- **Full campaign from your running app.** Point Shipcast at a repo or folder,
+  add env vars, and walk away for 2–4 hours. It copies the project, sets it up
+  locally (installs, a throwaway database or Docker service, seed data), fixes
+  what it can, and when it truly can't — a missing licence key, a credential —
+  it pauses and asks you one specific question in the app, then carries on.
+  It logs in for real, films the main flows with a visible cursor, plans a
+  campaign (one line, pillars, a posting calendar), makes every asset, and
+  packages them in an offline hub with a zip. Secrets stay in a 600-mode file,
+  are scrubbed from every output, and nothing leaves your machine.
+- **Feature explainers on the real product.** Narrated "how it works" videos,
+  90 s to 7 minutes: Claude reads the feature's rules in your code first,
+  then the camera walks your real screens with exact highlights (element
+  positions recorded at capture) and caption chips, filmed click-throughs
+  auto-zoom on each click, and diagrams explain the rules — levels, worked
+  examples, flows, who-does-what, a recap.
+- **Product tours.** Music-led promos where the workflow plays out beat by
+  beat — the messy before, forms filling, options picked, actions passing a
+  checks rail — joined by motion-blurred whips.
 - **Real UI, not stock filler.** Formats reuse your product's actual screens,
   components, copy and brand.
 - **Revise like you'd brief a designer.** "Make the hook punchier, slow down
@@ -105,6 +123,10 @@ re-render without another Claude run.
 | **Launch Film** | 20–40s film for YouTube, LinkedIn, X or your site: hook, the real product in motion, proof, CTA |
 | **Feature Spotlight** | 8–15s silent motion graphic for the feed |
 | **Explainer** | 45–75s narrated explainer — teach first, sell last |
+| **Feature Explainer** | 90 s – 7 min narrated "how it works" on your real UI: part cards, walkthroughs with highlights and caption chips, filmed click-throughs, rule diagrams, recap |
+| **Product Tour** | 45 s – 2 min music-led promo: the messy before, rebuilt UI that animates, real screens, a trust beat, CTA |
+| **Social Posts** | Feed, portrait, wide and story images per post, with LinkedIn / Instagram / X / Facebook captions and alt text |
+| **Full campaign** | Run your app → capture it → plan → every asset → an offline campaign hub, zip and a desktop notification |
 | **Captions** | Upload a talking-head clip → word-timed captions (6 styles), hook title, mastered audio. No Claude turn, about a minute |
 | **LinkedIn Carousel** | 6–10 slides in 4 themes × 9 layouts, upload-ready PDF, animated MP4 with music, post caption |
 | **Thumbnails & Cards** | 3 YouTube thumbnails for Test & Compare, OG / GitHub cards, X & LinkedIn images, stories, banners |
@@ -119,7 +141,7 @@ Discovery Journey, changelog video from a pull request, talking-head captions.
 Third-party skills are **not bundled**; Shipcast installs them from their own
 repositories on first use, under their own licenses.
 
-Videos are built from 12 motion scenes — kinetic title, highlight statement, stat count-up, product zoom with cursor click (browser or phone frame), typing terminal, animated bar chart, feature reveal, testimonial, before/after, page scroll, logo sting and CTA outro — plus any of HyperFrames' ~450 registry blocks. Every video gets an **original music bed** (6 moods, cuts snapped to its beat, whooshes on transitions), a **Kokoro voiceover** aligned word-by-word to the script, and a **director's review**: after the automated checks pass, Claude looks at the rendered frames once and fixes what a human editor would.
+Videos are built from 32 motion scenes — UI walkthrough with drawn highlights, recorded click-through with auto-zoom, ladder, worked-example table, flow, tree, who-does-what matrix, checklist, a form that fills itself, an option being picked, the messy before, a checks rail, kinetic title, highlight statement, stat count-up, product zoom with cursor click (browser or phone frame), typing terminal, animated bar chart, feature reveal, testimonial, before/after, page scroll, logo sting and CTA outro — plus any of HyperFrames' ~450 registry blocks. Every video gets an **original music bed** (6 moods, cuts snapped to its beat, whooshes on transitions), a **Kokoro voiceover** aligned word-by-word to the script, and a **director's review**: after the automated checks pass, Claude looks at the rendered frames once and fixes what a human editor would.
 
 ### What "quality" means here
 
@@ -159,6 +181,13 @@ render. Website and repo content is treated as data, never instructions; the
 api listens on `127.0.0.1` only and rejects cross-site requests; generated HTML
 is served in a sandbox. Run Shipcast on a machine you're comfortable letting an
 agent build files on. See [SECURITY.md](SECURITY.md).
+
+Full campaigns run your project on a **copy** (the original folder is never
+changed), with sample data only. Env values live in the campaign's
+`secrets.env` (mode 600), are passed to Claude's shell, never shown again in
+the UI, and are scrubbed from every output file. Claude stops at any
+confirmation that would send, delete or pay for real, and the hub step stops
+the processes it started.
 
 ## Development
 

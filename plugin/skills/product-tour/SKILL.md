@@ -37,8 +37,8 @@ something, joined by motion-blurred whips.
 
 ## Rules
 
-- Headline per beat ≤ 7 words, one *accent* phrase: "Every action passes
-  the *safety engine*".
+- Headline per beat ≤ 7 words, one *accent* phrase: "Every request passes
+  *your rules*".
 - Every value shown must exist in the product: field options, plan names,
   limits, integrations (from `product-facts.md`, the code, or screens).
   Sample people and companies are fine and should look real.

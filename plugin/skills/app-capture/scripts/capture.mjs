@@ -21,11 +21,11 @@
 //     { "mobile": true }, { "goto": "/dashboard" }, { "shot": "dashboard-mobile" },
 //     { "eval": "document.querySelector('.cookie-banner')?.remove()" },
 //     // Exact boxes for the video's highlights (0–1 fractions of the screenshot) → billing.marks.json
-//     { "shot": "billing", "marks": { "buy": "text=Buy credits", "usage": "#usage-card" } },
-//     // A real click-through, filmed with a visible cursor and human typing → buy-credits.mp4 (+ .json timeline)
-//     { "record": "buy-credits", "actions": [
-//         { "move": "text=Buy a custom amount" }, { "click": "input[name=credits]" },
-//         { "type": "1200" }, { "wait": 700 }, { "click": "text=Buy" }, { "wait": 1500 },
+//     { "shot": "billing", "marks": { "upgrade": "text=Upgrade plan", "usage": "#usage-card" } },
+//     // A real click-through, filmed with a visible cursor and human typing → new-invoice.mp4 (+ .json timeline)
+//     { "record": "new-invoice", "actions": [
+//         { "move": "text=New invoice" }, { "click": "input[name=amount]" },
+//         { "type": "1200" }, { "wait": 700 }, { "click": "text=Save draft" }, { "wait": 1500 },
 //         { "scroll": 500 }, { "hover": ".usage-row" }, { "wait": 1200 } ] }
 //   ]
 // }

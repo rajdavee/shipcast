@@ -52,7 +52,7 @@ populated — if a page is empty, go back and seed data (or note it).
 
 - `out/screens/*.png|mp4` with descriptive names (`dashboard.png`,
   `leads-list.png`, `pipeline-walkthrough.mp4`, `home-mobile.png`).
-- `out/screens.json`: `[{"file": "screens/dashboard.png", "title": "Dashboard", "role": "agency admin", "shows": "what's on screen", "marks": {"pipeline": {"x": 0.1, "y": 0.2, "w": 0.3, "h": 0.1}}, "best_for": ["video", "carousel", "post"]}, {"file": "screens/create-deal.mp4", "title": "Creating a deal", "actions": "click New deal → type name → pick stage → save", "seconds": 14}]`
+- `out/screens.json`: `[{"file": "screens/dashboard.png", "title": "Dashboard", "role": "team admin", "shows": "what's on screen", "marks": {"pipeline": {"x": 0.1, "y": 0.2, "w": 0.3, "h": 0.1}}, "best_for": ["video", "carousel", "post"]}, {"file": "screens/create-deal.mp4", "title": "Creating a deal", "actions": "click New deal → type name → pick stage → save", "seconds": 14}]`
   (copy each shot's marks in; describe each recording's actions).
 - `out/product-facts.md`: what the product verifiably does, as seen in the UI
   and code (features, plans/prices if shown, integrations that exist) — the

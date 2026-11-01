@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.9.0 — 2026-11-01
+
+Point it at your app and walk away: a full campaign, explained on the real product.
+
+- **Full campaign from a running app** — connect a repo or folder plus env vars; Shipcast sets the app up on a copy (installs, a throwaway database or Docker service, seed data), diagnoses and fixes failures for several rounds, and logs what it did in `setup.md`. It logs in for real and captures 20–30 screens and filmed flows, then plans the campaign and makes every asset. Runs in the background for 2–4 hours.
+- **Asks only when it must** — when something can't be fixed locally (a licence key, a credential, a decision), the step pauses with one specific question, the reason, and typed fields (secret ones masked). Your answer resumes the same session; secrets go to a 600-mode `secrets.env`, never back to the UI, and are scrubbed from every output. Desktop notification when it needs you.
+- **Campaign plan → jobs → hub** — one campaign line, pillars, an asset list with a short brief each and a 2–4 week calendar; Shipcast queues a job per asset, then packages everything in an offline `index.html` hub (videos, carousels, posts, captions, calendar) with a zip, stops the app it started, and notifies you.
+- **Feature Explainer** — narrated "how it works" videos (90 s – 7 min) on the real product: rules verified in code first, calm "Part N" cards, the camera walking real screens with drawn highlights and caption chips, filmed click-throughs, and diagrams (ladder of levels, worked-example table, flow, one-record tree, who-does-what matrix, recap).
+- **Product Tour** — music-led promos told in moving UI: the messy before, a form filling itself, an option picked, an action passing (or stopped by) a checks rail, real screens, CTA.
+- **Social Posts** — feed (1:1), portrait, wide and story images per post, with per-platform captions and alt text.
+- **Capture** — `text=` selectors, exact element boxes for every hero screenshot, filmed flows with a gliding cursor, human typing, scroll and hover (each with a timeline the video auto-zooms from), dark mode, and missed targets that warn instead of stopping the take.
+- **Transitions** — `blur`, a motion-blurred whip, and `push`.
+- **Resilient long runs** — steps that hit a network or API blip retry up to twice on their own.
+
 ## 0.8.0 — 2026-11-01
 
 Sketch it before you make it, and a hub of the best community skills.

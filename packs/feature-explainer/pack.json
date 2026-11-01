@@ -11,7 +11,7 @@
   "context": true,
   "timeoutMinutes": 150,
   "options": [
-    { "key": "feature", "label": "Feature", "type": "text", "default": "", "placeholder": "e.g. AI credits and top-ups — blank = the feature users ask about most" },
+    { "key": "feature", "label": "Feature", "type": "text", "default": "", "placeholder": "e.g. spending limits and approvals — blank = the feature users ask about most" },
     { "key": "length", "label": "Length", "type": "select", "choices": ["90 s", "3 min", "5 min", "7 min"], "default": "3 min" },
     { "key": "audience", "label": "For", "type": "select", "choices": ["customers", "admins", "new team members", "prospects"], "default": "customers" },
     { "key": "preset", "label": "Format", "type": "select", "choices": ["youtube", "linkedin-video", "vertical"], "default": "youtube" },

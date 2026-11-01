@@ -122,7 +122,7 @@ ${S} .pos{color:#34d399;font-weight:700}${S} .mut{opacity:.55}${S} b.acc{font-we
       minSeconds: 4,
       fields: [
         { id: 'image', type: 'image', label: 'Screenshot' },
-        { id: 'kicker', type: 'text', label: 'Kicker (who / where)', optional: true, max: 40, help: 'e.g. "AGENCY ADMIN · BILLING"' },
+        { id: 'kicker', type: 'text', label: 'Kicker (who / where)', optional: true, max: 40, help: 'e.g. "TEAM ADMIN · BILLING"' },
         { id: 'steps', type: 'list', label: 'Steps', help: 'One per line: "x,y,w,h | LABEL | caption with *value* | click" — x,y,w,h are 0–1 fractions of the screenshot. 1–4 steps.' },
         { id: 'theme', type: 'text', label: 'Ground (dark/light)', optional: true },
       ],
@@ -361,7 +361,7 @@ tl.fromTo("${S} .pile",{x:0},{x:${Math.round(8 * u)},duration:.05,repeat:5,yoyo:
     {
       id: 'rail',
       label: 'Checks rail: an action passes (or is stopped)',
-      use: 'A safety or approval engine in motion: 3–5 checkpoint cards sit on a rail; one action (a pill like "Connection request → Priya") travels along it and each checkpoint ticks green. Optionally one checkpoint stops it (red, "Stopped · no retry"). Great for limits, approvals, guardrails, compliance.',
+      use: 'A safety or approval engine in motion: 3–5 checkpoint cards sit on a rail; one action (a pill like "Expense $412 → Sam") travels along it and each checkpoint ticks green. Optionally one checkpoint stops it (red, "Stopped · no retry"). Great for limits, approvals, guardrails, compliance.',
       minSeconds: 4.5,
       fields: [
         { id: 'title', type: 'text', label: 'Headline', optional: true, max: 50, help: 'Wrap the key words in *stars*' },
@@ -529,7 +529,7 @@ ${S} .arr span{position:absolute;left:${Math.round(40 * u)}px;top:0;font:650 ${M
       fields: [
         { id: 'kicker', type: 'text', label: 'Kicker', optional: true, max: 40 },
         { id: 'title', type: 'text', label: 'Title', optional: true, max: 60 },
-        { id: 'columns', type: 'text', label: 'Columns', help: '"Agent | Where | Rule | Commission"' },
+        { id: 'columns', type: 'text', label: 'Columns', help: '"Person | Where | Rule | Limit"' },
         { id: 'rows', type: 'list', label: 'Rows', help: 'One per line, cells split by " | "' },
         { id: 'highlight', type: 'number', label: 'Lit row (1-based)', optional: true },
         { id: 'theme', type: 'text', label: 'Ground (dark/light)', optional: true },
@@ -624,7 +624,7 @@ tl.fromTo("${S} .dot",{scale:.4},{scale:1,duration:.5,ease:"back.out(2.2)",stagg
     {
       id: 'tree',
       label: 'One record, many views',
-      use: 'One shared thing at the top (a record, a plan, a workspace) branching to 2–4 people or cases, each with its own value — "same lot, three agents, three commissions". Lines draw from the root to each branch.',
+      use: 'One shared thing at the top (a record, a plan, a workspace) branching to 2–4 people or cases, each with its own value — "same policy, three people, three limits". Lines draw from the root to each branch.',
       minSeconds: 4,
       fields: [
         { id: 'kicker', type: 'text', label: 'Kicker', optional: true, max: 40 },
@@ -729,7 +729,7 @@ tl.to("${S} .it path",{strokeDashoffset:0,duration:.35,ease:"power2.out",stagger
       fields: [
         { id: 'kicker', type: 'text', label: 'Kicker', optional: true, max: 40 },
         { id: 'title', type: 'text', label: 'Title', optional: true, max: 50 },
-        { id: 'columns', type: 'text', label: 'Roles', help: '"Team member | Agency admin | Platform admin"' },
+        { id: 'columns', type: 'text', label: 'Roles', help: '"Member | Team admin | Finance"' },
         { id: 'rows', type: 'list', label: 'Rows', help: 'One per line: "Ability | yes,no,yes"' },
         { id: 'highlight', type: 'number', label: 'Lit column (1-based)', optional: true },
         { id: 'theme', type: 'text', label: 'Ground (dark/light)', optional: true },
