@@ -23,7 +23,8 @@ const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 async function walk(d: string): Promise<string[]> {
   const out: string[] = [];
   for (const e of await readdir(d, { withFileTypes: true }).catch(() => [])) {
-    if (e.name.startsWith('.') || e.name === 'work' || e.name === 'node_modules') continue;
+    // Render internals (projects, per-chapter cuts, copied assets) are not deliverables.
+    if (e.name.startsWith('.') || (e.isDirectory() && ['work', 'node_modules', 'project', 'chapters', 'assets', 'preview'].includes(e.name))) continue;
     const p = join(d, e.name);
     if (e.isDirectory()) out.push(...(await walk(p)));
     else out.push(p);
@@ -112,7 +113,7 @@ export async function buildHub(c: Campaign, outDir: string): Promise<{ items: nu
     const kind = kindFor(s.pack, pack?.category, all);
     const keep = all.filter((f) => {
       const b = basename(f);
-      if (b === 'NOTES.md' || b === 'catalog.md' || b === 'qa.json' || /\.sheet\.jpg$/.test(b)) return false;
+      if (b === 'NOTES.md' || b === 'catalog.md' || b === 'qa.json' || /\.sheet\.jpg$/.test(b) || /\.html$/.test(b)) return false;
       if (kind === 'product') return /\.(png|jpe?g|mp4|webm)$/i.test(f);
       if (kind === 'carousel') return /\.(pdf|mp4|md)$/i.test(f) || /^slides\/.*\.png$/.test(f);
       if (kind === 'video') {
