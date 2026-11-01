@@ -332,7 +332,7 @@ export function Campaign({ id }: { id: string }) {
         );
       })}
 
-      {campaign.steps.some((s) => s.pack === 'app-run' && s.status === 'done') && <AppBar id={campaign.id} busyStep={campaign.steps.some((s) => s.status === 'running')} />}
+      {campaign.steps.some((s) => s.pack === 'app-run' && s.status === 'done') && <AppBar id={campaign.id} busyStep={campaign.steps.some((s) => s.status === 'running')} onChange={setCampaign} />}
 
       <BriefStrip campaign={campaign} step={brief} />
       {brief.status === 'failed' && (
@@ -439,8 +439,9 @@ function AddMore({ packs, campaign, onClose, onAdd }: { packs: Pack[]; campaign:
 }
 
 /** The user's app as the campaign left it: running or stopped, with Start / Stop. */
-function AppBar({ id, busyStep }: { id: string; busyStep: boolean }) {
+function AppBar({ id, busyStep, onChange }: { id: string; busyStep: boolean; onChange: (c: C) => void }) {
   const [st, setSt] = useState<AppState | null>(null);
+  const [keys, setKeys] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<'start' | 'stop' | null>(null);
   useEffect(() => {
     let on = true;
@@ -465,7 +466,9 @@ function AppBar({ id, busyStep }: { id: string; busyStep: boolean }) {
       setBusy(null);
     }
   };
+  const missing = (st.optional ?? []).filter((o) => !o.set);
   return (
+    <>
     <div className={`app-bar ${st.up ? 'up' : ''}`}>
       <i className="dot" />
       <span>
@@ -477,5 +480,35 @@ function AppBar({ id, busyStep }: { id: string; busyStep: boolean }) {
         <button className="btn sm" disabled={!!busy} onClick={() => act('start')}>{busy === 'start' ? 'Starting…' : 'Start'}</button>
       ) : null}
     </div>
+    {missing.length > 0 && (
+      <form
+        className="unlock"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          try {
+            onChange(await api.appUnlock(id, keys));
+            setKeys({});
+            toast('Got it — reconfiguring your app, then capturing it again');
+          } catch (err) {
+            toast(String((err as Error).message));
+          }
+        }}
+      >
+        <div>
+          <b>Unlock more of your product</b>
+          <span>These were left out because the keys weren't available. Add any of them and Shipcast wires them in, restarts the app and captures it again. They stay on this computer.</span>
+        </div>
+        {missing.map((o) => (
+          <label key={o.key} className="field">
+            <span>{o.label}{o.unlocks && <small className="muted"> · unlocks {o.unlocks}</small>}</span>
+            <input className="input mono" type="password" autoComplete="off" placeholder={o.key} value={keys[o.key] ?? ''} onChange={(e) => setKeys({ ...keys, [o.key]: e.target.value })} />
+          </label>
+        ))}
+        <div className="row-actions" style={{ justifyContent: 'flex-end' }}>
+          <button className="btn primary sm" disabled={busyStep || !Object.values(keys).some((v) => v.trim())}>Add and capture again</button>
+        </div>
+      </form>
+    )}
+    </>
   );
 }

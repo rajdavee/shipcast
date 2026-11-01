@@ -165,6 +165,7 @@ export const api = {
   revise: (id: string, step: string, note: string) => call<Campaign>('POST', `/api/campaigns/${id}/steps/${step}/revise`, { note }),
   app: (id: string) => call<AppState>('GET', `/api/campaigns/${id}/app`),
   appStart: (id: string) => call<AppState & { log: string[] }>('POST', `/api/campaigns/${id}/app/start`),
+  appUnlock: (id: string, values: Record<string, string>) => call<Campaign>('POST', `/api/campaigns/${id}/app/unlock`, { values }),
   appStop: (id: string) => call<AppState & { log: string[] }>('POST', `/api/campaigns/${id}/app/stop`),
   size: (id: string) => call<{ bytes: number; appBytes: number }>('GET', `/api/campaigns/${id}/size`),
   cleanup: (id: string, app: boolean) => call<{ freed: number; bytes: number; appBytes: number }>('POST', `/api/campaigns/${id}/cleanup`, { app }),
@@ -205,6 +206,7 @@ export function fmtDuration(ms?: number): string {
 }
 
 export interface AppState {
+  optional: { key: string; label: string; unlocks?: string; set: boolean }[];
   hasApp: boolean;
   url?: string;
   up: boolean;

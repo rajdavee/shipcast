@@ -126,6 +126,15 @@ test('the app can be started and stopped from its recorded commands, with the ca
   assert.equal(started.body.up, true, started.body.log?.join(' | '));
   const stopped = await api(`/api/campaigns/${c.id}/app/stop`, { method: 'POST', json: {} });
   assert.equal(stopped.body.up, false);
+  // A key the app step couldn't get shows up as "unlock more"; adding it resumes the app step.
+  const app = JSON.parse(readFileSync(join(dir, 'out', 'app.json'), 'utf8'));
+  writeFileSync(join(dir, 'out', 'app.json'), JSON.stringify({ ...app, optional: [{ key: 'EXTRA_API_KEY', label: 'Extra key', unlocks: 'the AI bits' }] }));
+  assert.deepEqual((await api(`/api/campaigns/${c.id}/app`)).body.optional.map((o: any) => [o.key, o.set]), [['EXTRA_API_KEY', false]]);
+  const unlocked = await api(`/api/campaigns/${c.id}/app/unlock`, { method: 'POST', json: { values: { EXTRA_API_KEY: 'extra-value-123456', 'bad key': 'x' } } });
+  assert.equal(unlocked.status, 200);
+  assert.ok(unlocked.body.steps.find((s: any) => s.pack === 'app-run').pendingNote.startsWith('[answer]'));
+  await waitFor(c.id, (x) => x.steps.find((s: any) => s.pack === 'app-run').status === 'done');
+  assert.deepEqual((await api(`/api/campaigns/${c.id}/env`)).body.keys.sort(), ['EXTRA_API_KEY', 'TEST_LICENSE_KEY']);
   // Deleting the campaign must not leave anything behind either.
   assert.equal((await api(`/api/campaigns/${c.id}`, { method: 'DELETE' })).status, 200);
 });

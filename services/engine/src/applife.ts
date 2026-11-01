@@ -83,10 +83,22 @@ export async function stopApp(c: Campaign): Promise<string[]> {
 /** True when nothing in the campaign is running, queued or waiting for the user. */
 export const campaignIdle = (c: Campaign) => !c.steps.some((s) => s.status === 'running' || s.status === 'queued' || s.status === 'needs-input' || s.status === 'blocked');
 
-export async function appStatus(c: Campaign): Promise<{ hasApp: boolean; url?: string; up: boolean; external: boolean; canStart: boolean }> {
+export interface OptionalKey {
+  key: string;
+  label: string;
+  unlocks?: string;
+  set: boolean;
+}
+
+export async function appStatus(c: Campaign): Promise<{ hasApp: boolean; url?: string; up: boolean; external: boolean; canStart: boolean; optional: OptionalKey[] }> {
   const info = await appInfo(c);
-  if (!info) return { hasApp: false, up: false, external: false, canStart: false };
-  return { hasApp: true, url: info.app.url, up: await appUp(info.app.url), external: !!info.app.external, canStart: list(info.app.start).length > 0 && existsSync(join(info.dir, 'work', 'app')) };
+  if (!info) return { hasApp: false, up: false, external: false, canStart: false, optional: [] };
+  const env = await readCampaignEnv(c.id).catch(() => ({}) as Record<string, string>);
+  const optional = (Array.isArray(info.app.optional) ? info.app.optional : [])
+    .filter((o: any) => o && /^[A-Z][A-Z0-9_]*$/.test(String(o.key)))
+    .slice(0, 8)
+    .map((o: any) => ({ key: String(o.key), label: String(o.label ?? o.key).slice(0, 80), unlocks: o.unlocks ? String(o.unlocks).slice(0, 160) : undefined, set: !!env[String(o.key)] }));
+  return { hasApp: true, url: info.app.url, up: await appUp(info.app.url), external: !!info.app.external, canStart: list(info.app.start).length > 0 && existsSync(join(info.dir, 'work', 'app')), optional };
 }
 
 async function du(path: string): Promise<number> {

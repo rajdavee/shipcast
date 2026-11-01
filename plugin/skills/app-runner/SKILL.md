@@ -99,10 +99,17 @@ Write `out/app.json`:
   "stack": "Laravel 12 + Inertia/React, SQLite", "processes": [{ "name": "web", "pid": 1234, "cwd": "work/app", "log": "work/logs/web.log" }],
   "start": ["docker start shipcast-…-pg", "mkdir -p work/pids && cd work/app && (nohup php artisan serve --port=8091 > ../logs/web.log 2>&1 & echo $! > ../pids/web.pid)"],
   "stop": ["kill $(cat work/pids/*.pid) 2>/dev/null; true", "docker rm -f shipcast-…-pg"], "mainPages": ["/dashboard", "/leads", "/reports"],
-  "sampleData": "what was seeded", "notes": "anything the capture step should know" }
+  "sampleData": "what was seeded", "notes": "anything the capture step should know",
+  "optional": [{ "key": "OPENROUTER_API_KEY", "label": "OpenRouter API key", "unlocks": "AI site generator" }] }
 ```
 and `out/setup.md` (what you did, what failed and how you fixed it, what
 was disabled). Leave the app running for the next step.
+
+`optional` lists keys you couldn't get that would unlock more of the product
+(the ones you set placeholders for): `[{"key": "OPENROUTER_API_KEY", "label":
+"OpenRouter API key", "unlocks": "AI builds, the Constitution Counsellor"}]`.
+Shipcast shows them to the user as "Unlock more"; if they add one later, this
+session is resumed to wire it in.
 
 `start` brings the app back after a reboot or a stop, without reinstalling:
 the exact commands, in order, each one returning straight away (background

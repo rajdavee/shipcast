@@ -510,6 +510,26 @@ router.post('/api/campaigns/:id/app/start', async (_q, _r, p) => {
   await appendEvent(p.id, { step: 'brief', type: 'log', text: r.up ? 'App started' : `App didn't start: ${r.log.slice(-1)[0] ?? ''}` });
   return { ...(await appStatus(c)), log: r.log };
 });
+/** Add keys the app step couldn't get: resume that step to wire them in, then capture the screens again. */
+router.post('/api/campaigns/:id/app/unlock', async (req, _r, p) => {
+  const c = await mustCampaign(p.id);
+  const b = await readJson(req);
+  const values: Record<string, string> = {};
+  for (const [k, v] of Object.entries((b.values ?? {}) as Record<string, unknown>)) if (/^[A-Z][A-Z0-9_]*$/.test(k) && String(v ?? '').trim()) values[k] = String(v).trim().slice(0, 4000);
+  if (!Object.keys(values).length) throw new HttpError(400, 'add at least one value');
+  if (c.steps.some((s) => s.status === 'running')) throw new HttpError(409, 'wait for the running step to finish');
+  await writeCampaignEnv(p.id, values);
+  const names = Object.keys(values).join(', ');
+  const { campaign } = await updateCampaign(p.id, (x) => {
+    const run = [...x.steps].reverse().find((s) => s.pack === 'app-run' && s.status === 'done');
+    if (!run) throw new HttpError(400, 'run the app first');
+    Object.assign(run, { status: 'queued', error: undefined, pendingNote: run.sessionId ? `[answer] The user added these environment variables (already in your shell): ${names}. Replace the placeholders in the app's config with them, restart the app (update work/pids), check the features they unlock now work, and update out/app.json (drop them from optional) and out/setup.md.` : undefined });
+    for (const s of x.steps) if (s.pack === 'app-capture' && s.status !== 'running') Object.assign(s, { status: 'queued', error: undefined, sessionId: undefined, pendingNote: undefined });
+  });
+  await appendEvent(p.id, { step: 'brief', type: 'log', text: `Added ${names} — reconfiguring the app, then capturing again` });
+  return campaign;
+});
+
 router.post('/api/campaigns/:id/app/stop', async (_q, _r, p) => {
   const c = await mustCampaign(p.id);
   if (c.steps.some((s) => s.status === 'running' && s.pack && s.pack !== 'campaign-hub')) throw new HttpError(409, 'a step is using the app right now');
