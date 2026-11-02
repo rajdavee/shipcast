@@ -85,6 +85,8 @@ test('a campaign plan becomes one job per valid asset, then a hub that packages 
   assert.equal(copy.options._title, 'Launch copy');
   assert.equal(copy.options.voice, 'brand');
   assert.equal(copy.options.bogus, undefined, 'unknown options dropped');
+  assert.equal(typeof copy.brandScore?.score, 'number', 'copy is scored against the brand voice');
+  assert.ok(existsSync(join(home, 'campaigns', id, 'deliverables', copy.id, 'out', 'brand-score.json')));
   const hub = done.steps.find((s: any) => s.pack === 'campaign-hub');
   const index = hub.outputs.find((o: string) => o.endsWith('index.html'));
   assert.ok(index && hub.outputs.some((o: string) => o.endsWith('.zip')));
@@ -158,4 +160,18 @@ test('a project with a known loader in a config file pauses for a typed RUN befo
   await api(`/api/campaigns/${c.body.id}/steps/${asked.steps[1].id}/answer`, { method: 'POST', json: { values: { confirm: 'RUN' } } });
   await waitFor(c.body.id, (x) => x.steps[1].sessionId !== undefined || x.steps[1].status === 'done' || (x.steps[1].status === 'needs-input' && /licence/.test(x.steps[1].question?.text ?? '')));
   rmSync(bad, { recursive: true, force: true });
+});
+
+test('voice profiles: save, score, pick for a campaign', async () => {
+  const saved = (await api('/api/tones', { method: 'PUT', json: { name: 'Calm Fiduciary', lexicon: { banned: ['disrupt'], preferred: { client: 'beneficiary' } } } })).body;
+  assert.equal(saved.id, 'calm-fiduciary');
+  assert.ok((await api('/api/tones')).body.some((t: any) => t.id === 'calm-fiduciary'));
+  const sc = (await api('/api/tones/score', { method: 'POST', json: { toneId: 'calm-fiduciary', text: 'We disrupt how every client is served.', channel: 'linkedin' } })).body;
+  assert.ok(sc.issues.some((i: any) => i.rule === 'banned') && sc.issues.some((i: any) => i.rule === 'preferred'));
+  const c = await api('/api/campaigns', { method: 'POST', json: { name: 'Voiced', toneId: 'calm-fiduciary', source: { type: 'url', value: 'example.com' }, deliverables: [{ pack: 'copy-kit' }] } });
+  assert.equal(c.body.toneId, 'calm-fiduciary');
+  const bogus = await api('/api/campaigns', { method: 'POST', json: { name: 'NoVoice', toneId: 'nope', source: { type: 'url', value: 'example.com' }, deliverables: [{ pack: 'copy-kit' }] } });
+  assert.equal(bogus.body.toneId, undefined, 'unknown voice ignored');
+  for (const x of [c.body, bogus.body]) await api(`/api/campaigns/${x.id}/steps/brief/cancel`, { method: 'POST', json: {} });
+  assert.equal((await api('/api/tones/default', { method: 'DELETE' })).status, 400);
 });

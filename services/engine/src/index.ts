@@ -30,3 +30,5 @@ export * from './hub.ts';
 export * from './applife.ts';
 export * from './usage.ts';
 export * from './scan.ts';
+export * from './tone.ts';
+export * from './tone-learn.ts';

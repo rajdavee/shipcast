@@ -6,6 +6,7 @@ import { Campaign } from './pages/Campaign.tsx';
 import { Library } from './pages/Library.tsx';
 import { Setup } from './pages/Setup.tsx';
 import { Skills } from './pages/Skills.tsx';
+import { Voice } from './pages/Voice.tsx';
 
 export function App() {
   const route = useRoute();
@@ -27,6 +28,7 @@ export function App() {
         <nav className="tabs-top" aria-label="Main">
           <a href="#/new" aria-current={page === 'new' || !page ? 'page' : undefined}>New</a>
           <a href="#/library" aria-current={page === 'library' ? 'page' : undefined}>Projects</a>
+          <a href="#/voice" aria-current={page === 'voice' ? 'page' : undefined}>Brand voice</a>
           <a href="#/skills" aria-current={page === 'skills' ? 'page' : undefined}>Skills</a>
         </nav>
         <div className="top-right">
@@ -46,6 +48,8 @@ export function App() {
         <Campaign id={route[1]} />
       ) : route[0] === 'library' ? (
         <Library campaigns={campaigns.data} />
+      ) : route[0] === 'voice' ? (
+        <Voice />
       ) : route[0] === 'skills' ? (
         <Skills />
       ) : route[0] === 'setup' ? (

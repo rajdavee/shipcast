@@ -68,6 +68,16 @@ import {
   unsplashCheck,
   getSecret,
   setSecret,
+  listTones,
+  getTone,
+  saveTone,
+  deleteTone,
+  learnTone,
+  rewriteInVoice,
+  scoreText,
+  DEFAULT_TONE,
+  CHANNELS,
+  type Channel,
 } from '@shipcast/engine';
 import { HttpError, json, readJson, Router, sendFile } from './http.ts';
 import { loginState, startClaudeLogin, startGithubLogin } from './connect.ts';
@@ -297,6 +307,44 @@ router.delete('/api/broll', async () => {
   return stockState();
 });
 
+// ── Tone & Voice: brand voice profiles, scoring and rewrites ──────────
+router.get('/api/tones', () => listTones());
+router.get('/api/tones/:id', async (_q, _r, p) => (await getTone(p.id)) ?? Promise.reject(new HttpError(404, 'no such voice')));
+router.put('/api/tones', async (req) => saveTone(await readJson(req)));
+router.delete('/api/tones/:id', async (_q, _r, p) => {
+  if (p.id === 'default') throw new HttpError(400, 'the default voice stays');
+  await deleteTone(p.id);
+  return { ok: true };
+});
+router.post('/api/tones/learn', async (req) => {
+  const b = await readJson(req);
+  const samples = Array.isArray(b.samples) ? b.samples.map(String) : typeof b.samples === 'string' ? String(b.samples).split(/\n{2,}|\n(?=https?:)/) : [];
+  const base = typeof b.id === 'string' ? ((await getTone(b.id)) ?? undefined) : undefined;
+  try {
+    const learned = await learnTone({ name: typeof b.name === 'string' ? b.name : undefined, samples, base });
+    return b.save === false ? learned : saveTone(learned);
+  } catch (e) {
+    throw new HttpError(400, (e as Error).message);
+  }
+});
+const channelOf = (v: unknown) => (typeof v === 'string' && (CHANNELS as string[]).includes(v) ? (v as Channel) : undefined);
+router.post('/api/tones/score', async (req) => {
+  const b = await readJson(req);
+  const tone = (await getTone(String(b.toneId ?? 'default'))) ?? DEFAULT_TONE;
+  return scoreText(String(b.text ?? '').slice(0, 50_000), tone, channelOf(b.channel));
+});
+router.post('/api/tones/rewrite', async (req) => {
+  const b = await readJson(req);
+  const tone = (await getTone(String(b.toneId ?? 'default'))) ?? DEFAULT_TONE;
+  const text = String(b.text ?? '').slice(0, 8000);
+  if (!text.trim()) throw new HttpError(400, 'text is required');
+  try {
+    return await rewriteInVoice(text, tone, channelOf(b.channel));
+  } catch (e) {
+    throw new HttpError(502, (e as Error).message);
+  }
+});
+
 // ── media engines for "Anything": stock, generative, sound effects (all optional, your own keys) ──
 const PROVIDERS: Record<string, { label: string; check?: (key: string) => Promise<void> }> = {
   pixabay: { label: 'Pixabay', check: pixabayCheck },
@@ -437,6 +485,7 @@ router.post('/api/campaigns', async (req) => {
     audience: String(b.audience ?? '').slice(0, 500),
     tone: String(b.tone ?? '').slice(0, 200),
     notes: String(b.notes ?? '').slice(0, 4000),
+    ...(typeof b.toneId === 'string' && (await getTone(b.toneId)) ? { toneId: b.toneId } : {}),
     steps,
   });
   // Env vars and a test login for running the app (stored with the campaign, never returned).

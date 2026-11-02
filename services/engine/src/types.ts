@@ -24,6 +24,8 @@ export interface Revision {
 }
 
 export interface Step {
+  /** Brand-voice score of the copy this step produced (0–100), with the top issues. */
+  brandScore?: { score: number; voice: string; issues: string[] };
   id: string;
   kind: 'brief' | 'pack';
   /** Pack id for kind === 'pack'. */
@@ -64,6 +66,8 @@ export interface Campaign {
   goal: string;
   audience: string;
   tone: string;
+  /** Saved Tone & Voice profile to write in (Setup → Brand voice). */
+  toneId?: string;
   notes: string;
   steps: Step[];
 }

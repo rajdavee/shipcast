@@ -53,6 +53,8 @@ const PostMock = () => (
 export function Home({ status, services, campaigns }: { status: Status | null; services: { name: string; ok: boolean }[] | null; campaigns: Campaign[] | null }) {
   const [text, setText] = useState('');
   const [picks, setPicks] = useState<string[]>(loadPicks);
+  const tones = useLoad(() => api.tones());
+  const [toneId, setToneId] = useState('');
   const [noteOpen, setNoteOpen] = useState(false);
   const [notes, setNotes] = useState('');
   const [shortLen, setShortLen] = useState<'15s' | '30s' | '60s'>('30s');
@@ -114,7 +116,7 @@ export function Home({ status, services, campaigns }: { status: Status | null; s
     setBusy(true);
     setError(null);
     try {
-      const c = await api.createCampaign({ source, notes: finalNotes, deliverables: chosen.map((id) => ({ pack: id, options: optionsFor(id) })) });
+      const c = await api.createCampaign({ source, notes: finalNotes, toneId: toneId || undefined, deliverables: chosen.map((id) => ({ pack: id, options: optionsFor(id) })) });
       go(`/c/${c.id}`);
     } catch (e) {
       setError(String((e as Error).message));
@@ -133,6 +135,7 @@ export function Home({ status, services, campaigns }: { status: Status | null; s
       const c = await api.createCampaign({
         source,
         notes,
+        toneId: toneId || undefined,
         name: undefined,
         env: envText,
         login: login.email || login.password || login.url ? login : undefined,
@@ -254,9 +257,20 @@ export function Home({ status, services, campaigns }: { status: Status | null; s
       <section className="pick" aria-labelledby="pick-h">
         <div className="pick-head">
           <h2 id="pick-h">What should we make?</h2>
+          <span className="pick-tools">
+          {(tones.data?.length ?? 0) > 1 && (
+            <label className="voice-pick">
+              <span className="muted">Voice</span>
+              <select className="select" value={toneId} onChange={(e) => setToneId(e.target.value)} aria-label="Brand voice">
+                <option value="">Learn it from the product</option>
+                {tones.data!.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </label>
+          )}
           <button className="linkish" onClick={() => setNoteOpen(!noteOpen)} aria-expanded={noteOpen}>
             {noteOpen ? 'Hide note' : notes ? 'Edit your note' : 'Add a note for Claude'}
           </button>
+          </span>
         </div>
         {noteOpen && (
           <textarea className="textarea note-box" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Who it's for, what to highlight, what to avoid. E.g. “For CTOs. Show the new dashboard. Don't mention pricing.”" />

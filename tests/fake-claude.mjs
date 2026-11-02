@@ -76,7 +76,7 @@ if (process.env.FAKE_CLAUDE_MODE === 'hang') {
     writeFileSync('out/slides/slide-01.png', 'png');
     writeFileSync('out/carousel.pdf', 'pdf');
     writeFileSync('out/copy.md', '# Copy');
-    writeFileSync('out/copy.json', JSON.stringify({ linkedin: [{ label: 'Story', text: 'A short, specific hook.\n\nBody.' }] }));
+    writeFileSync('out/copy.json', JSON.stringify({ linkedin: [{ label: 'Story', text: 'A short, specific hook that tells you what changes on day one.\n\nBody.' }] }));
     writeFileSync('out/NOTES.md', prompt.includes('Revision request') ? 'revised' : 'first');
   }
   emit({ type: 'result', subtype: 'success', is_error: false, result: 'Done.', total_cost_usd: 0.01, duration_ms: 5, session_id: session });

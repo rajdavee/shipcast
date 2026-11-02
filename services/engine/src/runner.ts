@@ -21,6 +21,7 @@ import { installSkill, isSkillInstalled } from './skills.ts';
 import { ensureForRoles, hubPluginDir, rolesPrompt } from './skillhub.ts';
 import { readCampaignEnv, scrubSecrets } from './campaignenv.ts';
 import type { Campaign, Pack, Step } from './types.ts';
+import { DEFAULT_TONE, getTone, normalizeTone, outputText, PACK_CHANNEL, scoreText, toneBrief, type ToneProfile } from './tone.ts';
 
 export const WORKER_ID = `${hostname()}:${process.pid}`;
 
@@ -199,6 +200,8 @@ export function briefPrompt(c: Campaign): string {
 - **A product, company, app, library or service to market** (a website, a repo, a description of something people use or buy) → use the shipcast:brief skill to research it and write the campaign brief into the current directory, then write intent.json as {"kind": "product"}.
 - **Anything else — a piece of content to make** (a story, cartoon, trailer, music video, documentary, tutorial, recipe, news recap, data story, motivational piece, montage…) → use the shipcast:production-brief skill and write brief.md, brand.json and intent.json into the current directory. Don't treat it as a product.
 
+For a product, also write tone.json: the brand's voice as you heard it in its own copy — {"name", "description", "personality": [≤5 adjectives], "sliders": {"formalCasual", "seriousPlayful", "reservedBold", "technicalSimple", "humor"} (each 0–100), "readingLevel": "grade6|grade8|grade10|expert", "person": "we|I|you", "audience": {"role", "pains": [], "desires": [], "objections": []}, "do": [], "dont": [], "lexicon": {"preferred": {}, "banned": []}, "cta": "soft|direct|urgent"}. Only what the copy shows; leave out what you can't tell.
+
 ${campaignHeader(c)}`;
 }
 
@@ -212,7 +215,22 @@ export function campaignIntent(c: Campaign): { kind: 'product' | 'content'; genr
   }
 }
 
-export function packPrompt(c: Campaign, pack: Pack, step: Step): string {
+/** Formats without copy of their own (captions follow the speaker; app steps write setup notes). */
+const NO_VOICE_PACKS = new Set(['app-run', 'app-capture', 'caption-video', 'captions', 'shorts', 'campaign-hub', 'campaign-plan']);
+
+/** The voice a campaign writes in: the profile the user picked, else the one the brief heard, else the default. */
+export async function campaignTone(c: Campaign): Promise<ToneProfile> {
+  const picked = await getTone(c.toneId);
+  if (picked) return picked;
+  try {
+    const heard = JSON.parse(await readFile(join(campaignDir(c.id), 'brief', 'tone.json'), 'utf8'));
+    return normalizeTone({ ...heard, id: 'campaign', lexicon: { preferred: heard?.lexicon?.preferred ?? {}, banned: [...new Set([...DEFAULT_TONE.lexicon.banned, ...(heard?.lexicon?.banned ?? [])])] } });
+  } catch {
+    return DEFAULT_TONE;
+  }
+}
+
+export function packPrompt(c: Campaign, pack: Pack, step: Step, tone?: ToneProfile): string {
   const vars: Record<string, string> = {
     ...step.options,
     campaign: c.name,
@@ -235,7 +253,7 @@ ${existsSync(join(campaignDir(c.id), 'brief', 'CAMPAIGN-BRIEF.md')) ? `\n\nThis 
 
 ${campaignIntent(c).kind === 'content' ? `\n\n**This is content, not a product** (${campaignIntent(c).genre ?? 'see brief.md'}). brief.md is a production brief: follow its beats, look, sound and engines. Ignore any product-marketing instructions below that don't fit (features, proof, claims, CTA, URLs) unless the brief asks for them — make the piece the brief describes, in this format. For the engines, read the shipcast:director skill.` : ''}
 
-${renderTemplate(pack.prompt, vars).trim()}${step.options._brief || step.options._angle ? `\n\n## Your part of the campaign: ${step.options._title ?? pack.name}\n${[step.options._angle, step.options._brief].filter(Boolean).join('\n')}` : ''}`;
+${renderTemplate(pack.prompt, vars).trim()}${step.options._brief || step.options._angle ? `\n\n## Your part of the campaign: ${step.options._title ?? pack.name}\n${[step.options._angle, step.options._brief].filter(Boolean).join('\n')}` : ''}${tone && campaignIntent(c).kind === 'product' ? `\n\n${toneBrief(tone, PACK_CHANNEL[pack.id])}\n\nEvery word the audience reads or hears follows this voice. Your copy is scored against it when you finish.` : ''}`;
 }
 
 /** Prepare the shared source folder before the brief runs. */
@@ -303,7 +321,7 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
         if (!r.ok) throw new Error(`Couldn't install the ${dep.name} skill from ${dep.source}. Run: npx skills add ${dep.source} -g -a claude-code\n${r.log.slice(-400)}`);
       }
       cwd = join(dir, 'deliverables', step.id);
-      prompt = packPrompt(campaign, pack, step) + hubNote;
+      prompt = packPrompt(campaign, pack, step, await campaignTone(campaign)) + hubNote;
       if (pack.context) {
         const earlier = campaign.steps.filter((s) => s.kind === 'pack' && s.status === 'done' && s.id !== step.id);
         if (earlier.length) prompt += `\n\n## Earlier steps in this campaign\n${earlier.map((s) => `- ${s.pack}: ${join(dir, 'deliverables', s.id, 'out')}/`).join('\n')}`;
@@ -600,6 +618,26 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
       }
     }
 
+    let brandScore: Step['brandScore'];
+    // Brand voice: score what the audience will read; hard misses (banned words, forbidden claims) get one fix round.
+    if (ok && pack && step.kind === 'pack' && !canceled && !timedOut && campaignIntent(campaign).kind === 'product' && !NO_VOICE_PACKS.has(pack.id)) {
+      const tone = await campaignTone(campaign);
+      const ch = PACK_CHANNEL[pack.id];
+      for (let round = 0; round < 2; round++) {
+        const text = await outputText(join(cwd, 'out'));
+        if (text.trim().split(/\s+/).length < 8) break;
+        const sc = scoreText(text, tone, ch);
+        await writeFile(join(cwd, 'out', 'brand-score.json'), JSON.stringify({ voice: tone.name, channel: ch ?? null, ...sc }, null, 2));
+        brandScore = { score: sc.score, voice: tone.name, issues: sc.issues.slice(0, 5).map((i) => i.detail) };
+        const hard = sc.issues.filter((i) => i.severity === 'error');
+        await log({ step: step.id, type: 'log', text: `Brand score ${sc.score}%${sc.issues.length ? ` — ${sc.issues.slice(0, 3).map((i) => i.detail).join(' · ')}` : ''}` });
+        if (!hard.length || round > 0 || renderOnly || !sessionId || Date.now() > deadline) break;
+        const fix = await execClaude(`The brand-voice check (voice "${tone.name}") found:\n${sc.issues.map((i) => `- ${i.detail}`).join('\n')}\n\nRewrite the affected copy in the files you made under out/ so every error is gone (warnings too where it's easy). Keep layout, structure and length; change only the words. If a spec changed, it will be re-rendered for you.`, sessionId);
+        if (!fix.result?.ok) break;
+        if (specKind && existsSync(join(cwd, 'out', SPEC_FILE[specKind]))) await renderSpec(specKind, cwd, join(dir, 'brief')).catch(() => null);
+      }
+    }
+
     // Secrets never ship: scrub every value the user gave from this step's files.
     if (appEnv || Object.keys(await readCampaignEnv(id)).length) {
       const hits = await scrubSecrets(cwd, appEnv ?? (await readCampaignEnv(id)));
@@ -619,6 +657,7 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
       worker: undefined,
       sessionId,
       costUsd: (step.costUsd ?? 0) + costUsd,
+      ...(brandScore ? { brandScore } : {}),
     };
     if (note) patch.revisions = [...step.revisions, { note, at: new Date().toISOString() }];
 

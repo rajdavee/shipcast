@@ -146,7 +146,10 @@ function ResultCard({ campaign, step, pack, now, onOpen, onRetry }: { campaign: 
       </div>
       <div className="result-meta">
         <h3>{step.options._title ?? name}</h3>
-        <p>{step.options._title && step.status !== 'running' ? `${name} · ` : ''}{step.status === 'done' ? (step.revisions.length ? `Revised ${step.revisions.length}×` : 'Ready') : step.status === 'running' ? 'Making it now' : step.status === 'queued' ? 'Queued' : ''}</p>
+        <p>{step.options._title && step.status !== 'running' ? `${name} · ` : ''}{step.status === 'done' ? (step.revisions.length ? `Revised ${step.revisions.length}×` : 'Ready') : step.status === 'running' ? 'Making it now' : step.status === 'queued' ? 'Queued' : ''}
+          {step.status === 'done' && step.brandScore && (
+            <span className={`brand-badge ${step.brandScore.score >= 85 ? 'ok' : step.brandScore.score >= 60 ? 'mid' : 'bad'}`} title={`Voice “${step.brandScore.voice}”${step.brandScore.issues.length ? `: ${step.brandScore.issues.join(' · ')}` : ' — no issues'}`}> · Voice {step.brandScore.score}%</span>
+          )}</p>
       </div>
     </button>
   );

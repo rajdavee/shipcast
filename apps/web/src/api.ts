@@ -12,6 +12,7 @@ export interface StepQuestion { text: string; why?: string; fields: { key: strin
 
 export interface Step {
   id: string;
+  brandScore?: { score: number; voice: string; issues: string[] };
   kind: 'brief' | 'pack';
   pack?: string;
   question?: StepQuestion;
@@ -127,6 +128,35 @@ export interface VoiceState {
   error?: string;
 }
 
+export interface ToneSliders { formalCasual: number; seriousPlayful: number; reservedBold: number; technicalSimple: number; humor: number }
+export interface ToneProfile {
+  id: string;
+  name: string;
+  description: string;
+  personality: string[];
+  sliders: ToneSliders;
+  readingLevel: 'grade6' | 'grade8' | 'grade10' | 'expert';
+  person: 'we' | 'I' | 'you';
+  audience: { role: string; pains: string[]; desires: string[]; objections: string[] };
+  do: string[];
+  dont: string[];
+  lexicon: { preferred: Record<string, string>; banned: string[] };
+  emoji: 'none' | 'sparing' | 'native';
+  hashtags: { max: number; style: 'none' | 'niche' | 'broad' | 'branded' };
+  cta: 'soft' | 'direct' | 'urgent';
+  claims: { allowedStats: string[]; forbidden: string[]; requireSource: boolean };
+  locale: string;
+  channels: Record<string, unknown>;
+  aiDisclosure: boolean;
+  samples: string[];
+  updatedAt?: string;
+}
+export interface BrandScore {
+  score: number;
+  issues: { rule: string; severity: 'error' | 'warn'; detail: string; match?: string; fix?: string }[];
+  stats: { words: number; sentences: number; grade: number; emojis: number; hashtags: number; exclamations: number };
+}
+
 export type StockProvider = 'pixabay' | 'unsplash' | 'pexels';
 export interface StockState {
   connected: boolean;
@@ -162,6 +192,12 @@ export const api = {
   broll: () => call<StockState>('GET', '/api/broll'),
   saveBroll: (provider: StockProvider, apiKey: string) => call<StockState>('PUT', '/api/broll', { provider, apiKey }),
   disconnectBroll: (provider: StockProvider) => call<StockState>('DELETE', `/api/broll/${provider}`),
+  tones: () => call<ToneProfile[]>('GET', '/api/tones'),
+  saveTone: (t: Partial<ToneProfile>) => call<ToneProfile>('PUT', '/api/tones', t),
+  deleteTone: (id: string) => call<{ ok: boolean }>('DELETE', `/api/tones/${id}`),
+  learnTone: (b: { samples: string[]; name?: string; id?: string }) => call<ToneProfile>('POST', '/api/tones/learn', b),
+  scoreCopy: (b: { text: string; toneId: string; channel?: string }) => call<BrandScore>('POST', '/api/tones/score', b),
+  rewriteCopy: (b: { text: string; toneId: string; channel?: string }) => call<{ text: string; score: BrandScore }>('POST', '/api/tones/rewrite', b),
   saveSettings: (s: Partial<Settings>) => call<Settings>('PUT', '/api/settings', s),
   campaigns: () => call<Campaign[]>('GET', '/api/campaigns'),
   campaign: (id: string) => call<Campaign>('GET', `/api/campaigns/${id}`),
