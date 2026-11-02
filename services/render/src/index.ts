@@ -5,11 +5,11 @@ import { join } from 'node:path';
 import { assertInHome, callService, contactSheet, createService, home, PRESETS, presetForSize, run, SERVICE_PORTS, npxRun, engineEnv, chatterboxReady, findBroll, getSecret, readSettings } from '@shipcast/engine';
 import { SCENES } from './scenes.ts';
 import { CAPTION_STYLES } from './captions.ts';
-import { compileStoryboard, validateStoryboard, type Storyboard } from './compile.ts';
+import { compileStoryboard, echoesVoice, validateStoryboard, type Storyboard } from './compile.ts';
 import { compileCaptionVideo } from './captionVideo.ts';
 import { compileInfographic, validateInfographic } from './infographic.ts';
 
-export { SCENES, CAPTION_STYLES, compileStoryboard, validateStoryboard, validateInfographic };
+export { SCENES, CAPTION_STYLES, compileStoryboard, validateStoryboard, validateInfographic, echoesVoice };
 export type { Storyboard };
 
 /** Voice lines are cached by (text, voice, speed): editing visuals never re-synthesizes speech. */

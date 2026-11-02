@@ -360,7 +360,8 @@ export async function compileStoryboard(story: Storyboard, opts: { dir: string; 
   let captionsFile: string | undefined;
   if (words.length && style !== 'none') {
     // Cinematic and B-roll scenes carry their own subtitle line; captions would duplicate it.
-    const ownText = timeline.filter((e) => ['cinema', 'broll', 'character', 'outro', 'logo-sting'].includes(e.sc.scene ?? '')).map((e) => [e.start, e.start + e.duration]);
+    // Likewise any scene whose on-screen words already say most of what the voice says.
+    const ownText = timeline.filter((e) => ['cinema', 'broll', 'character', 'outro', 'logo-sting'].includes(e.sc.scene ?? '') || echoesVoice(e.sc.fields, words.filter((w) => w.start >= e.start && w.start < e.start + e.duration))).map((e) => [e.start, e.start + e.duration]);
     const captionWords = words.filter((w) => !ownText.some(([a, b]) => w.start >= a && w.start < b));
     const part = buildCaptions(captionWords, style, { id: 'captions', width, height, safe: preset.safe, brand: fallbackBrand });
     captionsFile = join(dir, 'compositions', 'captions.html');
@@ -457,3 +458,13 @@ function esc(s: string) {
 }
 
 export const extOf = (f: string) => extname(f).slice(1).toLowerCase();
+
+const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9' ]+/g, ' ').split(/\s+/).filter((w) => w.length > 2);
+
+/** True when ≥60% of the spoken words in a scene are already on screen, so captions would only repeat them. */
+export function echoesVoice(fields: unknown, spoken: Pick<Word, 'text'>[]): boolean {
+  const said = norm(spoken.map((w) => w.text).join(' '));
+  if (said.length < 3) return false;
+  const shown = new Set(norm(JSON.stringify(fields ?? {}).replace(/"[a-zA-Z]+":/g, ' ')));
+  return said.filter((w) => shown.has(w)).length / said.length >= 0.6;
+}

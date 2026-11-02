@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { contrastRatio, ensureContrast, normalizeBrand, brandCss, PRESETS, getPreset, VERTICAL_SAFE, shortsFromStoryboard, patternSimilarity, varietyFeedback } from '@shipcast/engine';
 import { makeMusic, MOODS, toWav, addSfx } from '@shipcast/media';
-import { CAPTION_STYLES, SCENES, validateInfographic, validateStoryboard } from '@shipcast/render';
+import { CAPTION_STYLES, SCENES, echoesVoice, validateInfographic, validateStoryboard } from '@shipcast/render';
 
 test('brand tokens always meet contrast on their ground', () => {
   for (const [primary, bg] of [['#6965db', '#121212'], ['#ffd400', '#ffffff'], ['#1a1a1a', '#0b0d12'], ['#2b3bff', '#eceff3']]) {
@@ -133,4 +133,11 @@ test('music follows the energy curve of the edit', () => {
   const calm = rms(t.left, 2.5, 5.5);
   const big = rms(t.left, 7.5, 9.5);
   assert.ok(big > calm * 1.3, `full section (${big.toFixed(3)}) should be clearly louder than the calm one (${calm.toFixed(3)})`);
+});
+
+test('captions step aside when the scene already shows what the voice says', () => {
+  const w = (s: string) => s.split(' ').map((text) => ({ text }));
+  assert.equal(echoesVoice({ headline: 'Shipped it. Now who makes the launch video?' }, w('Shipped it. Now who makes the launch video?')), true);
+  assert.equal(echoesVoice({ headline: 'Eight tools.' }, w('You need eight different tools to launch one product properly')), false);
+  assert.equal(echoesVoice({ image: 'shots/x.png', zoom: 1.3 }, w('Paste one link into Shipcast today')), false);
 });
