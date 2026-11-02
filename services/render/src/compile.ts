@@ -308,6 +308,20 @@ export async function compileStoryboard(story: Storyboard, opts: { dir: string; 
     clips.push(`<video id="clip-${e.id}" src="${rel}" muted playsinline data-has-audio="false" data-volume="0" data-start="${e.start}" data-duration="${e.duration}" data-track-index="0" style="position:absolute;left:0;top:0;width:${width}px;height:${height}px;object-fit:cover"></video>`);
     credits.push(`${clip.credit} — ${clip.url}`);
   }
+  // Zoom is relative to the screenshot: a full screen can take a 1.6–2.2× push, but a crop is already
+  // zoomed — pushing it further turns the UI into fragments. Cap by the image's real width.
+  for (const e of timeline) {
+    if (e.sc.scene !== 'product' || !e.sc.fields) continue;
+    const f = e.sc.fields as Record<string, unknown>;
+    const src = typeof f.image === 'string' ? (f.image.startsWith('/') ? f.image : join(opts.brandDir ?? '', f.image)) : '';
+    if (!src || !existsSync(src)) continue;
+    const w = (await probe(src).catch(() => null))?.video?.width ?? 0;
+    if (!w) continue;
+    const cap = w < 1600 ? 1.25 : w < 2400 ? 1.6 : 2.2;
+    const want = Number(f.zoom ?? 1.6);
+    if (want > cap) f.zoom = cap;
+    if (w < 1600 && f.focusX === undefined) f.focusX = 0.5;
+  }
   // "Real product UI · sample data" belongs in a kicker or chip, not tacked onto a headline.
   const LABEL = /\s*[·•–—-]?\s*Real product UI(\s*[·•,–—-]?\s*sample data)?\.?\s*$/i;
   for (const e of timeline) {

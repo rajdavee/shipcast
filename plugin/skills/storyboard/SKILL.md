@@ -68,3 +68,11 @@ back to you to fix.
 Fix exactly what's listed — shorten text that overflowed, swap a scene that
 failed, correct a field — by editing `out/storyboard.json`. Then say what you
 changed in `out/NOTES.md` (one line per fix) along with the creative angle.
+
+## Product screens: zoom so the UI stays readable
+
+- A full screenshot (≥ 2400 px wide) can push in 1.6–2.0× — aim `focusX/focusY` at the one control or line the voice is talking about.
+- A cropped screenshot (`#crop=…` or anything narrower than 1600 px) is already a close-up: use `zoom` 1–1.25 and centre it. The renderer caps zoom by image width so a crop never turns into unreadable fragments.
+- Prefer a crop that shows the whole relevant card or panel plus a little context over a deep push into a few words.
+- One idea per product scene: if two details matter, use two scenes rather than a long pan.
+

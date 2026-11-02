@@ -232,7 +232,7 @@ ${S} mark .hl{position:absolute;left:0;top:0;right:0;bottom:0;padding:0 .08em;ba
       { id: 'title', type: 'text', label: 'Caption title', optional: true, max: 60 },
       { id: 'focusX', type: 'number', label: 'Focus X (0–1)', optional: true },
       { id: 'focusY', type: 'number', label: 'Focus Y (0–1)', optional: true },
-      { id: 'zoom', type: 'number', label: 'Zoom (1–2.2)', optional: true },
+      { id: 'zoom', type: 'number', label: 'Zoom (1–2.2)', optional: true, help: 'Full screens 1.6–2.0 on the detail that matters; cropped screenshots (#crop or small images) 1–1.25 — they are already zoomed. The renderer caps zoom by the image width.' },
       { id: 'click', type: 'text', label: 'Click (yes/no)', optional: true },
       { id: 'device', type: 'text', label: 'Frame (browser/phone)', optional: true, help: 'phone = a mobile screenshot in a phone; best for vertical video' },
     ],
