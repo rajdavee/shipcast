@@ -110,6 +110,8 @@ const CSS = (w: number, h: number) => {
 .tall.narrow .hl{font-size:${Math.round(w * 0.15)}px}.tall.narrow .sub{font-size:${Math.round(w * 0.085)}px}.tall.narrow .btn{font-size:${Math.round(w * 0.085)}px;padding:${Math.round(w * 0.05)}px ${Math.round(w * 0.07)}px}
 .tall.narrow .txt{padding:${Math.round(w * 0.09)}px}.tall.narrow .foot{padding:${Math.round(w * 0.06)}px ${Math.round(w * 0.09)}px ${Math.round(w * 0.09)}px;flex-direction:column;align-items:flex-start}
 .tall.narrow .logo{height:${Math.round(w * 0.14)}px}
+.tall.narrow .disc{left:0;right:0;bottom:${Math.round(w * 0.025)}px;text-align:center;font-size:${Math.max(8, Math.round(w * 0.05))}px}
+.tall.narrow .foot{padding-bottom:${Math.round(w * 0.16)}px}
 `;
 };
 
