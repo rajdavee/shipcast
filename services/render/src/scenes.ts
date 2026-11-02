@@ -247,16 +247,22 @@ ${S} mark .hl{position:absolute;left:0;top:0;right:0;bottom:0;padding:0 .08em;ba
       const availW = c.width - pad.l - pad.r;
       // Imagery may run under the platform's bottom UI (only text must stay clear of it).
       const bottom = vertical ? Math.round(c.height * 0.14) : pad.b;
-      const h = c.height - pad.t - bottom - titleH;
+      const boxH = c.height - pad.t - bottom - titleH;
       // Phones keep a 9:19.5 body inside the available box; browsers fill it.
-      const w = phone ? Math.min(availW, Math.round(h / 2.05)) : availW;
+      const w = phone ? Math.min(availW, Math.round(boxH / 2.05)) : availW;
       const left = phone ? Math.round(pad.l + (availW - w) / 2) : pad.l;
+      // A wide screenshot in a tall frame: fit the window to the image instead of cropping its edges.
+      const aspect = Number(f._aspect) || 0;
+      const barH = Math.round(40 * u);
+      const fitH = !phone && aspect > 1 && vertical ? Math.min(boxH, Math.round(w / aspect) + barH) : boxH;
+      const h = fitH;
+      const topOff = Math.round((boxH - fitH) * 0.35);
       const click = String(f.click ?? 'yes') !== 'no';
       return {
         markup:
           b.markup +
           `${f.title ? `<h2 class="cap" style="position:absolute;left:${pad.l}px;right:${pad.r}px;top:${pad.t}px;font-size:${Math.round((vertical ? 80 : 76) * u)}px">${words(f.title)}</h2>` : ''}
-<div class="win${phone ? ' phone' : ''}" style="left:${left}px;top:${pad.t + titleH}px;width:${w}px;height:${h}px"><div class="cam">${phone ? '' : '<div class="bar"><i></i><i></i><i></i></div>'}<img src="${img(f.image, c)}" alt=""></div>${phone ? '<i class="notch"></i>' : ''}</div>
+<div class="win${phone ? ' phone' : ''}" style="left:${left}px;top:${pad.t + titleH + topOff}px;width:${w}px;height:${h}px"><div class="cam">${phone ? '' : '<div class="bar"><i></i><i></i><i></i></div>'}<img src="${img(f.image, c)}" alt=""></div>${phone ? '<i class="notch"></i>' : ''}</div>
 ${click ? `<div class="cursor"><svg viewBox="0 0 24 24" width="${Math.round(54 * u)}" height="${Math.round(54 * u)}"><path d="M4 2l16 9.5-7 1.6-3.6 6.9z" fill="#fff" stroke="#111" stroke-width="1.4" stroke-linejoin="round"/></svg><i class="ripple"></i></div>` : ''}`,
         css:
           b.css +
@@ -277,7 +283,7 @@ ${S} .ripple{position:absolute;left:${Math.round(-30 * u)}px;top:${Math.round(-3
           `tl.fromTo("${S} .win",{y:${80 * u},rotateX:12,opacity:0,transformPerspective:1600},{y:0,rotateX:0,opacity:1,duration:1,ease:"expo.out"},.1);
 tl.fromTo("${S} .cam",{scale:1},{scale:${zoom},duration:1.1,ease:"power3.inOut"},1.2);` +
           (click
-            ? `const tx=${left + w * fx}, ty=${pad.t + titleH + (phone ? 0 : 40 * u) + (h - (phone ? 0 : 40 * u)) * fy};
+            ? `const tx=${left + w * fx}, ty=${pad.t + titleH + topOff + (phone ? 0 : 40 * u) + (h - (phone ? 0 : 40 * u)) * fy};
 tl.fromTo("${S} .cursor",{x:${c.width * 0.86},y:${c.height * 0.9},opacity:0},{x:tx,y:ty,opacity:1,duration:1.15,ease:"power3.inOut"},1.1);
 tl.fromTo("${S} .cursor svg",{scale:1},{scale:.82,duration:.09,yoyo:true,repeat:1,ease:"power2.out",transformOrigin:"10% 10%"},2.35);
 tl.fromTo("${S} .ripple",{scale:.3,opacity:.9},{scale:1.7,opacity:0,duration:.6,ease:"expo.out"},2.38);`

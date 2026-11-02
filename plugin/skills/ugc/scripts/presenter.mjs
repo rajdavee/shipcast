@@ -75,6 +75,7 @@ async function say() {
     image: c.portrait,
     audio: voice.file,
     seconds: Math.ceil(voice.duration),
+    aspect: c.aspect ?? '9:16',
     tier: flags.tier || 'standard',
     ...(flags.placeholder ? { provider: 'fake' } : {}),
     budgetKey: campaign,

@@ -318,6 +318,8 @@ export async function compileStoryboard(story: Storyboard, opts: { dir: string; 
     const pv = (await probe(src).catch(() => null))?.video;
     const w = pv?.width ?? 0;
     if (!w) continue;
+    // The scene sizes its window to the screenshot's real shape (no edge crop in tall frames).
+    if (pv && pv.height) f._aspect = +(pv.width / pv.height).toFixed(4);
     let cap = w < 1600 ? 1.25 : w < 2400 ? 1.6 : 2.2;
     // A wide desktop screen in a tall frame is already cropped at both edges; a deep push cuts the words off.
     const wide = pv && pv.width / Math.max(1, pv.height) > 1.2;
