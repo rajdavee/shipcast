@@ -88,7 +88,11 @@ export function replicateAdapter(key: string): Adapter {
   };
 }
 
-/** Local placeholder: a labelled card (image) or a short labelled clip (video), with the prompt on it. */
+/**
+ * Local placeholder: a labelled card drawn by the stills service (Chrome), so it
+ * shows what the shot will be — capability, prompt, aspect — and for video the
+ * same card held for the clip's length. Falls back to a plain card if stills is down.
+ */
 export function fakeAdapter(workDir: string): Adapter {
   return {
     async upload(file) {
@@ -98,20 +102,32 @@ export function fakeAdapter(workDir: string): Adapter {
       await mkdir(workDir, { recursive: true });
       const id = createHash('sha1').update(JSON.stringify(payload)).digest('hex').slice(0, 10);
       const video = ['i2v', 't2v', 's2v', 'lipsync', 'upscale-video'].includes(m.capability);
-      const [w, h] = payload.aspect === '9:16' ? [720, 1280] : payload.aspect === '1:1' ? [1024, 1024] : [1280, 720];
-      const label = String(payload.prompt ?? m.capability).replace(/[^\w ,.-]/g, ' ').slice(0, 80);
-      const out = `${workDir}/fake-${m.capability}-${id}.${video ? 'mp4' : 'png'}`;
-      const text = `drawtext=text='PLACEHOLDER  ${m.capability}':fontcolor=white:fontsize=${Math.round(h / 16)}:x=(w-text_w)/2:y=h/2-${Math.round(h / 10)},drawtext=text='${label.replace(/'/g, '')}':fontcolor=0xcfd6e4:fontsize=${Math.round(h / 36)}:x=(w-text_w)/2:y=h/2+${Math.round(h / 24)}`;
-      const src = `color=c=0x1e2533:s=${w}x${h}${video ? `:d=${Math.min(10, Number(payload.seconds ?? payload.duration ?? 5) || 5)}` : ''}`;
-      const args = video ? ['-y', '-v', 'error', '-f', 'lavfi', '-i', src, '-vf', text, '-pix_fmt', 'yuv420p', out] : ['-y', '-v', 'error', '-f', 'lavfi', '-i', src, '-vf', text, '-frames:v', '1', out];
-      const r = await run('ffmpeg', args, { timeoutMs: 120_000 });
-      if (r.code !== 0) {
-        // drawtext needs a font; fall back to a plain card rather than failing the pipeline.
-        const plain = video ? ['-y', '-v', 'error', '-f', 'lavfi', '-i', src, '-pix_fmt', 'yuv420p', out] : ['-y', '-v', 'error', '-f', 'lavfi', '-i', src, '-frames:v', '1', out];
-        const r2 = await run('ffmpeg', plain, { timeoutMs: 120_000 });
-        if (r2.code !== 0) throw new Error(`placeholder render failed: ${r2.stderr.slice(-200)}`);
+      const [w, h] = payload.aspect === '9:16' ? [720, 1280] : payload.aspect === '1:1' ? [1024, 1024] : payload.aspect === '4:5' ? [1024, 1280] : [1280, 720];
+      const esc = (x: unknown) => String(x ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+      const kind = { t2i: 'Generated image', edit: 'Edited image', i2v: 'Generated clip', t2v: 'Generated clip', s2v: 'Talking presenter', lipsync: 'Lip-synced clip', upscale: 'Upscaled image', 'upscale-video': 'Upscaled clip', cutout: 'Cut-out' }[m.capability];
+      const html = `<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;width:${w}px;height:${h}px;overflow:hidden}body{display:grid;place-items:center;background:repeating-linear-gradient(135deg,#1d2433 0 22px,#212a3b 22px 44px);font-family:-apple-system,Helvetica,Arial,sans-serif;color:#e8ecf4}.c{max-width:78%;text-align:center;display:grid;gap:${Math.round(h / 40)}px}.k{font-weight:800;letter-spacing:.16em;text-transform:uppercase;font-size:${Math.round(h / 34)}px;color:#9fb0cc}.p{font-size:${Math.round(h / 22)}px;line-height:1.3;font-weight:600}.n{font-size:${Math.round(h / 44)}px;color:#8a97ad}</style></head><body><div class="c"><div class="k">Placeholder · ${esc(kind)}</div><div class="p">${esc(String(payload.prompt ?? '').slice(0, 180))}</div><div class="n">Connect a generation key in Setup to make it real · ${w}×${h}</div></div></body></html>`;
+      const card = `${workDir}/fake-${m.capability}-${id}.html`;
+      const png = `${workDir}/fake-${m.capability}-${id}.png`;
+      await writeFile(card, html);
+      let drawn = false;
+      try {
+        const base = process.env.SHIPCAST_STILLS_URL ?? 'http://127.0.0.1:4321';
+        const r = await fetch(`${base}/run`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'html', input: { file: card, out: png, width: w, height: h } }), signal: AbortSignal.timeout(60_000) });
+        drawn = r.ok && ((await r.json()) as { status?: string }).status === 'done';
+      } catch {}
+      if (!drawn) {
+        const r = await run('ffmpeg', ['-y', '-v', 'error', '-f', 'lavfi', '-i', `color=c=0x1e2533:s=${w}x${h}`, '-frames:v', '1', png], { timeoutMs: 60_000 });
+        if (r.code !== 0) throw new Error(`placeholder render failed: ${r.stderr.slice(-200)}`);
       }
-      return { files: [out] };
+      if (!video) return { files: [png] };
+      const secs = Math.min(10, Number(payload.seconds ?? payload.duration ?? 5) || 5);
+      const mp4 = `${workDir}/fake-${m.capability}-${id}.mp4`;
+      // Talking-presenter stand-ins keep the voice track so the edit's timing and sound are real.
+      const audio = typeof payload.audio === 'string' && !/^https?:/.test(payload.audio) ? payload.audio : '';
+      const args = ['-y', '-v', 'error', '-loop', '1', '-i', png, ...(audio ? ['-i', audio] : []), '-t', String(secs), '-r', '30', '-pix_fmt', 'yuv420p', '-c:v', 'libx264', ...(audio ? ['-c:a', 'aac', '-shortest'] : []), mp4];
+      const r = await run('ffmpeg', args, { timeoutMs: 120_000 });
+      if (r.code !== 0) throw new Error(`placeholder clip failed: ${r.stderr.slice(-200)}`);
+      return { files: [mp4] };
     },
   };
 }
