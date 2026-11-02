@@ -396,7 +396,7 @@ tbody tr:nth-child(even) td{background:color-mix(in srgb,var(--tint) 60%,transpa
 .op-head{background:var(--cover-bg);color:var(--cover-fg);padding:44px 56px 40px;display:grid;gap:12px}
 .op-head .title{font:800 40px/1.05 var(--font-display);letter-spacing:-.03em;text-wrap:balance}
 .op-head .lede{font-size:16px}
-.op-body{flex:1;padding:28px 56px 0;display:flex;flex-direction:column;gap:18px;overflow:hidden}
+.op-body{flex:1;min-height:0;padding:28px 56px 0;display:flex;flex-direction:column;gap:18px;overflow:hidden}
 .op-body .shot img{max-height:250px}
 .op-foot{display:flex;justify-content:space-between;align-items:center;padding:20px 56px 28px;border-top:1px solid var(--rule);font:600 13px var(--font-body);color:var(--soft)}
 `;
@@ -434,7 +434,10 @@ export const DOC_AUDIT_SCRIPT = `(() => {
   const out = [];
   document.querySelectorAll('section.pg').forEach((pg, i) => {
     const box = pg.querySelector('.pg-body, .op-body, .cover-body') || pg;
-    const over = Math.max(0, box.scrollHeight - box.clientHeight);
+    // Content can also push past the page itself (a box that grew instead of scrolling), or under the one-pager footer.
+    const foot = pg.querySelector('.op-foot');
+    const lastBottom = Math.max(...[...box.children].map((c) => c.getBoundingClientRect().bottom), 0);
+    const over = Math.max(0, box.scrollHeight - box.clientHeight, pg.scrollHeight - pg.clientHeight, foot ? lastBottom - foot.getBoundingClientRect().top : 0, lastBottom - pg.getBoundingClientRect().bottom);
     const wide = [...pg.querySelectorAll('h1,h2,table,.feat-grid,.stat-grid')].some((el) => el.scrollWidth > el.clientWidth + 2);
     const broken = [...pg.querySelectorAll('img')].filter((im) => !im.complete || !im.naturalWidth).length;
     // How much of the page the content actually uses: half-empty inner pages look unfinished.
