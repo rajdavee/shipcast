@@ -5,6 +5,7 @@ import { assertInHome, browser, writePptx, type PptxSlide, createService, FIT_SC
 import { CAROUSEL_LAYOUTS, carouselIconNames, renderCarouselSlide, THEMES } from './templates/carousel.ts';
 import type { RenderCtx } from './templates/common.ts';
 import { CARD_LAYOUTS, renderCard, renderThumbnail, THUMBNAIL_LAYOUTS } from './templates/graphics.ts';
+import { AD_SIZES, DEFAULT_AD_SIZES, renderAd, type AdSpec } from './templates/ads.ts';
 import { HIDE_TEXT_CSS, MEASURE_TEXT_SCRIPT, renderSlide, SLIDE_LAYOUTS, SLIDE_THEMES, slideIconNames, type SlidePage } from './templates/slides.ts';
 import { DOC_AUDIT_SCRIPT, DOC_LAYOUTS, DOC_THEMES, docIconNames, PAGE_SIZES, renderDocument, type DocPage } from './templates/document.ts';
 
@@ -86,6 +87,8 @@ async function captureOnce(html: string, file: string, width: number, height: nu
   const page = await browser().open(pathToFileURL(htmlFile).href, { width, height, settleMs: 80 });
   try {
     await page.eval(FIT_SCRIPT);
+    // Templates with their own fitting rules (ads) expose it on the page.
+    await page.eval('document.fonts.ready.then(() => (window.__shipcastFit ? window.__shipcastFit() : 0))');
     const audit = await page.eval<LayoutAudit>(layoutAuditScript(safe, width, height));
     const jpg = /\.jpe?g$/.test(file);
     await writeFile(file, await page.screenshot(jpg ? 'jpeg' : 'png', 90));
@@ -96,6 +99,25 @@ async function captureOnce(html: string, file: string, width: number, height: nu
 }
 
 /** Combine PNG pages into one PDF, each page exactly the slide size. */
+/** A labelled grid of mixed-size images (ads, page sets), drawn by Chrome so any sizes fit. */
+async function contactSheet(images: { file: string; label: string }[], out: string, cell = 300): Promise<string> {
+  const cols = Math.min(5, images.length);
+  const rows = Math.ceil(images.length / cols);
+  const W = cols * (cell + 20) + 20;
+  const H = rows * (cell + 46) + 20;
+  const html = `<!doctype html><html><head><style>html,body{margin:0;background:#e6e8ec;font:600 13px system-ui}.g{display:grid;grid-template-columns:repeat(${cols},${cell}px);gap:20px 20px;padding:20px}.c{height:${cell + 26}px;display:grid;grid-template-rows:${cell}px 26px;justify-items:center;align-items:center}.c img{max-width:${cell}px;max-height:${cell}px;box-shadow:0 6px 18px -8px rgba(0,0,0,.35)}.c span{color:#4a505c}</style></head><body><div class="g">${images.map((i) => `<div class="c"><img src="${pathToFileURL(i.file).href}"><span>${i.label}</span></div>`).join('')}</div></body></html>`;
+  const tmp = out.replace(/\.png$/, '.html');
+  await writeFile(tmp, html);
+  const p = await browser().open(pathToFileURL(tmp).href, { width: W, height: H, settleMs: 200 });
+  try {
+    await writeFile(out, await p.screenshot('png'));
+  } finally {
+    await p.close();
+    await rm(tmp, { force: true });
+  }
+  return out;
+}
+
 async function pdfFromImages(images: string[], out: string, width: number, height: number): Promise<string> {
   try {
     return await pdfOnce(images, out, width, height);
@@ -143,9 +165,37 @@ export function createStillsService() {
         carousel: { themes: Object.fromEntries(Object.entries(THEMES).map(([k, v]) => [k, v.label])), layouts: CAROUSEL_LAYOUTS.map(({ html, ...l }) => l) },
         thumbnail: { layouts: THUMBNAIL_LAYOUTS.map(({ html, ...l }) => l) },
         card: { layouts: CARD_LAYOUTS.map(({ html, ...l }) => l) },
+        ads: { sizes: Object.fromEntries(Object.entries(AD_SIZES).map(([k, v]) => [k, `${v.w}×${v.h} ${v.label}`])), defaultSizes: DEFAULT_AD_SIZES, themes: ['brand', 'light', 'dark'] },
         slides: { themes: Object.fromEntries(Object.entries(SLIDE_THEMES).map(([k, v]) => [k, v.label])), layouts: SLIDE_LAYOUTS.map(({ html, ...l }) => l) },
         document: { themes: Object.fromEntries(Object.entries(DOC_THEMES).map(([k, v]) => [k, v.label])), sizes: Object.fromEntries(Object.entries(PAGE_SIZES).map(([k, v]) => [k, v.label])), layouts: DOC_LAYOUTS.map(({ html, ...l }) => l) },
       }),
+
+      /** An ad set: every hook variant × every placement size, an upload sheet and a contact sheet per variant. */
+      ads: async (input: AdSpec & { brandDir?: string; brand?: Partial<BrandKit>; outDir: string }, ctx) => {
+        const outDir = assertInHome(input.outDir, 'outDir');
+        const { brand, assetsDir } = await brandFrom(input);
+        if (!Array.isArray(input.variants) || !input.variants.length) throw new Error('variants are required');
+        const sizes = (input.sizes?.length ? input.sizes : DEFAULT_AD_SIZES).filter((x) => AD_SIZES[x]);
+        const slug = (x: string) => String(x).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30) || 'v';
+        const items = [];
+        const csv = [['variant', 'size', 'platform', 'width', 'height', 'file', 'headline', 'primary_text', 'description', 'cta', 'url'].join(',')];
+        const q = (x: unknown) => `"${String(x ?? '').replace(/"/g, '""')}"`;
+        let n = 0;
+        for (const v of input.variants.slice(0, 10)) {
+          const vdir = join(outDir, 'ads', slug(v.name));
+          for (const sz of sizes) {
+            ctx.progress(n++ / (input.variants.length * sizes.length), `${v.name} · ${sz}`);
+            const s = AD_SIZES[sz];
+            const file = join(vdir, `${slug(v.name)}-${sz}.png`);
+            const r = await capture(renderAd(input, v, sz, { brand, width: s.w, height: s.h, assetsDir }), file, s.w, s.h, s.safe ?? { top: 0, right: 0, bottom: 0, left: 0 });
+            items.push({ ...r, variant: v.name, size: sz });
+            csv.push([q(v.name), sz, s.platform, s.w, s.h, q(file.slice(outDir.length + 1)), q(v.headline.replace(/[*=]/g, '')), q(v.primary), q(v.description), q(input.cta), q(input.url)].join(','));
+          }
+          await contactSheet(items.filter((x) => x.variant === v.name).map((x) => ({ file: x.file, label: `${AD_SIZES[x.size].w}×${AD_SIZES[x.size].h}` })), join(outDir, `${slug(v.name)}.sheet.png`));
+        }
+        await writeFile(join(outDir, 'ads.csv'), csv.join('\n') + '\n');
+        return { items, csv: join(outDir, 'ads.csv'), sizes, variants: input.variants.map((v) => v.name) };
+      },
 
       /**
        * A presentation → slide PNGs, a PDF and an editable PPTX: each PPTX slide is a

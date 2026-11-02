@@ -136,3 +136,23 @@ test('stills renders slides to PNGs, a PDF and an editable PPTX with notes', { s
   const xml = execFileSync('unzip', ['-p', join(out, 'presentation.pptx'), 'ppt/slides/slide1.xml']).toString();
   assert.match(xml, /R&amp;D &lt;2026&gt;/, 'title is editable text');
 });
+
+test('stills renders an ad set: every variant × size, an upload sheet, nothing overflowing', { skip: !hasChrome && 'no Chrome' }, async () => {
+  const out = join(home, 'ads');
+  const job = await run('ads', {
+    theme: 'brand',
+    brand: { name: 'Acme', colors: { background: '#ffffff', primary: '#3355ff' } },
+    outDir: out,
+    cta: 'Start free',
+    sizes: ['meta-square', 'story', 'display-728x90', 'display-300x250', 'display-160x600'],
+    variants: [{ name: 'Pain', headline: 'Still chasing *invoices* by email every Friday afternoon?', sub: 'Get paid two days sooner.', primary: 'Stop chasing.' }, { name: 'stat', headline: '2 days *faster*' }],
+  });
+  assert.equal(job.status, 'done', job.error);
+  assert.equal(job.output.items.length, 10);
+  assert.ok(existsSync(join(out, 'ads', 'pain', 'pain-display-728x90.png')));
+  assert.ok(existsSync(join(out, 'pain.sheet.png')));
+  const csv = (await import('node:fs')).readFileSync(join(out, 'ads.csv'), 'utf8').trim().split('\n');
+  assert.equal(csv.length, 11);
+  assert.match(csv[1], /"Pain",meta-square,meta,1080,1080/);
+  for (const it of job.output.items) assert.deepEqual(it.audit.offCanvas, [], `${it.variant} ${it.size}`);
+});

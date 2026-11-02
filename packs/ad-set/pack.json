@@ -1,0 +1,22 @@
+{
+  "id": "ad-set",
+  "name": "Ad set",
+  "tagline": "One concept, 3–10 hook variants, every placement — Meta, Stories, LinkedIn, X and Google Display banners — plus an upload sheet with primary text and headlines.",
+  "category": "design",
+  "order": 9,
+  "estimate": "4–8 min",
+  "accent": "#e8481c",
+  "spec": "ads",
+  "options": [
+    { "key": "variants", "label": "Hook variants", "type": "number", "default": "5", "min": 2, "max": 10 },
+    { "key": "placements", "label": "Placements", "type": "select", "choices": ["social", "display", "all"], "default": "social" },
+    { "key": "theme", "label": "Theme", "type": "select", "choices": ["auto", "brand", "light", "dark"], "default": "auto" },
+    { "key": "goal", "label": "Goal", "type": "select", "choices": ["conversion", "awareness", "retargeting"], "default": "conversion" },
+    { "key": "offer", "label": "Offer (optional)", "type": "text", "default": "", "placeholder": "e.g. 30-day free trial — only if it's real" }
+  ],
+  "outputs": ["ads/**/*.png", "*.sheet.png", "ads.csv", "ads.json", "*.md"],
+  "skills": [],
+  "tools": ["chrome"],
+  "roles": ["design-taste", "copy", "humanize"],
+  "timeoutMinutes": 30
+}

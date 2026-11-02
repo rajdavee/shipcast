@@ -446,7 +446,7 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
     else if (pack?.pipeline === 'shorts') await phase('Cutting Shorts from your video');
     else if (pack?.pipeline === 'hub') await phase('Packaging the campaign');
     else if (pack?.pipeline) await phase('Transcribing and captioning');
-    else if (!renderOnly) await phase(specKind === 'storyboard' ? 'Writing the script' : specKind === 'infographic' ? 'Researching the framework' : specKind === 'deck' ? 'Writing the slides' : specKind === 'graphics' ? 'Designing the graphics' : specKind === 'document' ? 'Writing the document' : specKind === 'slides' ? 'Writing the deck' : pack?.id === 'copy-kit' ? 'Writing the posts' : 'Making it');
+    else if (!renderOnly) await phase(specKind === 'storyboard' ? 'Writing the script' : specKind === 'infographic' ? 'Researching the framework' : specKind === 'deck' ? 'Writing the slides' : specKind === 'graphics' ? 'Designing the graphics' : specKind === 'document' ? 'Writing the document' : specKind === 'slides' ? 'Writing the deck' : specKind === 'ads' ? 'Writing the hooks' : pack?.id === 'copy-kit' ? 'Writing the posts' : 'Making it');
     if (pack?.pipeline === 'captions') {
       // No Claude: transcribe the upload, style the captions, render, master, check.
       const uploads = join(dir, 'uploads');
@@ -569,7 +569,7 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
         const force: Record<string, unknown> = {};
         if (pack?.id === 'carousel') force.motion = step.options.motion === 'no' ? null : 'chill';
         // Choices made in the format options win over what the model wrote.
-        if ((pack?.id === 'document' || pack?.id === 'presentation') && step.options.theme && step.options.theme !== 'auto') force.theme = step.options.theme;
+        if ((pack?.id === 'document' || pack?.id === 'presentation' || pack?.id === 'ad-set') && step.options.theme && step.options.theme !== 'auto') force.theme = step.options.theme;
         if (pack?.id === 'document' && step.options.size && step.options.size !== 'auto') force.size = step.options.size;
         const r = await renderSpec(specKind, cwd, join(dir, 'brief'), { force });
         await log({ step: step.id, type: 'log', text: r.ok ? `Rendered: ${r.summary}` : `Quality check found ${r.feedback.length} issue(s): ${r.feedback.slice(0, 3).join(' · ')}` });

@@ -31,7 +31,7 @@ html,body{background:var(--bg);color:var(--fg)}
 .theme-light .s.hero{background:var(--bg);color:var(--fg)}
 .foot{position:absolute;left:120px;right:120px;bottom:40px;display:flex;justify-content:space-between;align-items:center;font:600 20px/1 var(--font-body);color:var(--muted)}
 .s.hero .foot{color:color-mix(in srgb,currentColor 70%,transparent)}
-.logo{height:40px;width:auto;max-width:240px;object-fit:contain}
+.logo{height:40px;width:auto;max-width:240px;object-fit:contain;align-self:flex-start;flex:none}
 .s.hero img.logo{background:#fff;border-radius:12px;padding:8px 12px;height:58px;box-shadow:0 10px 30px -14px rgba(0,0,0,.4)}
 .theme-light .s.hero img.logo{background:none;padding:0;box-shadow:none;height:40px}
 .s.hero .src{color:inherit;opacity:.78}

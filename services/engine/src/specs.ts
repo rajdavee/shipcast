@@ -13,9 +13,9 @@ import { KNOWN_ICONS } from './icons.ts';
  * actionable feedback.
  */
 
-export type SpecKind = 'deck' | 'graphics' | 'storyboard' | 'infographic' | 'document' | 'slides';
+export type SpecKind = 'deck' | 'graphics' | 'storyboard' | 'infographic' | 'document' | 'slides' | 'ads';
 
-export const SPEC_FILE: Record<SpecKind, string> = { deck: 'deck.json', graphics: 'graphics.json', storyboard: 'storyboard.json', infographic: 'infographic.json', document: 'document.json', slides: 'slides.json' };
+export const SPEC_FILE: Record<SpecKind, string> = { deck: 'deck.json', graphics: 'graphics.json', storyboard: 'storyboard.json', infographic: 'infographic.json', document: 'document.json', slides: 'slides.json', ads: 'ads.json' };
 
 type FieldDoc = { id: string; type: string; label: string; optional?: boolean; max?: number; help?: string; choices?: string[] };
 const fieldLine = (f: FieldDoc) =>
@@ -76,6 +76,17 @@ export async function catalogMarkdown(kind: SpecKind): Promise<string> {
       '',
       '## Layouts',
       ...c.document.layouts.map((l: any) => `### \`${l.id}\` — ${l.label}\n${l.use}\n${l.fields.map(fieldLine).join('\n')}`),
+    ].join('\n');
+  }
+  if (kind === 'ads') {
+    return [
+      '# Ad set catalog',
+      '',
+      'Spec: `{ "theme": "brand|light|dark", "image": "assets/…", "imageStyle": "shot|cover", "cta": "Book a demo", "url": "acme.com", "offer"?: "30-day trial", "sizes"?: [ids], "disclosure"?: "AI-generated image", "variants": [ { "name": "pain", "headline": "≤ 8 words, *accent*", "sub": "≤ 14 words", "primary": "platform primary text ≤ 125 chars", "description": "≤ 30 chars" } ] }`',
+      `Sizes (default: ${c.ads.defaultSizes.join(', ')}):`,
+      ...Object.entries(c.ads.sizes).map(([k, v]) => `- \`${k}\` ${v}`),
+      'One template reflows per shape: strips (728×90, 320×50) show logo + headline + button only, so the headline must work alone; skyscrapers stack; stories keep text out of the top 270 px and bottom 380 px.',
+      '`imageStyle: "shot"` frames a product screenshot; `"cover"` fills the visual area with a photo. Use real screenshots from assets/.',
     ].join('\n');
   }
   if (kind === 'slides') {
@@ -178,6 +189,15 @@ export async function renderSpec(kind: SpecKind, cwd: string, briefDir: string, 
     if (kind === 'document') {
       const r = await callService('stills', 'document', { ...spec, brandDir: briefDir, outDir: out, name: 'document' });
       return { ok: !r.problems.length, feedback: r.problems, summary: `${r.pages.length}-page PDF` };
+    }
+    if (kind === 'ads') {
+      const r = await callService('stills', 'ads', { ...spec, brandDir: briefDir, outDir: out });
+      const fb = r.items.flatMap((g: any) => [
+        ...g.audit.overflow.map((x: string) => `${g.variant} @ ${g.size}: text overflows (${x}) — shorten the headline for small sizes.`),
+        ...g.audit.offCanvas.map((x: string) => `${g.variant} @ ${g.size}: text runs off the ad (${x}).`),
+        ...(g.size === 'story' ? g.audit.unsafe.slice(0, 1).map((x: string) => `${g.variant} @ story: ${x} sits where the platform UI covers it.`) : []),
+      ]);
+      return { ok: !fb.length, feedback: fb.slice(0, 20), summary: `${r.variants.length} variants × ${r.sizes.length} sizes + ads.csv` };
     }
     if (kind === 'slides') {
       const r = await callService('stills', 'slides', { ...spec, brandDir: briefDir, outDir: out, name: 'presentation' });
