@@ -23,4 +23,4 @@ Read `./catalog.md` first: sizes, layouts and fields. Never invent a size or lay
 - Event pieces need real date, place and booth from the brief — if missing, leave the field out and list it in NOTES.md; never invent them.
 - Real screenshots or photos from `assets/` only.
 - Theme: `brand` for attention (posters, banners), `light` for information (flyers, table cards), `dark` for tech events and evening venues.
-- Screenshots: crop to the part that matters with `#crop=x,y,w,h` on the image path (fractions of the image). Readable UI beats a whole screen; never leave a slide or page as a wall of text when a cropped screen or chart can carry the point.
+- Screenshots: crop to the part that matters with `#crop=x,y,w,h` on the image path (fractions of the image). Readable UI beats a whole screen; never leave a slide or page as a wall of text when a cropped screen or chart can carry the point. A crop that cuts a card or panel is widened to show all of it; one wholly inside a panel stays a zoom. The checker reports UI text that lands too small and how far to tighten — for phone formats, show roughly 400–600 px of the screen's width at most.

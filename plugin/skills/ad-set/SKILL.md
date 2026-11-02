@@ -39,4 +39,4 @@ Rules:
 - Use a real product screenshot from `assets/` with `imageStyle: "shot"`; use `"cover"` only for a real photo.
 - If the visual shows an AI-generated person or scene, set `disclosure` (e.g. "AI-generated image").
 - Theme: `brand` for awareness and feeds, `dark` for developer/tech audiences, `light` for conservative B2B and display networks.
-- Screenshots: crop to the part that matters with `#crop=x,y,w,h` on the image path (fractions of the image). Readable UI beats a whole screen; never leave a slide or page as a wall of text when a cropped screen or chart can carry the point.
+- Screenshots: crop to the part that matters with `#crop=x,y,w,h` on the image path (fractions of the image). Readable UI beats a whole screen; never leave a slide or page as a wall of text when a cropped screen or chart can carry the point. A crop that cuts a card or panel is widened to show all of it; one wholly inside a panel stays a zoom. The checker reports UI text that lands too small and how far to tighten — for phone formats, show roughly 400–600 px of the screen's width at most.

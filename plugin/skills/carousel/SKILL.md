@@ -48,4 +48,4 @@ Pick one angle (the prompt may set it): `problem-solution`, `how-it-works`, `lis
 - Use the brand's own words and proof from the brief. No invented stats, quotes or customers.
 
 Finish with `out/NOTES.md`: the angle in one line and why this theme.
-- Screenshots: crop to the part that matters with `#crop=x,y,w,h` on the image path (fractions of the image). Readable UI beats a whole screen; never leave a slide or page as a wall of text when a cropped screen or chart can carry the point.
+- Screenshots: crop to the part that matters with `#crop=x,y,w,h` on the image path (fractions of the image). Readable UI beats a whole screen; never leave a slide or page as a wall of text when a cropped screen or chart can carry the point. A crop that cuts a card or panel is widened to show all of it; one wholly inside a panel stays a zoom. The checker reports UI text that lands too small and how far to tighten — for phone formats, show roughly 400–600 px of the screen's width at most.
