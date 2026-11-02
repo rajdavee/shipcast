@@ -1,4 +1,4 @@
-import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile, rename } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -217,8 +217,9 @@ export async function setRole(role: string, id: string | null): Promise<HubState
 /** Rebuild the "hub" plugin from every installed, enabled package. */
 export async function buildHubPlugin(): Promise<string[]> {
   const [reg, s] = await Promise.all([loadRegistry(), hubState()]);
-  const dir = hubPluginDir();
-  await rm(dir, { recursive: true, force: true });
+  // Several workers can rebuild at once: build aside, then swap the finished folder in.
+  const final = hubPluginDir();
+  const dir = `${final}.build-${process.pid}-${Date.now().toString(36)}`;
   await mkdir(join(dir, '.claude-plugin'), { recursive: true });
   await mkdir(join(dir, 'skills'), { recursive: true });
   await writeFile(join(dir, '.claude-plugin', 'plugin.json'), JSON.stringify({ name: 'hub', description: "Upstream skills enabled in Shipcast's Skill Hub", version: '1.0.0' }, null, 2));
@@ -232,6 +233,15 @@ export async function buildHubPlugin(): Promise<string[]> {
       names.push(name);
     }
   }
+  const old = `${final}.old-${process.pid}-${Date.now().toString(36)}`;
+  await rename(final, old).catch(() => {});
+  try {
+    await rename(dir, final);
+  } catch {
+    // Another worker swapped its build in first; theirs is identical, keep it.
+    await rm(dir, { recursive: true, force: true });
+  }
+  await rm(old, { recursive: true, force: true }).catch(() => {});
   return names;
 }
 
