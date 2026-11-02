@@ -106,3 +106,8 @@ test('bracketed "replace before sending" notes are placeholders', async () => {
   const { scoreText, DEFAULT_TONE } = await import('@shipcast/engine');
   assert.equal(scoreText('Veracy, [Veracy postal address: replace before sending], Panama. Thanks for reading our launch note today.', DEFAULT_TONE).issues.filter((i) => i.rule === 'placeholder').length, 1);
 });
+
+test('"the best way to" is phrasing, not a claim', async () => {
+  const { scoreText, DEFAULT_TONE } = await import('@shipcast/engine');
+  assert.equal(scoreText('The best way to see it is a short walkthrough with a matter of your own.', DEFAULT_TONE).issues.filter((i) => i.rule === 'claim').length, 0);
+});

@@ -253,7 +253,7 @@ export function scoreText(text: string, p: ToneProfile, ch?: Channel): BrandScor
       if (/https?:\/\/|\]\(|\bsource[ds]?\b|\bper\s+[A-Z]/i.test(line)) continue;
       if (!allowed.includes(m[1].toLowerCase().replace(/\s/g, ''))) issues.push({ rule: 'unsourced', severity: 'warn', detail: `Check the source for "${m[1].trim()}"`, match: m[1].trim() });
     }
-    for (const m of text.matchAll(/\b(the (?:best|fastest|leading|most (?:advanced|powerful|trusted)) \w+|best-in-class|industry-leading|world-leading|unmatched|unbeatable)\b/gi)) issues.push({ rule: 'claim', severity: 'warn', detail: `Superlative needs proof: "${m[1]}"`, match: m[1] });
+    for (const m of text.matchAll(/\b(the (?:best|fastest|leading|most (?:advanced|powerful|trusted)) (?!way\b|time\b|part\b|thing\b|place\b|moment\b|approach\b|practice\b)\w+|best-in-class|industry-leading|world-leading|unmatched|unbeatable)\b/gi)) issues.push({ rule: 'claim', severity: 'warn', detail: `Superlative needs proof: "${m[1]}"`, match: m[1] });
   }
   const rg = readingGrade(text);
   const target = GRADE[c.readingLevel][1];
