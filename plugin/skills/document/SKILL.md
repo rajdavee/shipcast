@@ -34,5 +34,7 @@ Don't render anything yourself — the worker renders `document.json`, checks ea
 - Article pages: about 280 words with an image, 420 without. Split long chapters across pages rather than cramming; but a page under half full looks unfinished — add substance or merge pages.
 - Every number has a source (the brief, product-facts.md or a cited public source in `source`). Never invent customers, quotes, logos or statistics.
 - Use real product screenshots from `assets/` on the cover, in articles and on the one-pager.
+- The document speaks to the reader only. Never put production notes in it ("screens are from the demo seed", "described from the script") — those go in NOTES.md. A single honest label like "Fictional demo data" in the footer is enough.
+- No placeholders: if the brief has no URL, use the product's domain from the brief or leave the field out. `[URL]`, TBD and lorem ipsum are flagged as errors.
 - Pick the theme for the audience: `clean` (most B2B), `editorial` (thought leadership, finance, legal, premium), `dark` (developer and security products, launches).
 - Size: `letter` for a US audience, otherwise `a4`.

@@ -192,7 +192,7 @@ export function toneBrief(p: ToneProfile, ch?: Channel): string {
 // ── brand score ──────────────────────────────────────────────────────────
 
 export interface ScoreIssue {
-  rule: 'banned' | 'preferred' | 'claim' | 'unsourced' | 'reading' | 'emoji' | 'hashtags' | 'exclaim' | 'caps' | 'person';
+  rule: 'banned' | 'preferred' | 'claim' | 'unsourced' | 'reading' | 'emoji' | 'hashtags' | 'exclaim' | 'caps' | 'person' | 'placeholder';
   severity: 'error' | 'warn';
   detail: string;
   /** Text to find, when the issue points at a span. */
@@ -237,6 +237,8 @@ export function scoreText(text: string, p: ToneProfile, ch?: Channel): BrandScor
     const m = text.match(wordRe(w));
     if (m) issues.push({ rule: 'banned', severity: 'error', detail: `Banned: "${w}" (${m.length}×)`, match: w });
   }
+  // Unfinished copy never ships: bracketed placeholders, TBDs, lorem ipsum, template tokens.
+  for (const m of text.matchAll(/\[(?:[^\]\n]{0,40}\b(?:url|link|insert|tbd|tbc|todo|confirm|name|date|company|placeholder|xx+)\b[^\]\n]{0,40})\]|\bTBD\b|\bTODO\b|lorem ipsum|\{\{[^}]{1,40}\}\}/gi)) issues.push({ rule: 'placeholder', severity: 'error', detail: `Unfinished placeholder: "${m[0]}" — fill it in from the brief or remove it`, match: m[0] });
   for (const [from, to] of Object.entries(p.lexicon.preferred)) {
     if (wordRe(from).test(text)) issues.push({ rule: 'preferred', severity: 'warn', detail: `Say "${to}" instead of "${from}"`, match: from, fix: to });
   }

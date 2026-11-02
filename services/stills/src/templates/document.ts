@@ -334,7 +334,7 @@ mark{background:color-mix(in srgb,var(--brand-primary) 22%,transparent);color:in
 blockquote{border-left:3px solid var(--brand-primary);padding:6px 0 6px 16px;margin:8px 0;font:600 16px/1.45 var(--font-display);color:var(--ink)}
 .cols{display:grid;gap:28px}.cols.two{grid-template-columns:1fr 1fr}.cols.with-aside{grid-template-columns:1fr 220px}.cols.two.with-aside{grid-template-columns:1fr 1fr}
 .aside{background:var(--tint);border-radius:16px;padding:22px;font:600 18px/1.45 var(--font-display);align-self:start}
-.shot{border-radius:14px;overflow:hidden;box-shadow:0 18px 40px -22px rgba(0,0,0,.45),0 0 0 1px var(--rule);flex:0 1 auto;min-height:0}
+.shot{border-radius:14px;overflow:hidden;box-shadow:0 18px 40px -22px rgba(0,0,0,.45),0 0 0 1px var(--rule);flex:0 1 auto;min-height:190px}
 .shot img{width:100%;height:100%;max-height:430px;object-fit:cover;object-position:top}
 .shot.sm img{max-height:260px}.shot.full{flex:1}.shot.full img{max-height:none;height:100%}
 figcaption,.src{font-size:11.5px;color:var(--soft)}

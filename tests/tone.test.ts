@@ -80,3 +80,10 @@ test('a voice learned from scratch never overwrites the default', async () => {
   assert.equal(saved.id, 'heard-voice');
   assert.equal((await getTone('default'))?.name, DEFAULT_TONE.name);
 });
+
+test('placeholders are errors', async () => {
+  const { scoreText, DEFAULT_TONE } = await import('@shipcast/engine');
+  const r = scoreText('Book a walkthrough at [URL to confirm]. Pricing TBD. Call {{name}} today about the product we built.', DEFAULT_TONE);
+  assert.equal(r.issues.filter((i) => i.rule === 'placeholder').length, 3);
+  assert.equal(scoreText('See [1] for the source; we cite every number in the report body here.', DEFAULT_TONE).issues.filter((i) => i.rule === 'placeholder').length, 0, 'citations are fine');
+});
