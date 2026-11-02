@@ -51,7 +51,8 @@ ul.bul{list-style:none;display:grid;gap:22px}
 ul.bul li{font:500 34px/1.35 var(--font-body);padding-left:42px;position:relative}
 ul.bul li::before{content:"";position:absolute;left:0;top:.48em;width:16px;height:16px;border-radius:5px;background:var(--brand-primary)}
 .shot{border-radius:24px;overflow:hidden;box-shadow:0 40px 80px -36px rgba(0,0,0,.5),0 0 0 1px var(--rule);flex:1.25;min-width:0;align-self:center;max-height:100%}
-.shot img{width:100%;height:100%;object-fit:cover;object-position:top left}
+.shot{display:flex;align-items:center;justify-content:center;background:var(--card)}
+.shot img{max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain}
 .cards{display:grid;gap:28px;margin:auto 0;align-items:stretch}
 .cards.n2{grid-template-columns:repeat(2,1fr)}.cards.n3{grid-template-columns:repeat(3,1fr)}.cards.n4{grid-template-columns:repeat(4,1fr)}
 .card{background:var(--card);border-radius:28px;padding:40px;display:flex;flex-direction:column;gap:16px;border:1px solid var(--rule)}

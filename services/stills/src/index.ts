@@ -1,4 +1,4 @@
-import { copyFile, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
+import { copyFile, mkdir, writeFile, readFile, rename, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
@@ -235,7 +235,12 @@ export function createStillsService() {
             if (over > 2) problems.push(`${pc.name}: content overflows the safe area by ${Math.round(over)}px — shorten the copy or drop an element.`);
             if (broken) problems.push(`${pc.name}: ${broken} image(s) didn't load.`);
             await writeFile(`${base}.pdf`, await pg.pdf());
-            await writeFile(`${base}.png`, await pg.screenshot('png'));
+            await writeFile(`${base}.full.png`, await pg.screenshot('png'));
+            // The PNG is the finished piece (trimmed, no marks); the PDF keeps bleed and crop marks for the printer.
+            const k = scale;
+            const cut = await run('ffmpeg', ['-y', '-v', 'error', '-i', `${base}.full.png`, '-vf', `crop=${Math.round(g.trimW * k)}:${Math.round(g.trimH * k)}:${Math.round(g.outer * k)}:${Math.round(g.outer * k)}`, `${base}.png`]);
+            if (cut.code === 0) await rm(`${base}.full.png`, { force: true });
+            else await rename(`${base}.full.png`, `${base}.png`);
           } finally {
             await pg.close();
           }
@@ -307,8 +312,11 @@ export function createStillsService() {
           await writeFile(html, r.html);
           await writeFile(join(dir, `${slug(e.name)}.txt`), r.text);
           const shots: Record<string, string> = {};
+          // Previews show what a subscriber sees: merge tags filled with a sample name (the exported HTML keeps the tags).
+          const previewHtml = join(dir, `.preview-${slug(e.name)}.html`);
+          await writeFile(previewHtml, r.html.replace(/\{\{\s*first_?name\s*\}\}/gi, 'Alex'));
           for (const [view, opts] of [['desktop', { width: 680, height: 900, scale: 1 }], ['mobile', { width: 390, height: 844, scale: 2, mobile: true }]] as const) {
-            const pg = await browser().open(pathToFileURL(html).href, { ...opts, settleMs: 200 });
+            const pg = await browser().open(pathToFileURL(previewHtml).href, { ...opts, settleMs: 200 });
             try {
               shots[view] = join(outDir, `${slug(e.name)}-${view}.png`);
               await writeFile(shots[view], await pg.fullPage(12000));
@@ -320,6 +328,7 @@ export function createStillsService() {
               await pg.close();
             }
           }
+          await rm(previewHtml, { force: true });
           await rm(join(outDir, `${slug(e.name)}.zip`), { force: true });
           await run('zip', ['-qr', join(outDir, `${slug(e.name)}.zip`), '.'], { cwd: dir });
           problems.push(...checkEmail(e, r, input));
@@ -442,7 +451,7 @@ export function createStillsService() {
         let page = await open().catch(async () => (await browser().restart(), open()));
         try {
           await page.eval('document.fonts.ready.then(() => true)');
-          const audit = await page.eval<{ page: number; overflow: number; wide: boolean; brokenImages: number; fill: number }[]>(DOC_AUDIT_SCRIPT);
+          const audit = await page.eval<{ page: number; overflow: number; wide: boolean; brokenImages: number; fill: number; tiny: number }[]>(DOC_AUDIT_SCRIPT);
           ctx.progress(0.3, 'printing the PDF');
           const pdf = join(outDir, `${base}.pdf`);
           await writeFile(pdf, await page.pdf());
@@ -461,6 +470,7 @@ export function createStillsService() {
             ...(a.overflow > 2 ? [`page ${a.page} (${input.pages[a.page - 1]?.layout}) overflows by ${Math.round(a.overflow)}px — shorten the copy or split it onto another page`] : []),
             ...(a.wide ? [`page ${a.page} has a heading or table wider than the page`] : []),
             ...(a.brokenImages ? [`page ${a.page} has ${a.brokenImages} image(s) that didn't load — check the paths`] : []),
+            ...(a.tiny ? [`page ${a.page} shows a full screenshot shrunk below a third of its size — its UI can't be read; crop it to the part that matters with #crop=x,y,w,h`] : []),
             ...(a.fill < 0.55 && input.pages.length > 1 ? [`page ${a.page} (${input.pages[a.page - 1]?.layout}) is only ${Math.round(a.fill * 100)}% full — add substance (a paragraph, an image, a chart) or merge it with a neighbouring page`] : []),
           ]);
           return { pdf, html: htmlFile, pages: previews, sheet, width: sz.width, height: sz.height, audit, problems };

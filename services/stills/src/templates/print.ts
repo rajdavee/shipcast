@@ -99,7 +99,8 @@ h1 em{font-style:normal;color:var(--accent);text-decoration:${'underline'};text-
 .big{font:900 ${t(30 * u)}px/.9 var(--font-display);letter-spacing:-.05em;color:var(--accent)}
 .src{font:500 ${t(1.8 * u)}px/1.3 var(--font-body);color:var(--muted)}
 .pic{flex:1;min-height:0;border-radius:${t(2.4 * u)}px;overflow:hidden;box-shadow:0 ${t(2 * u)}px ${t(5 * u)}px -${t(2 * u)}px rgba(0,0,0,.45)}
-.pic img{width:100%;height:100%;object-fit:cover;object-position:top}
+.pic{display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--fg) 6%,transparent)}
+.pic img{max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain}
 ul{list-style:none;display:grid;gap:${t(1.6 * u)}px;font:600 ${t(3.2 * u)}px/1.25 var(--font-body)}
 ul li{padding-left:${t(4.2 * u)}px;position:relative}ul li::before{content:"";position:absolute;left:0;top:.35em;width:${t(2 * u)}px;height:${t(2 * u)}px;border-radius:${t(.5 * u)}px;background:var(--accent)}
 .when{display:flex;gap:${t(6 * u)}px;flex-wrap:wrap}.when small{display:block;font:700 ${t(1.8 * u)}px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:${t(.8 * u)}px}.when b{font:800 ${t(4.2 * u)}px/1.1 var(--font-display)}

@@ -255,6 +255,8 @@ export function layoutAuditScript(safe: { top: number; right: number; bottom: nu
       if (r.left < -1 || r.top < -1 || r.right > W + 1 || r.bottom > H + 1) out.offCanvas.push(label(el));
       else if (!el.closest('[data-safe-ignore]') && (r.left < S.left || r.top < S.top || r.right > W - S.right || r.bottom > H - S.bottom)) out.unsafe.push(label(el));
     }
+    // Screenshots shown far below their real size: readable UI needs a crop, not a shrink.
+    out.tinyShots = [...document.querySelectorAll('img')].filter((im) => !im.closest('.logo, .tag, .ic, .who, .lchip, .run') && !im.classList.contains('logo') && im.naturalWidth >= 1000 && im.getBoundingClientRect().width > 160 && im.getBoundingClientRect().width / im.naturalWidth < 0.3).map((im) => (im.getAttribute('src') || '').split('/').pop().slice(0, 60));
     if (out.minFont === 999) out.minFont = 0;
     out.overflow = out.overflow.slice(0, 20); out.offCanvas = out.offCanvas.slice(0, 20); out.unsafe = out.unsafe.slice(0, 20);
     return out;
@@ -267,6 +269,8 @@ export interface LayoutAudit {
   unsafe: string[];
   minFont: number;
   textCount: number;
+  /** Large screenshots shown below ~30% of their real width (unreadable UI). */
+  tinyShots?: string[];
 }
 
 /**

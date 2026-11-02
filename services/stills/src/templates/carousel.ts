@@ -95,7 +95,7 @@ const BASE = `
 .shot{margin-top:48px;border-radius:24px;overflow:hidden;box-shadow:0 30px 80px -30px rgba(0,0,0,.55),0 0 0 1px var(--rule);background:var(--card)}
 .shot .chrome{height:44px;display:flex;align-items:center;gap:10px;padding:0 18px;background:color-mix(in srgb,var(--fg) 6%,transparent)}
 .shot .chrome i{width:13px;height:13px;border-radius:50%;background:color-mix(in srgb,var(--fg) 22%,transparent)}
-.shot img{width:100%;height:auto;max-height:620px;object-fit:cover;object-position:top}
+.shot img{width:100%;height:auto;max-height:620px;object-fit:contain}
 .caption{font:500 30px/1.35 var(--font-body);color:var(--muted);margin-top:28px}
 .cta-btn{display:inline-flex;align-items:center;gap:14px;margin-top:48px;padding:28px 44px;border-radius:999px;background:var(--accent);color:var(--bg);font:800 36px/1 var(--font-body);letter-spacing:-.01em;align-self:flex-start}
 .url{font:600 32px/1.2 var(--font-mono);color:var(--muted);margin-top:28px}

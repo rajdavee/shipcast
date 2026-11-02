@@ -95,6 +95,8 @@ const CSS = (w: number, h: number) => {
 .square .vis.shot{padding-top:0;padding-bottom:0}
 .square .ad,.portrait .ad,.tall .ad{grid-template-rows:auto 1fr auto}
 .square .vis:empty{display:none}
+/* No visual (small rectangles): headline and button share the space instead of leaving a hole. */
+.square .ad:has(.vis:empty){grid-template-rows:auto auto;align-content:center}
 .tall .txt.top{padding-top:${px(300)}}
 .tall .foot{padding-bottom:${px(400)}}
 .foot{display:flex;justify-content:space-between;align-items:center;gap:${px(20)};padding:${px(10)} ${px(64)} ${px(56)}}
