@@ -92,7 +92,8 @@ export async function renderVariants(cwd: string, briefDir: string, kind: SpecKi
   const firsts: string[] = [];
   for (const v of variants) {
     const name = slug(v.name);
-    const vdir = join(cwd, 'variants', name);
+    // Inside out/ so the campaign page lists every variant like any other output.
+    const vdir = join(cwd, 'out', 'variants', name);
     await mkdir(join(vdir, 'out'), { recursive: true });
     await writeFile(join(vdir, 'out', SPEC_FILE[kind]), JSON.stringify(applyHook(base, v, field), null, 2));
     const r = await renderSpec(kind, vdir, briefDir);
