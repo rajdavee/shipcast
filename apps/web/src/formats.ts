@@ -7,6 +7,7 @@ export const FORMATS: { id: string; title: string; line: string; img?: string; r
   { id: 'carousel', title: 'Carousel', line: 'Swipe slides for LinkedIn and Instagram', img: '/formats/carousel.jpg', ratio: 4 / 5 },
   { id: 'presentation', title: 'Presentation', line: 'Pitch or sales deck — PDF and editable PowerPoint', img: '/formats/presentation.jpg', ratio: 16 / 9 },
   { id: 'ad-set', title: 'Ad set', line: 'Hook variants in every ad size, with upload sheet', img: '/formats/ad-set.jpg', ratio: 1 },
+  { id: 'email', title: 'Email', line: 'Launch email, newsletter or sequence — HTML + text', img: '/formats/email.jpg', ratio: 4 / 5 },
   { id: 'document', title: 'PDF document', line: 'One-pager, case study, ebook or whitepaper', img: '/formats/document.jpg', ratio: 0.707 },
   { id: 'reel', title: 'Reel', line: 'Vertical video with captions', img: '/formats/reel.jpg', ratio: 9 / 16 },
   { id: 'launch-film', title: 'Launch film', line: '30-second video for launch day', img: '/formats/launch-film.jpg', ratio: 16 / 9 },

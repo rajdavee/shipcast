@@ -156,3 +156,25 @@ test('stills renders an ad set: every variant × size, an upload sheet, nothing 
   assert.match(csv[1], /"Pain",meta-square,meta,1080,1080/);
   for (const it of job.output.items) assert.deepEqual(it.audit.offCanvas, [], `${it.variant} ${it.size}`);
 });
+
+test('stills renders inbox-safe email: HTML, text, zip, previews and deliverability checks', { skip: !hasChrome && 'no Chrome' }, async () => {
+  const out = join(home, 'email');
+  const job = await run('email', {
+    theme: 'light',
+    brand: { name: 'Acme', colors: { background: '#ffffff', primary: '#3355ff' } },
+    outDir: out,
+    emails: [{ name: 'Launch Day', subjects: ['Invoices, paid two days sooner'], preheader: 'Short.', blocks: [{ type: 'hero', headline: 'Get paid *sooner*', body: 'One link.\n\n- Fast\n- Simple', cta: 'Start free', url: 'https://acme.test' }, { type: 'cta', headline: 'Try it', cta: 'Click here', url: 'https://acme.test' }] }],
+  });
+  assert.equal(job.status, 'done', job.error);
+  const fs = await import('node:fs');
+  const html = fs.readFileSync(join(out, 'emails', 'launch-day', 'launch-day.html'), 'utf8');
+  assert.match(html, /role="presentation"/);
+  assert.match(html, /v:roundrect/, 'Outlook-safe button');
+  assert.ok(!/<link[^>]+stylesheet/.test(html), 'no external CSS');
+  assert.match(fs.readFileSync(join(out, 'emails', 'launch-day', 'launch-day.txt'), 'utf8'), /Start free: https:\/\/acme\.test/);
+  assert.ok(existsSync(join(out, 'launch-day.zip')) && existsSync(join(out, 'launch-day-mobile.png')));
+  const p = job.output.problems.join(' | ');
+  assert.match(p, /preheader/);
+  assert.match(p, /spam-trigger/);
+  assert.match(p, /postal address/);
+});

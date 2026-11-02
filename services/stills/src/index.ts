@@ -1,10 +1,11 @@
-import { mkdir, writeFile, readFile, rm } from 'node:fs/promises';
+import { copyFile, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { assertInHome, browser, writePptx, type PptxSlide, createService, FIT_SCRIPT, run, TIDY_PAGE_SCRIPT, getPreset, layoutAuditScript, loadBrand, normalizeBrand, presetForSize, resolveIcons, SERVICE_PORTS, type BrandKit, type LayoutAudit } from '@shipcast/engine';
 import { CAROUSEL_LAYOUTS, carouselIconNames, renderCarouselSlide, THEMES } from './templates/carousel.ts';
 import type { RenderCtx } from './templates/common.ts';
 import { CARD_LAYOUTS, renderCard, renderThumbnail, THUMBNAIL_LAYOUTS } from './templates/graphics.ts';
+import { checkEmail, renderEmail, type EmailSetSpec } from './templates/email.ts';
 import { AD_SIZES, DEFAULT_AD_SIZES, renderAd, type AdSpec } from './templates/ads.ts';
 import { HIDE_TEXT_CSS, MEASURE_TEXT_SCRIPT, renderSlide, SLIDE_LAYOUTS, SLIDE_THEMES, slideIconNames, type SlidePage } from './templates/slides.ts';
 import { DOC_AUDIT_SCRIPT, DOC_LAYOUTS, DOC_THEMES, docIconNames, PAGE_SIZES, renderDocument, type DocPage } from './templates/document.ts';
@@ -169,6 +170,49 @@ export function createStillsService() {
         slides: { themes: Object.fromEntries(Object.entries(SLIDE_THEMES).map(([k, v]) => [k, v.label])), layouts: SLIDE_LAYOUTS.map(({ html, ...l }) => l) },
         document: { themes: Object.fromEntries(Object.entries(DOC_THEMES).map(([k, v]) => [k, v.label])), sizes: Object.fromEntries(Object.entries(PAGE_SIZES).map(([k, v]) => [k, v.label])), layouts: DOC_LAYOUTS.map(({ html, ...l }) => l) },
       }),
+
+      /** Marketing emails: inbox-safe HTML + plain text + images folder + zip, with desktop/phone previews and deliverability checks. */
+      email: async (input: EmailSetSpec & { brandDir?: string; brand?: Partial<BrandKit>; outDir: string }, ctx) => {
+        const outDir = assertInHome(input.outDir, 'outDir');
+        const { brand, assetsDir } = await brandFrom(input);
+        if (!Array.isArray(input.emails) || !input.emails.length) throw new Error('emails are required');
+        const slug = (x: string) => String(x).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'email';
+        const resolve = (p: string) => (p.startsWith('/') ? p : join(assetsDir ?? outDir, p));
+        const results = [];
+        const problems: string[] = [];
+        const md: string[] = ['# Emails', ''];
+        for (const [i, e] of input.emails.entries()) {
+          ctx.progress(i / input.emails.length, e.name);
+          const dir = join(outDir, 'emails', slug(e.name));
+          await mkdir(join(dir, 'images'), { recursive: true });
+          const r = renderEmail(e, input, brand, resolve);
+          for (const im of r.images) await copyFile(im.src, join(dir, im.name)).catch(() => problems.push(`${e.name}: image ${im.src} not found`));
+          const html = join(dir, `${slug(e.name)}.html`);
+          await writeFile(html, r.html);
+          await writeFile(join(dir, `${slug(e.name)}.txt`), r.text);
+          const shots: Record<string, string> = {};
+          for (const [view, opts] of [['desktop', { width: 680, height: 900, scale: 1 }], ['mobile', { width: 390, height: 844, scale: 2, mobile: true }]] as const) {
+            const pg = await browser().open(pathToFileURL(html).href, { ...opts, settleMs: 200 });
+            try {
+              shots[view] = join(outDir, `${slug(e.name)}-${view}.png`);
+              await writeFile(shots[view], await pg.fullPage(12000));
+              if (view === 'mobile') {
+                const wide = await pg.eval<boolean>('document.documentElement.scrollWidth > innerWidth + 2');
+                if (wide) problems.push(`${e.name}: scrolls sideways on a phone — an image or table is wider than the screen.`);
+              }
+            } finally {
+              await pg.close();
+            }
+          }
+          await run('zip', ['-qr', join(outDir, `${slug(e.name)}.zip`), '.'], { cwd: dir });
+          problems.push(...checkEmail(e, r, input));
+          md.push(`## ${e.name}`, '', '**Subject lines**', ...e.subjects.map((x, n) => `${n + 1}. ${x}`), '', `**Preview text:** ${e.preheader}`, '', `HTML: emails/${slug(e.name)}/${slug(e.name)}.html · plain text: emails/${slug(e.name)}/${slug(e.name)}.txt · upload zip: ${slug(e.name)}.zip`, '');
+          results.push({ name: e.name, html, text: join(dir, `${slug(e.name)}.txt`), zip: join(outDir, `${slug(e.name)}.zip`), previews: shots, bytes: Buffer.byteLength(r.html), links: r.links });
+        }
+        md.push('Before sending: replace {{unsubscribe_url}} with your platform\'s unsubscribe tag (Mailchimp *|UNSUB|*, HubSpot {{ unsubscribe_link }}, Klaviyo {% unsubscribe %}).');
+        await writeFile(join(outDir, 'emails.md'), md.join('\n') + '\n');
+        return { emails: results, problems };
+      },
 
       /** An ad set: every hook variant × every placement size, an upload sheet and a contact sheet per variant. */
       ads: async (input: AdSpec & { brandDir?: string; brand?: Partial<BrandKit>; outDir: string }, ctx) => {

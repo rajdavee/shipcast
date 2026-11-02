@@ -87,3 +87,9 @@ test('placeholders are errors', async () => {
   assert.equal(r.issues.filter((i) => i.rule === 'placeholder').length, 3);
   assert.equal(scoreText('See [1] for the source; we cite every number in the report body here.', DEFAULT_TONE).issues.filter((i) => i.rule === 'placeholder').length, 0, 'citations are fine');
 });
+
+test('ordinary words are not superlative claims', async () => {
+  const { scoreText, DEFAULT_TONE } = await import('@shipcast/engine');
+  assert.equal(scoreText('Open the first screen, then the first card on the Docket. It is the only matter open today.', DEFAULT_TONE).issues.filter((i) => i.rule === 'claim').length, 0);
+  assert.equal(scoreText('We are the best platform and industry-leading in every way you can imagine here.', DEFAULT_TONE).issues.filter((i) => i.rule === 'claim').length, 2);
+});

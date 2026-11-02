@@ -13,9 +13,9 @@ import { KNOWN_ICONS } from './icons.ts';
  * actionable feedback.
  */
 
-export type SpecKind = 'deck' | 'graphics' | 'storyboard' | 'infographic' | 'document' | 'slides' | 'ads';
+export type SpecKind = 'deck' | 'graphics' | 'storyboard' | 'infographic' | 'document' | 'slides' | 'ads' | 'email';
 
-export const SPEC_FILE: Record<SpecKind, string> = { deck: 'deck.json', graphics: 'graphics.json', storyboard: 'storyboard.json', infographic: 'infographic.json', document: 'document.json', slides: 'slides.json', ads: 'ads.json' };
+export const SPEC_FILE: Record<SpecKind, string> = { deck: 'deck.json', graphics: 'graphics.json', storyboard: 'storyboard.json', infographic: 'infographic.json', document: 'document.json', slides: 'slides.json', ads: 'ads.json', email: 'email.json' };
 
 type FieldDoc = { id: string; type: string; label: string; optional?: boolean; max?: number; help?: string; choices?: string[] };
 const fieldLine = (f: FieldDoc) =>
@@ -76,6 +76,25 @@ export async function catalogMarkdown(kind: SpecKind): Promise<string> {
       '',
       '## Layouts',
       ...c.document.layouts.map((l: any) => `### \`${l.id}\` — ${l.label}\n${l.use}\n${l.fields.map(fieldLine).join('\n')}`),
+    ].join('\n');
+  }
+  if (kind === 'email') {
+    return [
+      '# Email catalog',
+      '',
+      'Spec: `{ "theme": "light|brand|dark", "footer": { "address": "postal address", "reason": "why they get this" }, "emails": [ { "name", "subjects": [3–5], "preheader": "40–110 chars", "blocks": [...], "signoff"? } ] }`',
+      '',
+      '## Blocks (in order, top to bottom)',
+      '- `{ "type": "hero", "kicker"?, "headline", "body"?, "cta"?, "url"?, "image"? }` — opening; the headline is the email\'s one idea.',
+      '- `{ "type": "text", "heading"?, "body" }` — body copy: blank-line paragraphs, `- ` bullets.',
+      '- `{ "type": "feature", "image"?, "heading", "body", "side": "left|right", "cta"?, "url"? }` — image beside copy (stacks on phones).',
+      '- `{ "type": "bullets", "heading"?, "items": [] }` — check-marked list.',
+      '- `{ "type": "quote", "quote", "name", "role"? }` — real people only.',
+      '- `{ "type": "stats", "stats": ["value | label", …≤3] }` — verified numbers only.',
+      '- `{ "type": "cta", "headline", "body"?, "cta", "url" }` — the closing ask.',
+      '- `{ "type": "image", "image", "alt", "url"? }` · `{ "type": "divider" }`',
+      'Rich text: `*word*` accent · `**word**` bold. Images: paths relative to the brief folder; they are copied next to the HTML and zipped for upload.',
+      'Checks after rendering: Gmail clipping (102 KB), subject and preheader length, link count, spam phrasing, phone width, footer address.',
     ].join('\n');
   }
   if (kind === 'ads') {
@@ -189,6 +208,10 @@ export async function renderSpec(kind: SpecKind, cwd: string, briefDir: string, 
     if (kind === 'document') {
       const r = await callService('stills', 'document', { ...spec, brandDir: briefDir, outDir: out, name: 'document' });
       return { ok: !r.problems.length, feedback: r.problems, summary: `${r.pages.length}-page PDF` };
+    }
+    if (kind === 'email') {
+      const r = await callService('stills', 'email', { ...spec, brandDir: briefDir, outDir: out });
+      return { ok: !r.problems.length, feedback: r.problems.slice(0, 20), summary: `${r.emails.length} email${r.emails.length === 1 ? '' : 's'} · HTML + text + upload zip` };
     }
     if (kind === 'ads') {
       const r = await callService('stills', 'ads', { ...spec, brandDir: briefDir, outDir: out });

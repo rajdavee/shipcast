@@ -237,8 +237,8 @@ export function scoreText(text: string, p: ToneProfile, ch?: Channel): BrandScor
     const m = text.match(wordRe(w));
     if (m) issues.push({ rule: 'banned', severity: 'error', detail: `Banned: "${w}" (${m.length}×)`, match: w });
   }
-  // Unfinished copy never ships: bracketed placeholders, TBDs, lorem ipsum, template tokens.
-  for (const m of text.matchAll(/\[(?:[^\]\n]{0,40}\b(?:url|link|insert|tbd|tbc|todo|confirm|name|date|company|placeholder|xx+)\b[^\]\n]{0,40})\]|\bTBD\b|\bTODO\b|lorem ipsum|\{\{[^}]{1,40}\}\}/gi)) issues.push({ rule: 'placeholder', severity: 'error', detail: `Unfinished placeholder: "${m[0]}" — fill it in from the brief or remove it`, match: m[0] });
+  // Unfinished copy never ships: bracketed placeholders, TBDs, lorem ipsum, template tokens (standard merge tags are fine).
+  for (const m of text.matchAll(/\[(?:[^\]\n]{0,40}\b(?:url|link|insert|tbd|tbc|todo|confirm|name|date|company|placeholder|xx+)\b[^\]\n]{0,40})\]|\bTBD\b|\bTODO\b|lorem ipsum|\{\{(?!\s*(?:unsubscribe|first_?name|view_in_browser))[^}]{1,40}\}\}/gi)) issues.push({ rule: 'placeholder', severity: 'error', detail: `Unfinished placeholder: "${m[0]}" — fill it in from the brief or remove it`, match: m[0] });
   for (const [from, to] of Object.entries(p.lexicon.preferred)) {
     if (wordRe(from).test(text)) issues.push({ rule: 'preferred', severity: 'warn', detail: `Say "${to}" instead of "${from}"`, match: from, fix: to });
   }
@@ -250,7 +250,7 @@ export function scoreText(text: string, p: ToneProfile, ch?: Channel): BrandScor
     for (const m of text.matchAll(/(\d+(?:[.,]\d+)?\s?(?:%|x\b|×|percent|times (?:faster|more|less)))/gi)) {
       if (!allowed.includes(m[1].toLowerCase().replace(/\s/g, ''))) issues.push({ rule: 'unsourced', severity: 'warn', detail: `Check the source for "${m[1].trim()}"`, match: m[1].trim() });
     }
-    for (const m of text.matchAll(/\b(the (?:best|fastest|only|leading|first) \w+|best-in-class|industry-leading|unmatched|unbeatable)\b/gi)) issues.push({ rule: 'claim', severity: 'warn', detail: `Superlative needs proof: "${m[1]}"`, match: m[1] });
+    for (const m of text.matchAll(/\b(the (?:best|fastest|leading|most (?:advanced|powerful|trusted)) \w+|best-in-class|industry-leading|world-leading|unmatched|unbeatable)\b/gi)) issues.push({ rule: 'claim', severity: 'warn', detail: `Superlative needs proof: "${m[1]}"`, match: m[1] });
   }
   const rg = readingGrade(text);
   const target = GRADE[c.readingLevel][1];

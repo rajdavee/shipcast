@@ -1,0 +1,20 @@
+{
+  "id": "email",
+  "name": "Email",
+  "tagline": "Launch emails, newsletters and nurture sequences — inbox-safe HTML for Gmail and Outlook, plain text, subject-line variants and an upload zip for your email tool.",
+  "category": "copy",
+  "order": 10,
+  "estimate": "3–6 min",
+  "accent": "#2f7d5c",
+  "spec": "email",
+  "options": [
+    { "key": "type", "label": "Email", "type": "select", "choices": ["launch", "newsletter", "product-update", "nurture-sequence", "onboarding-sequence", "event-invite"], "default": "launch" },
+    { "key": "count", "label": "Emails in a sequence", "type": "number", "default": "4", "min": 1, "max": 7 },
+    { "key": "theme", "label": "Theme", "type": "select", "choices": ["auto", "light", "brand", "dark"], "default": "auto" }
+  ],
+  "outputs": ["emails/**/*", "*.zip", "*-desktop.png", "*-mobile.png", "email.json", "emails.md", "*.md"],
+  "skills": [],
+  "tools": ["chrome"],
+  "roles": ["copy", "humanize"],
+  "timeoutMinutes": 30
+}
