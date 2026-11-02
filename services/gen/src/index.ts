@@ -98,7 +98,8 @@ export async function generate(i: GenerateInput, progress: (f: number, m: string
   const target = extname(out) ? out : `${out}${ext}`;
   await mkdir(dirname(target), { recursive: true });
   const meta = { model: m.id, label: m.label, provider: m.provider, license: m.license, prompt: plan.prompt, negative: plan.negative, disclosure: verdict.disclose, createdAt: new Date().toISOString() };
-  const hit = cached(key, ext);
+  // Placeholders are cheap to redraw and change with the code; only paid results are cached.
+  const hit = m.provider === 'fake' ? null : cached(key, ext);
   if (hit) {
     await copyFile(hit, target);
     await writeFile(`${target}.json`, JSON.stringify({ ...meta, usd: 0, cached: true }, null, 2));
@@ -121,8 +122,10 @@ export async function generate(i: GenerateInput, progress: (f: number, m: string
   } finally {
     release();
   }
-  await mkdir(cacheDir(), { recursive: true });
-  await copyFile(target, join(cacheDir(), `${key}${ext}`)).catch(() => {});
+  if (m.provider !== 'fake') {
+    await mkdir(cacheDir(), { recursive: true });
+    await copyFile(target, join(cacheDir(), `${key}${ext}`)).catch(() => {});
+  }
   await writeFile(`${target}.json`, JSON.stringify({ ...meta, usd: plan.usd, cached: false }, null, 2));
   return { file: target, model: m.id, usd: plan.usd, cached: false, prompt: plan.prompt, disclosure: verdict.disclose };
 }

@@ -44,14 +44,14 @@ test('shots compile to literal camera language within each model budget', () => 
   assert.ok(compileShot(shot, { promptWords: 20, capability: 'i2v' }).prompt.split(/\s+/).length <= 20);
 });
 
-test('generate runs end to end on the free placeholder, caches retakes and writes a disclosure sidecar', async () => {
+test('generate runs end to end on the free placeholder, redraws placeholders instead of caching them, and writes a disclosure sidecar', async () => {
   const img = await generate({ capability: 't2i', shot: { subject: 'a person reading', look: 'photoreal' }, aspect: '16:9', out: join(home, 'c1', 'hero') });
   assert.ok(existsSync(img.file) && img.file.endsWith('.png'));
   assert.equal(img.usd, 0);
   const meta = JSON.parse(readFileSync(`${img.file}.json`, 'utf8'));
   assert.deepEqual(meta.disclosure, ['AI-generated', 'synthetic person']);
   const again = await generate({ capability: 't2i', shot: { subject: 'a person reading', look: 'photoreal' }, aspect: '16:9', out: join(home, 'c1', 'hero-2') });
-  assert.equal(again.cached, true);
+  assert.equal(again.cached, false, 'placeholders are never served from cache');
   const clip = await generate({ capability: 'i2v', prompt: 'slow push in', image: img.file, seconds: 2, out: join(home, 'c1', 'clip') });
   assert.ok(clip.file.endsWith('.mp4') && existsSync(clip.file));
   await assert.rejects(generate({ capability: 't2i', prompt: 'nude', out: join(home, 'c1', 'x') }), /explicit/);
