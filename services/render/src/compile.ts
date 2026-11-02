@@ -1,5 +1,5 @@
 import { copyFile, mkdir, writeFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { basename, extname, join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { brandCss, getPreset, loadBrand, localizeFonts, normalizeBrand, probe, resolveIcons, run, type BrandKit, type PlatformPreset } from '@shipcast/engine';
@@ -284,6 +284,21 @@ export async function compileStoryboard(story: Storyboard, opts: { dir: string; 
   for (const e of timeline) {
     if (e.sc.scene !== 'broll') continue;
     const f = (e.sc.fields ?? {}) as Record<string, string>;
+    // A clip of our own (a generated presenter, a phone recording) plays instead of stock; its sound plays when asked.
+    if (f.video) {
+      const own = String(f.video).startsWith('/') ? String(f.video) : join(opts.brandDir ?? '', String(f.video));
+      if (own && existsSync(own)) {
+        const sound = /^(yes|true|on)$/i.test(String(f.audio ?? ''));
+        clips.push(`<video id="clip-${e.id}" src="${asset(own)}" muted${sound ? '="false"' : ''} playsinline data-has-audio="${sound}" data-volume="${sound ? 1 : 0}" data-start="${e.start}" data-duration="${e.duration}" data-track-index="0" style="position:absolute;left:0;top:0;width:${width}px;height:${height}px;object-fit:cover"></video>`);
+        if (existsSync(`${own}.json`)) {
+          try {
+            const meta = JSON.parse(readFileSync(`${own}.json`, 'utf8'));
+            credits.push(`${(meta.disclosure ?? ['AI-generated']).join(', ')} — ${meta.label ?? meta.model}`);
+          } catch {}
+        }
+        continue;
+      }
+    }
     const clip = opts.deps.broll ? await opts.deps.broll(String(f.query ?? f.line ?? ''), e.duration, vertical ? 'portrait' : width === height ? 'square' : 'landscape').catch(() => null) : null;
     if (!clip) {
       e.sc = { ...e.sc, scene: 'cinema', fields: { line: f.line ?? f.query ?? '', kicker: f.kicker } };

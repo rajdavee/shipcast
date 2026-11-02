@@ -11,6 +11,7 @@ export const FORMATS: { id: string; title: string; line: string; img?: string; r
   { id: 'print', title: 'Print', line: 'Posters, flyers and roll-ups with bleed and crop marks', img: '/formats/print.jpg', ratio: 0.707 },
   { id: 'email', title: 'Email', line: 'Launch email, newsletter or sequence — HTML + text', img: '/formats/email.jpg', ratio: 4 / 5 },
   { id: 'document', title: 'PDF document', line: 'One-pager, case study, ebook or whitepaper', img: '/formats/document.jpg', ratio: 0.707 },
+  { id: 'ugc-ad', title: 'UGC ad', line: 'Creator-style ad with a labelled AI presenter', ratio: 9 / 16 },
   { id: 'reel', title: 'Reel', line: 'Vertical video with captions', img: '/formats/reel.jpg', ratio: 9 / 16 },
   { id: 'launch-film', title: 'Launch film', line: '30-second video for launch day', img: '/formats/launch-film.jpg', ratio: 16 / 9 },
   { id: 'youtube-video', title: 'YouTube video', line: '3–10 minutes in chapters, with timestamps', img: '/formats/youtube-video.jpg', ratio: 16 / 9 },
@@ -38,7 +39,7 @@ export function shape(pack: Pack | undefined, step?: Step): number {
   const o = step?.options ?? {};
   const pick = (k: string) => o[k] ?? pack?.options.find((x) => x.key === k)?.default;
   const preset = pick('preset');
-  if (pack?.id === 'reel' || preset === 'vertical') return 9 / 16;
+  if (pack?.id === 'reel' || pack?.id === 'ugc-ad' || preset === 'vertical') return 9 / 16;
   if (preset === 'linkedin-video') return 4 / 5;
   if (preset === 'square-video') return 1;
   if (pack?.id === 'infographic') return pick('size') === '1080x1080' ? 1 : 4 / 5;

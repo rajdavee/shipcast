@@ -101,3 +101,8 @@ test('cited numbers and acronyms are not flagged; shouting is', async () => {
   assert.equal(scoreText('Get it FREE today, it is the deal of the year for every single team.', DEFAULT_TONE).issues.filter((i) => i.rule === 'caps').length, 1);
   assert.equal(scoreText('Our product is 3x faster than anything else you have tried this year.', DEFAULT_TONE).issues.filter((i) => i.rule === 'unsourced').length, 1);
 });
+
+test('bracketed "replace before sending" notes are placeholders', async () => {
+  const { scoreText, DEFAULT_TONE } = await import('@shipcast/engine');
+  assert.equal(scoreText('Veracy, [Veracy postal address: replace before sending], Panama. Thanks for reading our launch note today.', DEFAULT_TONE).issues.filter((i) => i.rule === 'placeholder').length, 1);
+});

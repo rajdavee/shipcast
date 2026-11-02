@@ -1,0 +1,21 @@
+{
+  "id": "ugc-ad",
+  "name": "UGC ad",
+  "tagline": "A creator-style vertical ad: a synthetic, labelled presenter delivers the hook and CTA, intercut with your real product screens in the same voice.",
+  "category": "video",
+  "order": 4,
+  "estimate": "8–15 min",
+  "accent": "#e11d48",
+  "spec": "storyboard",
+  "options": [
+    { "key": "angle", "label": "Angle", "type": "select", "choices": ["pain-fix", "three-things", "myth-vs-truth", "how-i-would", "objection"], "default": "pain-fix" },
+    { "key": "length", "label": "Length", "type": "select", "choices": ["20s", "30s", "35s"], "default": "30s" },
+    { "key": "presenter", "label": "Presenter (optional)", "type": "text", "default": "", "placeholder": "e.g. woman in her 30s, operations lead, friendly and direct" },
+    { "key": "tier", "label": "Realism", "type": "select", "choices": ["placeholder", "standard", "premium"], "default": "standard" }
+  ],
+  "outputs": ["video.mp4", "video.jpg", "video.sheet.jpg", "storyboard.json", "*.md"],
+  "skills": [],
+  "tools": ["ffmpeg", "chrome"],
+  "roles": ["copy", "social"],
+  "timeoutMinutes": 45
+}
