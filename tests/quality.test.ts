@@ -183,3 +183,18 @@ test('contact sheets can sample each scene at its settled moment, and frame deta
   const out = await contactSheet(v, join(d, 's.jpg'), { at: [1, 3] });
   assert.ok(existsSync(out));
 });
+
+test('the critic finds previews for per-size slide sets and loose cards', async () => {
+  const { previews } = await import('@shipcast/engine');
+  const { mkdtempSync, mkdirSync, writeFileSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const a = mkdtempSync(join(tmpdir(), 'pv-'));
+  mkdirSync(join(a, 'out', 'tiktok-photo', 'slides'), { recursive: true });
+  for (const f of ['slide-01.png', 'slide-02.png']) writeFileSync(join(a, 'out', 'tiktok-photo', 'slides', f), 'x');
+  assert.deepEqual((await previews(a)).map((f) => f.split('/out/')[1]), ['tiktok-photo/slides/slide-01.png', 'tiktok-photo/slides/slide-02.png']);
+  const b = mkdtempSync(join(tmpdir(), 'pv-'));
+  mkdirSync(join(b, 'out'));
+  for (const f of ['card-1-square.png', 'card-1-wide.png', 'card-2-square.png', 'brand-score.json']) writeFileSync(join(b, 'out', f), 'x');
+  assert.deepEqual((await previews(b)).map((f) => f.split('/out/')[1]), ['card-1-square.png', 'card-2-square.png']);
+});
