@@ -109,3 +109,22 @@ test('campaign env: .env text parses, writes are private, and scrubSecrets redac
   const t = readFileSync(join(d, 'out', 'log.md'), 'utf8');
   assert.ok(!t.includes('sk_test_abcdef1234') && t.includes('123'), 'long values redacted, tiny ones left alone');
 });
+
+test('media.mjs refuses explicit prompts and explains missing keys', async () => {
+  const { spawnCollect } = await import('@shipcast/engine');
+  const { mkdtempSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const home = mkdtempSync(join(tmpdir(), 'media-'));
+  const cli = join(import.meta.dirname, '..', 'plugin', 'skills', 'director', 'scripts', 'media.mjs');
+  const env = { ...process.env, SHIPCAST_HOME: home };
+  const bad = await spawnCollect('node', [cli, 'gen', 'image', 'a nude portrait'], { env });
+  assert.equal(bad.code, 3);
+  assert.match(bad.stderr, /sexual or explicit/);
+  const nokey = await spawnCollect('node', [cli, 'stock', 'video', 'ocean waves'], { env });
+  assert.equal(nokey.code, 2);
+  assert.match(nokey.stderr, /Pexels/);
+  const st = JSON.parse((await spawnCollect('node', [cli, 'status'], { env })).stdout);
+  assert.equal(st.generative.available, false);
+  assert.ok(st.always.length >= 5);
+});
