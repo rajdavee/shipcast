@@ -84,6 +84,38 @@ test('stills renders a carousel deck to PNGs + PDF with layout audits', { skip: 
   assert.deepEqual(job.output.slides[0].audit.overflow, []);
 });
 
+test('photo carousel renders one deck at TikTok 9:16 and Instagram 4:5, clear of the app overlays', { skip: !hasChrome && 'no Chrome' }, async () => {
+  const { renderSpec, getPreset } = await import('@shipcast/engine');
+  const cwd = join(home, 'photo');
+  const { mkdirSync } = await import('node:fs');
+  mkdirSync(join(cwd, 'out'), { recursive: true });
+  mkdirSync(join(cwd, 'brief'), { recursive: true });
+  writeFileSync(join(cwd, 'brief', 'brand.json'), JSON.stringify({ name: 'Shipcast', colors: { background: '#0b0d12', primary: '#2b3bff' } }));
+  const shot = join(process.cwd(), 'docs', 'assets', 'studio-new.png');
+  writeFileSync(join(cwd, 'out', 'deck.json'), JSON.stringify({
+    theme: 'midnight',
+    handle: '@shipcast',
+    slides: [
+      { layout: 'cover', fields: { kicker: 'For solo founders', title: 'Launch day, *zero* content ready?', subtitle: '5 things to make before you post' } },
+      { layout: 'points', fields: { title: 'Make these *first*', items: ['A hook video — 30 seconds, real UI', 'A carousel — one idea per slide', 'Social posts — every size', 'A one-pager — for the DMs'] } },
+      { layout: 'step', fields: { step: 'Step 1', title: 'Paste a link', body: 'Shipcast studies your site first.', image: `${shot}#crop=0.25,0.15,0.5,0.45` } },
+      { layout: 'compare', fields: { title: 'Before vs *after*', leftLabel: 'Before', left: ['Two days in Canva', 'Stock footage'], rightLabel: 'After', right: ['One paste', 'Your real UI'] } },
+      { layout: 'cta', fields: { title: 'Make it in *minutes*', button: 'Link in bio' } },
+    ],
+  }));
+  process.env.SHIPCAST_STILLS_URL = base;
+  try {
+    const r = await renderSpec('deck', cwd, join(cwd, 'brief'), { force: { sizes: ['tiktok-photo', 'instagram-carousel'] } });
+    assert.deepEqual(r.feedback, []);
+    assert.equal(r.summary, '5 slides × 2 sizes');
+  } finally {
+    delete process.env.SHIPCAST_STILLS_URL;
+  }
+  assert.ok(existsSync(join(cwd, 'out', 'tiktok-photo', 'slides', 'slide-05.png')) && existsSync(join(cwd, 'out', 'instagram-carousel', 'slides', 'slide-05.png')));
+  assert.ok(!existsSync(join(cwd, 'out', 'tiktok-photo', 'carousel.pdf')), 'photo apps take images, not a PDF');
+  assert.equal(getPreset('tiktok-photo')?.height, 1920);
+});
+
 test('stills audit catches text that overflows', { skip: !hasChrome && 'no Chrome' }, async () => {
   const f = join(home, 'bad.html');
   writeFileSync(f, '<html><body style="margin:0"><div style="width:200px;overflow:hidden;white-space:nowrap;font-size:40px">This headline is far too long for its box</div></body></html>');

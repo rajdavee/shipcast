@@ -593,7 +593,8 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
         await phase(round ? 'Applying fixes' : specKind === 'storyboard' ? 'Rendering the video' : specKind === 'infographic' ? 'Animating the infographic' : 'Rendering');
         await log({ step: step.id, type: 'log', text: round ? `Re-rendering after fixes (round ${round})…` : `Rendering ${SPEC_FILE[specKind]} with the ${specKind === 'storyboard' || specKind === 'infographic' ? 'render' : 'stills'} service…` });
         const force: Record<string, unknown> = {};
-        if (pack?.id === 'carousel') force.motion = step.options.motion === 'no' ? null : 'chill';
+        if (pack?.id === 'carousel' || pack?.id === 'photo-carousel') force.motion = step.options.motion === 'no' ? null : 'chill';
+        if (pack?.id === 'photo-carousel') force.sizes = step.options.platform === 'tiktok' ? ['tiktok-photo'] : step.options.platform === 'instagram' ? ['instagram-carousel'] : ['tiktok-photo', 'instagram-carousel'];
         // Choices made in the format options win over what the model wrote.
         if ((pack?.id === 'document' || pack?.id === 'presentation' || pack?.id === 'ad-set' || pack?.id === 'email' || pack?.id === 'landing') && step.options.theme && step.options.theme !== 'auto') force.theme = step.options.theme;
         if (pack?.id === 'document' && step.options.size && step.options.size !== 'auto') force.size = step.options.size;

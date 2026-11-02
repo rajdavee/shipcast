@@ -341,6 +341,7 @@ export async function deleteTone(id: string): Promise<void> {
 /** Which channel a format mostly speaks on (for channel overrides). */
 export const PACK_CHANNEL: Record<string, Channel> = {
   carousel: 'linkedin',
+  'photo-carousel': 'tiktok',
   'social-post': 'linkedin',
   reel: 'tiktok',
   'social-short': 'tiktok',

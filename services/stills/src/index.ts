@@ -47,7 +47,7 @@ export interface SlideSpec {
 
 export interface DeckSpec {
   theme: string;
-  /** Preset id: linkedin-carousel (default), instagram-carousel, or a WxH. */
+  /** Preset id: linkedin-carousel (default), instagram-carousel, tiktok-photo, or a WxH. */
   preset?: string;
   handle?: string;
   slides: SlideSpec[];
@@ -497,7 +497,7 @@ export function createStillsService() {
           }
           ctx.progress(i / input.slides.length, `slide ${i + 1}`);
           const s = input.slides[i];
-          const rctx: RenderCtx = { brand, width, height, page: i + 1, pages: input.slides.length, assetsDir, handle: input.handle, icons };
+          const rctx: RenderCtx = { brand, width, height, page: i + 1, pages: input.slides.length, assetsDir, handle: input.handle, icons, safe };
           results.push(await capture(renderCarouselSlide(s.layout, input.theme, s.fields ?? {}, rctx), file, width, height, safe));
         }
         const pdf = input.pdf === false ? undefined : await pdfFromImages(results.map((r) => r.file), join(outDir, 'carousel.pdf'), width, height);

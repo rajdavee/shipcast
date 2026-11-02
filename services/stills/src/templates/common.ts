@@ -35,6 +35,8 @@ export interface RenderCtx {
   handle?: string;
   /** Platform/tool logos resolved before rendering (name → data URI, null = monogram). */
   icons?: Record<string, string | null>;
+  /** Platform safe zone of the canvas, for templates that pad around app overlays. */
+  safe?: { top: number; right: number; bottom: number; left: number };
 }
 
 export const esc = (s: unknown) =>

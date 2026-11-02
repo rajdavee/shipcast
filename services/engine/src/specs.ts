@@ -162,7 +162,8 @@ export async function catalogMarkdown(kind: SpecKind): Promise<string> {
       '# Carousel catalog',
       '',
       `Themes: ${Object.entries(c.carousel.themes).map(([k, v]) => `\`${k}\` — ${v}`).join('; ')}`,
-      'Presets: `linkedin-carousel` (1080×1350, default), `instagram-carousel` (1080×1350), `1080x1080`',
+      'Presets: `linkedin-carousel` (1080×1350, default), `instagram-carousel` (1080×1350), `tiktok-photo` (1080×1920, TikTok photo mode), `1080x1080`',
+      'Several sizes at once: `"sizes": ["tiktok-photo", "instagram-carousel"]` renders the same slides into one folder per size (`out/<size>/slides/`). On `tiktok-photo` keep text out of the top 150 px, the right 140 px and the bottom 420 px — the template pads for it; long copy that overflows comes back to you.',
       'Motion: add `"motion": "chill"` (or any music mood) to also get carousel.mp4 — slides with push-ins, transitions and an original bed, for Reels / LinkedIn video.',
       'Rich text in any text field: `*word*` accent · `**word**` bold · `==word==` highlight.',
       '',
@@ -210,28 +211,46 @@ export async function renderSpec(kind: SpecKind, cwd: string, briefDir: string, 
   if (Object.keys(opts.force ?? {}).length) await writeFile(file, JSON.stringify(spec, null, 2));
   try {
     if (kind === 'deck') {
-      const r = await callService('stills', 'deck', { ...spec, handle: spec.handle ?? opts.handle, brandDir: briefDir, outDir: out });
-      // Motion version: slides → MP4 with push-ins and slide transitions over an original bed.
-      if (spec.motion) {
-        const slides = r.slides.map((x: any) => x.file);
-        const hold = 2.6;
-        const seconds = slides.length * hold + 0.35;
-        const bed = await callService('media', 'music', { mood: spec.motion === true ? 'chill' : String(spec.motion), seconds, out: join(out, 'work-bed.wav'), sfx: slides.slice(1).map((_: string, i: number) => ({ kind: 'whoosh', at: (i + 1) * hold, gain: 0.25 })) });
-        const silent = join(out, 'carousel.silent.mp4');
-        const mv = await run('node', [join(PLUGIN_DIR, 'scripts', 'slides-to-video.mjs'), '--out', silent, '--size', `${r.width}x${r.height}`, '--hold', String(hold), '--transition', 'slideleft', ...slides], { timeoutMs: 600_000 });
-        if (mv.code === 0) {
-          const mix = await callService('media', 'mix', { music: bed.file, out: join(out, 'carousel.m4a'), seconds });
-          await run('ffmpeg', ['-y', '-v', 'error', '-i', silent, '-i', mix.file, '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'copy', '-shortest', '-movflags', '+faststart', join(out, 'carousel.mp4')]);
+      // Photo carousels list several platform sizes: each renders into its own folder (no PDF — those apps take images).
+      const asked: string[] = Array.isArray(spec.sizes) ? spec.sizes.map(String).filter((x: string) => /^[\w-]+$/.test(x)) : [];
+      const sets: (string | undefined)[] = asked.length ? asked : [undefined];
+      const fb: string[] = [];
+      let count = 0;
+      let bed: { file: string; seconds: number } | undefined;
+      for (const preset of sets) {
+        const dir = preset ? join(out, preset) : out;
+        const r = await callService('stills', 'deck', { ...spec, preset: preset ?? spec.preset, handle: spec.handle ?? opts.handle, brandDir: briefDir, outDir: dir, pdf: !preset });
+        count = r.slides.length;
+        // Motion version: slides → MP4 with push-ins and slide transitions over an original bed (one bed shared by every size).
+        if (spec.motion) {
+          const slides = r.slides.map((x: any) => x.file);
+          const hold = 2.6;
+          const seconds = slides.length * hold + 0.35;
+          bed ??= { seconds, file: (await callService('media', 'music', { mood: spec.motion === true ? 'chill' : String(spec.motion), seconds, out: join(out, 'work-bed.wav'), sfx: slides.slice(1).map((_: string, i: number) => ({ kind: 'whoosh', at: (i + 1) * hold, gain: 0.25 })) })).file };
+          const silent = join(dir, 'carousel.silent.mp4');
+          const mv = await run('node', [join(PLUGIN_DIR, 'scripts', 'slides-to-video.mjs'), '--out', silent, '--size', `${r.width}x${r.height}`, '--hold', String(hold), '--transition', 'slideleft', ...slides], { timeoutMs: 600_000 });
+          if (mv.code === 0) {
+            const mix = await callService('media', 'mix', { music: bed.file, out: join(dir, 'carousel.m4a'), seconds });
+            await run('ffmpeg', ['-y', '-v', 'error', '-i', silent, '-i', mix.file, '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'copy', '-shortest', '-movflags', '+faststart', join(dir, 'carousel.mp4')]);
+          }
+          await run('rm', ['-f', silent, join(dir, 'carousel.m4a')]);
         }
-        await run('rm', ['-f', silent, join(out, 'carousel.m4a'), bed.file]);
+        const tag = preset && sets.length > 1 ? `${preset} slide` : 'Slide';
+        // Full-screen 9:16 slides sit under the app's overlays and are read on a phone: safe zone and a larger type floor.
+        const tall = r.height / r.width > 1.6;
+        const floor = tall ? 28 : 24;
+        fb.push(
+          ...r.slides.flatMap((s: any, i: number) => [
+            ...s.audit.overflow.map((x: string) => `${tag} ${i + 1}: text overflows its box (${x}). Shorten it.`),
+            ...s.audit.offCanvas.map((x: string) => `${tag} ${i + 1}: text runs off the canvas (${x}). Shorten it.`),
+            ...(tall ? s.audit.unsafe.slice(0, 1).map((x: string) => `${tag} ${i + 1}: ${x} sits where the app's caption, sound or buttons cover it. Shorten it.`) : []),
+            ...(s.audit.minFont && s.audit.minFont < floor ? [`${tag} ${i + 1}: smallest text is ${s.audit.minFont}px — too small for mobile.`] : []),
+            ...(s.audit.tinyShots?.length ? [`${tag} ${i + 1}: ${s.audit.tinyShots[0]} is a full screenshot shrunk past readability — crop it to the part that matters with #crop=x,y,w,h.`] : []),
+          ]),
+        );
       }
-      const fb = r.slides.flatMap((s: any, i: number) => [
-        ...s.audit.overflow.map((x: string) => `Slide ${i + 1}: text overflows its box (${x}). Shorten it.`),
-        ...s.audit.offCanvas.map((x: string) => `Slide ${i + 1}: text runs off the canvas (${x}). Shorten it.`),
-        ...(s.audit.minFont && s.audit.minFont < 24 ? [`Slide ${i + 1}: smallest text is ${s.audit.minFont}px — too small for mobile.`] : []),
-        ...(s.audit.tinyShots?.length ? [`Slide ${i + 1}: ${s.audit.tinyShots[0]} is a full screenshot shrunk past readability — crop it to the part that matters with #crop=x,y,w,h.`] : []),
-      ]);
-      return { ok: !fb.length, feedback: fb, summary: `${r.slides.length} slides + PDF` };
+      if (bed) await run('rm', ['-f', bed.file]);
+      return { ok: !fb.length, feedback: fb, summary: sets[0] ? `${count} slides × ${sets.length} size${sets.length === 1 ? '' : 's'}` : `${count} slides + PDF` };
     }
     if (kind === 'graphics') {
       const r = await callService('stills', 'graphics', { ...spec, brandDir: briefDir, outDir: out, handle: opts.handle });
