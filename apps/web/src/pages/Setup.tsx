@@ -290,8 +290,8 @@ function VoiceSection() {
 }
 
 const STOCK: { id: StockProvider; title: string; what: string; where: string }[] = [
-  { id: 'pixabay', title: 'Pixabay — footage and photos', what: 'Recommended. Free for commercial use, no attribution needed. Used first for B-roll and photos.', where: 'pixabay.com/api/docs (log in, the key is on that page)' },
-  { id: 'unsplash', title: 'Unsplash — photos', what: 'High-end photography. Photos only; credits are written next to each video.', where: 'unsplash.com/oauth/applications → Access Key' },
+  { id: 'pixabay', title: 'Pixabay — footage and photos', what: 'Recommended. Free for commercial use, no attribution needed. Used first for B-roll footage.', where: 'pixabay.com/api/docs (log in, the key is on that page)' },
+  { id: 'unsplash', title: 'Unsplash — photos', what: 'High-end photography, used first for photos (Pixabay fills in when Unsplash hits its hourly limit). Credits are written next to each video.', where: 'unsplash.com/oauth/applications → Access Key' },
   { id: 'pexels', title: 'Pexels — footage and photos', what: 'Used when Pixabay has nothing for a shot.', where: 'pexels.com/api' },
 ];
 

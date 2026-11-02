@@ -3,7 +3,7 @@
 //
 //   node media.mjs status
 //   node media.mjs stock video "rain on a tram window at night" --seconds 6 --orientation landscape --out work/assets
-//   node media.mjs stock image "misty pine forest at dawn" --orientation landscape --out work/assets
+//   node media.mjs stock image "misty pine forest at dawn" --orientation landscape --out work/assets [--provider pixabay|unsplash|pexels]
 //   node media.mjs gen image "<cinematographer prompt>" --aspect 16:9 --out work/assets [--model fal-ai/flux/schnell]
 //   node media.mjs gen video "<prompt>" --seconds 5 --aspect 16:9 [--image start.png] --out work/assets [--model …]
 //   node media.mjs sfx "magic sparkle whoosh" --seconds 4 --out work/assets
@@ -82,11 +82,11 @@ async function status() {
   console.log(JSON.stringify(s, null, 2));
 }
 
-// ── stock (Pixabay first, then Unsplash for photos, then Pexels) ────────────
+// ── stock: footage Pixabay → Pexels; photos Unsplash (2400 px) → Pixabay (1280 px) → Pexels ──
 // Pixabay: videos + photos, free for commercial use, no attribution required (we still credit).
 // Unsplash: photos only; its guidelines ask for credit and a ping to download_location.
 // Hotlinking is not allowed by Pixabay, so every file is downloaded into --out.
-const STOCK_ORDER = { video: ['pixabay', 'pexels'], image: ['pixabay', 'unsplash', 'pexels'] };
+const STOCK_ORDER = { video: ['pixabay', 'pexels'], image: ['unsplash', 'pixabay', 'pexels'] };
 const fits = (w, h, orientation) => (orientation === 'portrait' ? h > w : orientation === 'square' ? Math.abs(w - h) / Math.max(w, h) < 0.2 : w > h);
 
 const STOCK = {
@@ -95,9 +95,9 @@ const STOCK = {
     if (kind === 'video') {
       const r = await fetch(`https://pixabay.com/api/videos/?key=${encodeURIComponent(k)}&q=${q}&per_page=30&safesearch=true`, { signal: AbortSignal.timeout(20_000) });
       if (!r.ok) throw new Error(`Pixabay search failed (${r.status})`);
-      const want = orientation === 'portrait' ? 1080 : 1920;
       const hits = ((await r.json()).hits || []).filter((v) => v.duration >= Math.min(seconds, 20));
-      const pickFile = (v) => Object.values(v.videos || {}).filter((f) => f && f.url && f.width).sort((a, b) => Math.abs(a.width - want) - Math.abs(b.width - want))[0];
+      // Long side closest to 1920: full HD whichever way it's shot, so a landscape clip can still be cropped to vertical.
+      const pickFile = (v) => Object.values(v.videos || {}).filter((f) => f && f.url && f.width).sort((a, b) => Math.abs(Math.max(a.width, a.height) - 1920) - Math.abs(Math.max(b.width, b.height) - 1920))[0];
       const ranked = [...hits.filter((v) => { const f = pickFile(v); return f && fits(f.width, f.height, orientation); }), ...hits];
       const seen = new Set();
       const outFiles = [];
@@ -106,7 +106,7 @@ const STOCK = {
         seen.add(v.id);
         const f = pickFile(v);
         if (!f) continue;
-        const file = join(out, `${slug(query)}-pixabay-${v.id}.mp4`);
+        const file = join(out, `${slug(query)}-pixabay-${v.id}-${f.width}.mp4`);
         if (!existsSync(file)) await download(f.url, file);
         outFiles.push({ file, credit: `Video by ${v.user || 'a Pixabay creator'} on Pixabay — ${v.pageURL}`, url: v.pageURL, width: f.width, height: f.height, duration: v.duration });
         if (outFiles.length >= count) break;
@@ -173,7 +173,7 @@ const STOCK = {
 
 async function stock(kind, query) {
   guard(query);
-  const order = STOCK_ORDER[kind].filter((p) => key(p));
+  const order = STOCK_ORDER[kind].filter((p) => key(p) && (!flags.provider || flags.provider === p));
   if (!order.length) die(`No stock ${kind === 'video' ? 'footage' : 'photo'} key. Add a free Pixabay key${kind === 'image' ? ' (or Unsplash)' : ''} in Shipcast Setup → Stock footage, or use another engine.`, 2);
   const opts = { orientation: String(flags.orientation || 'landscape'), seconds: Number(flags.seconds) || 5, count: Math.min(5, Number(flags.count) || 1) };
   const errors = [];

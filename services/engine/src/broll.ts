@@ -45,8 +45,8 @@ async function pixabayClip(key: string, query: string, seconds: number, orientat
   const r = await fetch(`${PIXABAY}/videos/?key=${encodeURIComponent(key)}&q=${encodeURIComponent(query.slice(0, 100))}&per_page=30&safesearch=true`, { signal: AbortSignal.timeout(20_000) });
   if (!r.ok) return null;
   const data = (await r.json()) as { hits?: any[] };
-  const wantW = orientation === 'portrait' ? 1080 : 1920;
-  const fileOf = (v: any) => Object.values(v.videos ?? {}).filter((f: any) => f?.url && f.width).sort((a: any, b: any) => Math.abs(a.width - wantW) - Math.abs(b.width - wantW))[0] as any;
+  // Long side closest to 1920: full HD whichever way it's shot, so a landscape clip can still be cropped to vertical.
+  const fileOf = (v: any) => Object.values(v.videos ?? {}).filter((f: any) => f?.url && f.width).sort((a: any, b: any) => Math.abs(Math.max(a.width, a.height) - 1920) - Math.abs(Math.max(b.width, b.height) - 1920))[0] as any;
   const long = (data.hits ?? []).filter((v) => v.duration >= Math.min(seconds, 20) && fileOf(v));
   const v = long.find((x) => fits(fileOf(x).width, fileOf(x).height, orientation)) ?? long[0];
   if (!v) return null;
