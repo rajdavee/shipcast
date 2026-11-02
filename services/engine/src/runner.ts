@@ -4,7 +4,7 @@ import { readFile, readdir, rename, stat } from 'node:fs/promises';
 import { shortsFromStoryboard } from './shorts.ts';
 import { recentPatterns, scenePattern, varietyFeedback } from './variety.ts';
 import { callService } from './service.ts';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { join } from 'node:path';
 import { campaignDir, PLUGIN_DIR } from './paths.ts';
@@ -195,9 +195,21 @@ function campaignHeader(c: Campaign): string {
 }
 
 export function briefPrompt(c: Campaign): string {
-  return `Use the shipcast:brief skill to research this product and write the campaign brief into the current directory.
+  return `First decide what the source is:
+- **A product, company, app, library or service to market** (a website, a repo, a description of something people use or buy) → use the shipcast:brief skill to research it and write the campaign brief into the current directory, then write intent.json as {"kind": "product"}.
+- **Anything else — a piece of content to make** (a story, cartoon, trailer, music video, documentary, tutorial, recipe, news recap, data story, motivational piece, montage…) → use the shipcast:production-brief skill and write brief.md, brand.json and intent.json into the current directory. Don't treat it as a product.
 
 ${campaignHeader(c)}`;
+}
+
+/** What the research step decided the source is (product to market, or content to make). */
+export function campaignIntent(c: Campaign): { kind: 'product' | 'content'; genre?: string; engines?: string[] } {
+  try {
+    const j = JSON.parse(readFileSync(join(campaignDir(c.id), 'brief', 'intent.json'), 'utf8'));
+    return j?.kind === 'content' ? { kind: 'content', genre: j.genre ? String(j.genre) : undefined, engines: Array.isArray(j.engines) ? j.engines.map(String) : undefined } : { kind: 'product' };
+  } catch {
+    return { kind: 'product' };
+  }
 }
 
 export function packPrompt(c: Campaign, pack: Pack, step: Step): string {
@@ -220,6 +232,8 @@ ${campaignHeader(c)}
 Read ${join(campaignDir(c.id), 'brief')}/brief.md and brand.json first — research is already done and assets are in its assets/ folder; reuse them instead of re-fetching.${existsSync(join(campaignDir(c.id), 'brief', 'product-facts.md')) ? `\n\n**Real product UI** captured from the running app is in brief/assets/app/ (described in brief/assets/app/screens.json) — prefer it over website screenshots. Slides, posts and cards label these screens "Real product UI · sample data" automatically, so never write that phrase into body copy; in a video, put it once in a kicker (e.g. the first real-UI scene). **Claims:** only what brief/product-facts.md verifies; no invented customers, numbers, ratings or testimonials.` : ''}
 
 ${existsSync(join(campaignDir(c.id), 'brief', 'CAMPAIGN-BRIEF.md')) ? `\n\nThis piece is part of a bigger campaign: read brief/CAMPAIGN-BRIEF.md (the line, the pillars, verified facts, naming) and stay on it.` : ''}
+
+${campaignIntent(c).kind === 'content' ? `\n\n**This is content, not a product** (${campaignIntent(c).genre ?? 'see brief.md'}). brief.md is a production brief: follow its beats, look, sound and engines. Ignore any product-marketing instructions below that don't fit (features, proof, claims, CTA, URLs) unless the brief asks for them — make the piece the brief describes, in this format. For the engines, read the shipcast:director skill.` : ''}
 
 ${renderTemplate(pack.prompt, vars).trim()}${step.options._brief || step.options._angle ? `\n\n## Your part of the campaign: ${step.options._title ?? pack.name}\n${[step.options._angle, step.options._brief].filter(Boolean).join('\n')}` : ''}`;
 }

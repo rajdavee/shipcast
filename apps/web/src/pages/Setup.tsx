@@ -107,6 +107,7 @@ export function Setup({ status, onChange }: { status: Status | null; onChange: (
       <VoiceSection />
 
       <BrollSection />
+      <EnginesSection />
 
       <section className="setup-section">
         <h2>On this computer</h2>
@@ -313,6 +314,47 @@ function BrollSection() {
             </form>
           )}
         </div>
+      </div>
+    </section>
+  );
+}
+
+const ENGINES: { id: string; title: string; what: string; where: string }[] = [
+  { id: 'fal', title: 'fal.ai — generative video & images', what: 'Any shot no other engine can make: cinematic, painted or anime-style scenes (Wan, Kling, Veo, FLUX). You pay fal per clip.', where: 'fal.ai/dashboard/keys' },
+  { id: 'replicate', title: 'Replicate — generative images (and video by model)', what: 'A second catalogue of open models, used when fal isn’t connected.', where: 'replicate.com/account/api-tokens' },
+  { id: 'freesound', title: 'Freesound — sound effects (CC0 only)', what: 'Whooshes, footsteps, magic, crowds — only public-domain sounds are used.', where: 'freesound.org/apiv2/apply' },
+];
+
+/** Optional engines for "Anything": generative media and sound effects, with the user's own keys. */
+function EnginesSection() {
+  const p = useLoad(() => api.providers());
+  const [keys, setKeys] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState<string | null>(null);
+  return (
+    <section className="setup-section">
+      <h2>Media engines for “Anything”</h2>
+      <p>Optional. With these, Shipcast can make any kind of video — real footage (Pexels above), generated shots and sound effects. Keys stay on this computer; nothing is generated without one.</p>
+      <div className="rows">
+        {ENGINES.map((e) => {
+          const on = !!p.data?.[e.id]?.connected;
+          return (
+            <div className="srow" key={e.id}>
+              <i className={`dot ${on ? 'ok' : ''}`} />
+              <div>
+                <h3>{e.title}</h3>
+                <p>{on ? 'Connected.' : `${e.what} Key: ${e.where}`}</p>
+              </div>
+              {on ? (
+                <button className="btn ghost" onClick={async () => { await api.removeProvider(e.id); await p.reload(); toast(`${e.title.split(' —')[0]} disconnected`); }}>Disconnect</button>
+              ) : (
+                <form className="row-actions" onSubmit={async (ev) => { ev.preventDefault(); const k = (keys[e.id] ?? '').trim(); if (!k) return; setBusy(e.id); try { await api.saveProvider(e.id, k); await p.reload(); setKeys({ ...keys, [e.id]: '' }); toast('Connected'); } catch (err) { toast(String((err as Error).message)); } finally { setBusy(null); } }}>
+                  <input className="input" type="password" autoComplete="off" placeholder="API key" value={keys[e.id] ?? ''} onChange={(ev) => setKeys({ ...keys, [e.id]: ev.target.value })} style={{ width: 220 }} aria-label={`${e.title} key`} />
+                  <button className="btn primary" disabled={busy === e.id || !(keys[e.id] ?? '').trim()}>{busy === e.id ? 'Checking…' : 'Connect'}</button>
+                </form>
+              )}
+            </div>
+          );
+        })}
       </div>
     </section>
   );

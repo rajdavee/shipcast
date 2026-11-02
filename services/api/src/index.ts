@@ -279,6 +279,52 @@ router.delete('/api/broll', async () => {
   return { connected: false };
 });
 
+// ── media engines for "Anything": stock, generative, sound effects (all optional, your own keys) ──
+const PROVIDERS: Record<string, { label: string; check?: (key: string) => Promise<void> }> = {
+  pexels: { label: 'Pexels', check: pexelsCheck },
+  fal: { label: 'fal.ai' },
+  replicate: {
+    label: 'Replicate',
+    check: async (key) => {
+      const r = await fetch('https://api.replicate.com/v1/account', { headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(15_000) });
+      if (r.status === 401 || r.status === 403) throw new Error('Replicate rejected that token');
+      if (!r.ok) throw new Error(`Replicate check failed (${r.status})`);
+    },
+  },
+  freesound: {
+    label: 'Freesound',
+    check: async (key) => {
+      const r = await fetch(`https://freesound.org/apiv2/search/text/?query=whoosh&page_size=1&token=${encodeURIComponent(key)}`, { signal: AbortSignal.timeout(15_000) });
+      if (r.status === 401 || r.status === 403) throw new Error('Freesound rejected that key');
+      if (!r.ok) throw new Error(`Freesound check failed (${r.status})`);
+    },
+  },
+};
+router.get('/api/providers', async () => {
+  const out: Record<string, { label: string; connected: boolean }> = {};
+  for (const [id, p] of Object.entries(PROVIDERS)) out[id] = { label: p.label, connected: !!(await getSecret(id)) };
+  return out;
+});
+router.put('/api/providers/:id', async (req, _r, p) => {
+  const prov = PROVIDERS[p.id];
+  if (!prov) throw new HttpError(404, 'unknown provider');
+  const b = await readJson(req);
+  const key = typeof b.apiKey === 'string' ? b.apiKey.trim() : '';
+  if (!key) throw new HttpError(400, 'apiKey is required');
+  try {
+    await prov.check?.(key);
+  } catch (e) {
+    throw new HttpError(400, (e as Error).message);
+  }
+  await setSecret(p.id, key);
+  return { connected: true };
+});
+router.delete('/api/providers/:id', async (_q, _r, p) => {
+  if (!PROVIDERS[p.id]) throw new HttpError(404, 'unknown provider');
+  await setSecret(p.id, null);
+  return { connected: false };
+});
+
 // ── brainstorm: a short conversation before a campaign ─────────────────
 router.post('/api/brainstorm', async (req) => {
   const b = await readJson(req);
