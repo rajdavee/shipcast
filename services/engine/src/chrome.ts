@@ -271,6 +271,9 @@ export function layoutAuditScript(safe: { top: number; right: number; bottom: nu
       const keep = Math.max(5, Math.min(95, Math.round((100 * ui) / minUi)));
       return name + ': its UI text lands at about ' + Math.round(ui) + 'px on the canvas (needs ' + minUi + 'px). Crop to roughly ' + keep + '% of the width it shows now (the button, chart or result that proves the point) with #crop=x,y,w,h.';
     }).filter(Boolean);
+    // Templates mark text that must stay big (data-min-font); auto-fit shrinking it below that means the copy is too long.
+    out.small = [...document.querySelectorAll('[data-min-font]')].filter((el) => parseFloat(getComputedStyle(el).fontSize) < Number(el.dataset.minFont)).map((el) => label(el) + ' ' + Math.round(parseFloat(getComputedStyle(el).fontSize)) + 'px');
+    out.broken = [...document.images].filter((im) => !im.complete || !im.naturalWidth).map((im) => (im.getAttribute('src') || '').split('/').pop().slice(0, 60));
     if (out.minFont === 999) out.minFont = 0;
     out.overflow = out.overflow.slice(0, 20); out.offCanvas = out.offCanvas.slice(0, 20); out.unsafe = out.unsafe.slice(0, 20);
     return out;
@@ -285,6 +288,10 @@ export interface LayoutAudit {
   textCount: number;
   /** Screenshots whose UI text lands below ~2.2% of the canvas width, each with the crop that would fix it. */
   tinyShots?: string[];
+  /** Text marked data-min-font that auto-fit had to shrink below its floor. */
+  small?: string[];
+  /** Images that failed to load (file names). */
+  broken?: string[];
 }
 
 /**

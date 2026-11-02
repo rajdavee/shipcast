@@ -62,6 +62,25 @@ test('every bundled pack is valid and renders without leftover tags', async () =
   }
 });
 
+test('marketing-material packs load, validate and point at a Shipcast skill that exists', async () => {
+  const { existsSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const { PLUGIN_DIR } = await import('@shipcast/engine');
+  const packs = await loadPacks(true);
+  const want: Record<string, string> = { 'photo-carousel': 'deck', 'quote-cards': 'graphics', 'app-store-screens': 'graphics', 'product-hunt-kit': 'graphics' };
+  for (const [id, spec] of Object.entries(want)) {
+    const p = packs.find((x) => x.id === id);
+    assert.ok(p, `${id} is bundled`);
+    assert.deepEqual(validatePack(p!, id), []);
+    assert.equal(p!.spec, spec, `${id} renders through the ${spec} spec`);
+    const skill = p!.prompt.match(/shipcast:([\w-]+)/)?.[1];
+    assert.ok(skill && existsSync(join(PLUGIN_DIR, 'skills', skill, 'SKILL.md')), `${id} → ${skill}`);
+  }
+  const photo = packs.find((x) => x.id === 'photo-carousel')!;
+  assert.deepEqual((photo.options.find((o) => o.key === 'platform') as { choices?: string[] })?.choices, ['both', 'tiktok', 'instagram']);
+  assert.ok(photo.outputs.includes('tiktok-photo/slides/*.png'));
+});
+
 test('parseUsageReset reads Claude usage-limit messages and ignores other errors', async () => {
   const { parseUsageReset } = await import('@shipcast/engine');
   const now = new Date('2026-11-01T10:00:00').getTime();

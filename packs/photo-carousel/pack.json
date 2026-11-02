@@ -1,0 +1,21 @@
+{
+  "id": "photo-carousel",
+  "name": "TikTok / Instagram Photo Carousel",
+  "tagline": "5–10 swipe slides sized for phones — 9:16 for TikTok photo mode and 4:5 for Instagram — with big type, safe zones, an optional music video and the post caption.",
+  "category": "design",
+  "order": 6,
+  "estimate": "3–5 min",
+  "accent": "#ee1d52",
+  "spec": "deck",
+  "options": [
+    { "key": "angle", "label": "Angle", "type": "select", "choices": ["listicle", "problem-solution", "how-it-works", "before-after", "myth-buster", "launch"], "default": "listicle" },
+    { "key": "slides", "label": "Slides", "type": "number", "default": "7", "min": 5, "max": 10 },
+    { "key": "theme", "label": "Theme", "type": "select", "choices": ["auto", "editorial", "swiss", "bold", "midnight"], "default": "auto" },
+    { "key": "platform", "label": "Sizes", "type": "select", "choices": ["both", "tiktok", "instagram"], "default": "both" },
+    { "key": "motion", "label": "MP4 with music", "type": "select", "choices": ["yes", "no"], "default": "yes" }
+  ],
+  "outputs": ["tiktok-photo/slides/*.png", "instagram-carousel/slides/*.png", "*/carousel.mp4", "caption.md", "deck.json", "*.md"],
+  "skills": [],
+  "tools": ["chrome", "ffmpeg"],
+  "roles": ["design-taste", "copy", "social", "humanize"]
+}

@@ -84,12 +84,118 @@ test('stills renders a carousel deck to PNGs + PDF with layout audits', { skip: 
   assert.deepEqual(job.output.slides[0].audit.overflow, []);
 });
 
+test('photo carousel renders one deck at TikTok 9:16 and Instagram 4:5, clear of the app overlays', { skip: !hasChrome && 'no Chrome' }, async () => {
+  const { renderSpec, getPreset } = await import('@shipcast/engine');
+  const cwd = join(home, 'photo');
+  const { mkdirSync } = await import('node:fs');
+  mkdirSync(join(cwd, 'out'), { recursive: true });
+  mkdirSync(join(cwd, 'brief'), { recursive: true });
+  writeFileSync(join(cwd, 'brief', 'brand.json'), JSON.stringify({ name: 'Shipcast', colors: { background: '#0b0d12', primary: '#2b3bff' } }));
+  const shot = join(process.cwd(), 'docs', 'assets', 'studio-new.png');
+  writeFileSync(join(cwd, 'out', 'deck.json'), JSON.stringify({
+    theme: 'midnight',
+    handle: '@shipcast',
+    slides: [
+      { layout: 'cover', fields: { kicker: 'For solo founders', title: 'Launch day, *zero* content ready?', subtitle: '5 things to make before you post' } },
+      { layout: 'points', fields: { title: 'Make these *first*', items: ['A hook video — 30 seconds, real UI', 'A carousel — one idea per slide', 'Social posts — every size', 'A one-pager — for the DMs'] } },
+      { layout: 'step', fields: { step: 'Step 1', title: 'Paste a link', body: 'Shipcast studies your site first.', image: `${shot}#crop=0.3,0.3,0.24,0.22` } },
+      { layout: 'compare', fields: { title: 'Before vs *after*', leftLabel: 'Before', left: ['Two days in Canva', 'Stock footage'], rightLabel: 'After', right: ['One paste', 'Your real UI'] } },
+      { layout: 'cta', fields: { title: 'Make it in *minutes*', button: 'Link in bio' } },
+    ],
+  }));
+  process.env.SHIPCAST_STILLS_URL = base;
+  try {
+    const r = await renderSpec('deck', cwd, join(cwd, 'brief'), { force: { sizes: ['tiktok-photo', 'instagram-carousel'] } });
+    assert.deepEqual(r.feedback, []);
+    assert.equal(r.summary, '5 slides × 2 sizes');
+  } finally {
+    delete process.env.SHIPCAST_STILLS_URL;
+  }
+  assert.ok(existsSync(join(cwd, 'out', 'tiktok-photo', 'slides', 'slide-05.png')) && existsSync(join(cwd, 'out', 'instagram-carousel', 'slides', 'slide-05.png')));
+  assert.ok(!existsSync(join(cwd, 'out', 'tiktok-photo', 'carousel.pdf')), 'photo apps take images, not a PDF');
+  assert.equal(getPreset('tiktok-photo')?.height, 1920);
+});
+
+test('quote, testimonial and post cards render at square, 4:5 and 1.91:1 without overflow; sample copy is labelled', { skip: !hasChrome && 'no Chrome' }, async () => {
+  const out = join(home, 'quotes');
+  const shot = join(process.cwd(), 'docs', 'assets', 'studio-new.png');
+  const cards: [string, Record<string, unknown>][] = [
+    ['pull-quote', { kicker: 'Paste a link. Get a launch.', quote: 'Shipcast makes *all of it* from one URL, on your own machine.', source: 'Shipcast README' }],
+    ['testimonial', { quote: 'We went from launch-day panic to a full set of posts in an afternoon. The carousel alone saved us two days.', name: 'Sample Person', role: 'Founder', company: 'Sample Co', sample: 'yes' }],
+    ['post-card', { name: 'Shipcast', handle: '@shipcast', time: '2h', avatar: 'logo', text: 'Paste a link → get a launch campaign. Videos, carousels, decks and posts — *open source*.', image: `${shot}#crop=0.3,0.3,0.14,0.12` }],
+  ];
+  const items = cards.flatMap(([layout, fields]) => ['instagram-post', 'linkedin-image', 'linkedin-landscape'].map((preset) => ({ type: 'card', layout, theme: 'editorial', preset, name: `${layout}-${preset}.png`, fields })));
+  const job = await run('graphics', { brand: { name: 'Shipcast', colors: { background: '#0b0d12', primary: '#2b3bff' } }, outDir: out, items });
+  assert.equal(job.status, 'done', job.error);
+  assert.equal(job.output.items.length, 9);
+  for (const it of job.output.items) {
+    const where = it.file.split('/').pop();
+    for (const k of ['overflow', 'offCanvas', 'unsafe', 'tinyShots', 'small']) assert.deepEqual(it.audit[k], [], `${where} ${k}`);
+  }
+  const fs = await import('node:fs');
+  assert.match(fs.readFileSync(join(out, 'testimonial-linkedin-image.html'), 'utf8'), /data-sample>Sample copy — not a real customer/);
+  assert.ok(!/data-sample>/.test(fs.readFileSync(join(out, 'pull-quote-instagram-post.html'), 'utf8')), 'real quotes carry no sample label');
+});
+
+test('app store screens: captions over real screens in a phone frame for iOS and Play, with readability checks', { skip: !hasChrome && 'no Chrome' }, async () => {
+  const out = join(home, 'appstore');
+  const shot = join(process.cwd(), 'docs', 'assets', 'studio-run.png');
+  const { execFileSync } = await import('node:child_process');
+  const wide = join(home, 'wide-desktop.png');
+  let hasWide = true;
+  try {
+    execFileSync('ffmpeg', ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'color=c=white:s=2880x1800', '-frames:v', '1', wide]);
+  } catch {
+    hasWide = false;
+  }
+  const screen = (preset: string, name: string, fields: Record<string, unknown>) => ({ type: 'card', layout: 'app-screen', theme: 'midnight', preset, name, fields });
+  const items = [
+    screen('app-store-ios', 'ios/01-launch.png', { headline: 'Paste a link. Get a *launch*.', sub: 'Videos, carousels and posts from one URL', image: `${shot}#crop=0.08,0,0.29,1` }),
+    screen('app-store-ios', 'ios/02-box.png', { headline: 'One *box*', image: `${shot}#crop=0.5,0,0.29,1`, frame: 'bleed' }),
+    screen('play-store', 'android/01-launch.png', { headline: 'Paste a link. Get a *launch*.', image: `${shot}#crop=0.08,0,0.29,1` }),
+    screen('play-store', 'android/02-box.png', { headline: 'One *box*', image: `${shot}#crop=0.55,0,0.2,1`, frame: 'full' }),
+    screen('play-store', '../../escape.png', { headline: 'Supercalifragilisticexpialidocious', image: hasWide ? wide : shot }),
+    screen('play-store', 'android/missing.png', { headline: 'Gone', image: join(home, 'nope.png') }),
+  ];
+  const job = await run('graphics', { brand: { name: 'Shipcast', colors: { background: '#0b0d12', primary: '#2b3bff' } }, outDir: out, items });
+  assert.equal(job.status, 'done', job.error);
+  const [ios1, ios2, and1, and2, bad, missing] = job.output.items;
+  for (const it of [ios1, ios2, and1, and2]) for (const k of ['overflow', 'offCanvas', 'unsafe', 'tinyShots', 'small', 'broken']) assert.deepEqual(it.audit[k], [], `${it.file} ${k}`);
+  assert.ok(existsSync(join(out, 'ios', '01-launch.png')) && existsSync(join(out, 'android', '02-box.png')), 'one folder per store');
+  assert.equal(bad.file, join(out, 'escape.png'), 'file names cannot leave the output folder');
+  assert.equal(bad.audit.small.length, 1, 'a caption that shrinks past its floor is reported');
+  if (hasWide) assert.equal(bad.audit.tinyShots.length, 1, 'a whole desktop page squeezed into a phone is unreadable');
+  assert.equal(missing.audit.broken.length, 1);
+  assert.ok(!/apple|iphone|android|google/i.test((await import('node:fs')).readFileSync(ios1.html, 'utf8').split('<body>')[1].replace(/src="[^"]*"/g, '')), 'no platform names drawn on the screen');
+});
+
+test('Product Hunt gallery and thumbnail render at 1270×760 and 240×240 without overflow', { skip: !hasChrome && 'no Chrome' }, async () => {
+  const out = join(home, 'ph');
+  const shot = join(process.cwd(), 'docs', 'assets', 'studio-new.png');
+  const logo = join(process.cwd(), 'docs', 'assets', 'mark.svg');
+  const items = [
+    { type: 'card', layout: 'gallery-shot', theme: 'midnight', preset: 'producthunt-gallery', name: 'gallery/01-launch.png', fields: { kicker: 'Open source', title: 'Paste a link. Get a *launch*.', sub: 'Videos, carousels, decks and posts from one URL.', image: `${shot}#crop=0.3,0.3,0.32,0.3` } },
+    { type: 'card', layout: 'gallery-points', theme: 'editorial', preset: 'producthunt-gallery', name: 'gallery/02-why.png', fields: { title: "Why it's *different*", items: ['No API keys — uses the login you have', 'Runs locally — files stay on your machine', 'Checks itself — overflow, safe zones, legibility'] } },
+    { type: 'card', layout: 'launch-thumb', theme: 'editorial', preset: 'producthunt-thumb', name: 'thumbnail.png', fields: { bg: 'light' } },
+  ];
+  const job = await run('graphics', { brand: { name: 'Shipcast', logo, colors: { background: '#0b0d12', primary: '#2b3bff' } }, outDir: out, items });
+  assert.equal(job.status, 'done', job.error);
+  for (const it of job.output.items) for (const k of ['overflow', 'offCanvas', 'unsafe', 'tinyShots', 'small', 'broken']) assert.deepEqual(it.audit[k], [], `${it.file} ${k}`);
+  const nomono = await run('graphics', { brand: { name: 'Shipcast', colors: { background: '#0b0d12', primary: '#2b3bff' } }, outDir: out, items: [{ ...items[2], name: 'mono.png', fields: { bg: 'brand' } }] });
+  assert.deepEqual(nomono.output.items[0].audit.offCanvas, []);
+  assert.match((await import('node:fs')).readFileSync(join(out, 'mono.html'), 'utf8'), />S<\/span>/, 'no logo → a monogram, never someone else\'s mark');
+  assert.ok(existsSync(join(out, 'gallery', '02-why.png')) && existsSync(join(out, 'thumbnail.png')));
+});
+
 test('stills audit catches text that overflows', { skip: !hasChrome && 'no Chrome' }, async () => {
   const f = join(home, 'bad.html');
   writeFileSync(f, '<html><body style="margin:0"><div style="width:200px;overflow:hidden;white-space:nowrap;font-size:40px">This headline is far too long for its box</div></body></html>');
   const job = await run('html', { file: f, out: join(home, 'bad.png'), width: 600, height: 400 });
   assert.equal(job.status, 'done', job.error);
   assert.equal(job.output.audit.overflow.length, 1);
+  writeFileSync(f, '<html><body style="margin:0"><h1 data-min-font="80" style="font-size:40px">Shrunk</h1><p data-min-font="20" style="font-size:30px">Fine</p></body></html>');
+  const small = await run('html', { file: f, out: join(home, 'small.png'), width: 600, height: 400 });
+  assert.deepEqual(small.output.audit.small, ['h1 "Shrunk" 40px'], 'text pushed below its floor is reported');
 });
 
 test('stills renders a document to a real-text PDF, previews and a page audit', { skip: !hasChrome && 'no Chrome' }, async () => {

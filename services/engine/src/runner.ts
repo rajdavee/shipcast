@@ -1,7 +1,7 @@
 import { lessonsBrief } from './learn.ts';
 import { criticSummary, criticWeakest, judge, previews } from './critic.ts';
 import { cp, mkdir, writeFile, rm } from 'node:fs/promises';
-import { catalogMarkdown, checkCopy, renderSpec, SPEC_FILE, type SpecKind } from './specs.ts';
+import { catalogMarkdown, checkCopy, checkLaunchCopy, renderSpec, SPEC_FILE, type SpecKind } from './specs.ts';
 import { readFile, readdir, rename, stat } from 'node:fs/promises';
 import { shortsFromStoryboard } from './shorts.ts';
 import { recentPatterns, scenePattern, varietyFeedback } from './variety.ts';
@@ -598,11 +598,16 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
         await phase(round ? 'Applying fixes' : specKind === 'storyboard' ? 'Rendering the video' : specKind === 'infographic' ? 'Animating the infographic' : 'Rendering');
         await log({ step: step.id, type: 'log', text: round ? `Re-rendering after fixes (round ${round})…` : `Rendering ${SPEC_FILE[specKind]} with the ${specKind === 'storyboard' || specKind === 'infographic' ? 'render' : 'stills'} service…` });
         const force: Record<string, unknown> = {};
-        if (pack?.id === 'carousel') force.motion = step.options.motion === 'no' ? null : 'chill';
+        if (pack?.id === 'carousel' || pack?.id === 'photo-carousel') force.motion = step.options.motion === 'no' ? null : 'chill';
+        if (pack?.id === 'photo-carousel') force.sizes = step.options.platform === 'tiktok' ? ['tiktok-photo'] : step.options.platform === 'instagram' ? ['instagram-carousel'] : ['tiktok-photo', 'instagram-carousel'];
         // Choices made in the format options win over what the model wrote.
         if ((pack?.id === 'document' || pack?.id === 'presentation' || pack?.id === 'ad-set' || pack?.id === 'email' || pack?.id === 'landing') && step.options.theme && step.options.theme !== 'auto') force.theme = step.options.theme;
         if (pack?.id === 'document' && step.options.size && step.options.size !== 'auto') force.size = step.options.size;
         const r = await renderSpec(specKind, cwd, join(dir, 'brief'), { force });
+        if (pack?.id === 'product-hunt-kit') {
+          const copy = checkLaunchCopy(await readFile(join(cwd, 'out', 'launch-copy.md'), 'utf8').catch(() => null));
+          if (copy.length) Object.assign(r, { ok: false, feedback: [...r.feedback, ...copy] });
+        }
         await log({ step: step.id, type: 'log', text: r.ok ? `Rendered: ${r.summary}` : `Quality check found ${r.feedback.length} issue(s): ${r.feedback.slice(0, 3).join(' · ')}` });
         if (r.ok) {
           // Director's review: QA can't judge taste. Claude looks at the frames once and may revise.
@@ -646,7 +651,7 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
           }
           break;
         }
-        const fix = await execClaude(`The render service checked your ${SPEC_FILE[specKind]} and found these problems:\n${r.feedback.map((f) => `- ${f}`).join('\n')}\n\nEdit out/${SPEC_FILE[specKind]} to fix every one of them (shorter text, different layout, valid fields). Don't render anything yourself — just update the JSON.`, sessionId);
+        const fix = await execClaude(`The render service checked your ${SPEC_FILE[specKind]} and found these problems:\n${r.feedback.map((f) => `- ${f}`).join('\n')}\n\nEdit out/${SPEC_FILE[specKind]} (or the file a problem names) to fix every one of them (shorter text, different layout, valid fields). Don't render anything yourself — just update the JSON.`, sessionId);
         if (!fix.result?.ok) break;
       }
     }

@@ -115,7 +115,76 @@ const CARD_CSS = `
 .c .chip{display:inline-flex;border:2px solid var(--rule);border-radius:999px;padding:10px 18px;font:600 22px/1 var(--font-body);color:var(--fg)}
 .c .url{font:600 24px/1 var(--font-mono);color:var(--muted)}
 em{font-style:normal;color:var(--accent)}
+.c .hd,.c .ft{display:flex;align-items:center;justify-content:space-between;gap:24px}
+.c .kick{font:700 var(--k,28px)/1.2 var(--font-body);color:var(--accent)}
+.c .sample{flex:none;border:2px dashed currentColor;border-radius:999px;padding:.45em .9em;font:700 var(--s,22px)/1 var(--font-body);color:var(--muted);white-space:nowrap}
+.c .av{flex:none;display:grid;place-items:center;border-radius:50%;object-fit:cover;background:var(--accent);color:var(--bg);font-family:var(--font-display);font-weight:800;letter-spacing:-.02em;overflow:hidden}
+.c .av img{width:62%;height:62%;object-fit:contain}
+.pq-body{display:flex;flex-direction:column;gap:12px;min-height:0}
+.pq-mark{font:900 1em/.62 var(--font-display);color:var(--accent);flex:none}
+.c .pq-q{font-weight:700;line-height:1.1;letter-spacing:-.03em}
+.ft .src{display:flex;align-items:center;gap:20px;font:600 var(--s,30px)/1.25 var(--font-body);color:var(--fg)}
+.ft .src small{display:block;font-weight:500;color:var(--muted)}
+.ft .rule{width:64px;height:6px;border-radius:3px;background:var(--accent);flex:none}
+.tm{display:flex;flex-direction:column;background:var(--card);border-radius:36px;box-shadow:0 0 0 1px color-mix(in srgb,var(--rule) 45%,transparent),0 40px 80px -40px rgba(0,0,0,.45)}
+.tm-q{font-family:var(--font-display);font-weight:600;letter-spacing:-.02em;line-height:1.2;text-wrap:pretty}
+.tm-who{display:flex;align-items:center;font-family:var(--font-body);line-height:1.25}
+.tm-who b{display:block;font-weight:700;color:var(--fg)}
+.tm-who small{display:block;font-weight:500;color:var(--muted);font-size:.86em}
+.post{display:grid;background:#fff;color:#14171c;border-radius:32px;box-shadow:0 0 0 1px rgba(0,0,0,.06),0 40px 90px -40px rgba(0,0,0,.55);font-family:var(--font-body)}
+.post.dk{background:#16181d;color:#eef0f4;box-shadow:0 0 0 1px rgba(255,255,255,.1),0 40px 90px -40px rgba(0,0,0,.7)}
+.post header{display:flex;align-items:center;gap:.6em}
+.post .pn{flex:1;min-width:0;line-height:1.2}.post .pn b{display:block;font-weight:700}.post .pn span{display:block;color:#69707d;font-size:.82em}
+.post.dk .pn span,.post.dk footer{color:#9aa1ad}
+.post .dots{font-style:normal;color:#9aa1ad;letter-spacing:.1em}
+.post .pt{line-height:1.32;white-space:pre-line;text-wrap:pretty;color:inherit}
+.post .pt em{color:var(--brand-primary)}.post.dk .pt em{color:var(--accent-on-dark)}
+.post .pimg{border-radius:20px;overflow:hidden;box-shadow:0 0 0 1px rgba(0,0,0,.08);min-height:0}
+.post .pimg img{width:100%;height:auto}
+.post footer{display:flex;justify-content:space-between;color:#69707d}
+.app{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;text-align:center}
+.app h1{max-width:100%;font-family:var(--font-display);font-weight:800;letter-spacing:-.04em;line-height:1.02;text-wrap:balance}
+.app .sub{font-family:var(--font-body);font-weight:500;color:var(--muted);line-height:1.3;text-wrap:balance}
+.app .stage{position:relative;flex:1;width:100%;min-height:0;container-type:size}
+.dev{--dw:min(96cqw,calc(100cqh / 2.08));position:absolute;left:50%;top:0;transform:translateX(-50%);width:var(--dw);height:calc(var(--dw) * 2.08);padding:calc(var(--dw) * .03);border-radius:calc(var(--dw) * .13);background:#15171c;
+  box-shadow:inset 0 0 0 calc(var(--dw) * .006) #3b3f48,0 calc(var(--dw) * .06) calc(var(--dw) * .12) calc(var(--dw) * -.04) rgba(0,0,0,.5)}
+.dev.bleed{--dw:92cqw}
+.dev::before,.dev::after{content:"";position:absolute;width:calc(var(--dw) * .012);border-radius:3px;background:#2b2e35}
+.dev::before{right:calc(var(--dw) * -.011);top:calc(var(--dw) * .42);height:calc(var(--dw) * .2)}
+.dev::after{left:calc(var(--dw) * -.011);top:calc(var(--dw) * .34);height:calc(var(--dw) * .28)}
+.dev .scr{position:relative;width:100%;height:100%;border-radius:calc(var(--dw) * .105);overflow:hidden;background:#fff}
+.dev .scr>img{width:100%;height:auto}
+.dev .cam{position:absolute;z-index:6;left:50%;top:calc(var(--dw) * .055);width:calc(var(--dw) * .04);height:calc(var(--dw) * .04);margin-left:calc(var(--dw) * -.02);border-radius:50%;background:#0b0c0f;box-shadow:0 0 0 calc(var(--dw) * .006) #23262c}
+.dev .ui-label{font-size:calc(var(--dw) * .028)}
+.post footer svg{width:1.15em;height:1.15em;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
 `;
+
+/** Initials for an avatar circle — the card never needs a real person's photo. */
+const initials = (name: unknown) =>
+  String(name ?? '').replace(/[^\p{L}\p{N}\s]/gu, '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '•';
+
+/** Placeholder quotes are labelled on the image itself, so a sample can't pass for a real customer. */
+const isSample = (f: Record<string, any>) => /^(yes|true)$/i.test(String(f.sample ?? ''));
+const sampleTag = (f: Record<string, any>) => (isSample(f) ? '<span class="sample" data-sample>Sample copy — not a real customer</span>' : '');
+
+function avatar(f: Record<string, any>, ctx: RenderCtx, px: number): string {
+  const st = `width:${px}px;height:${px}px;font-size:${Math.round(px * 0.4)}px`;
+  if (f.avatar === 'logo' && ctx.brand.logo) return `<span class="av" style="${st};background:#fff"><img src="${img(ctx.brand.logo, ctx)}" alt=""></span>`;
+  if (f.avatar && f.avatar !== 'logo') return `<img class="av" style="${st}" src="${img(f.avatar, ctx)}" alt="">`;
+  return `<span class="av" style="${st}">${esc(String(f.initials ?? '').slice(0, 3) || initials(f.name))}</span>`;
+}
+
+// Generic outline glyphs (reply, share-again, like, send) so a post card reads as "a post" without any platform's marks.
+const POST_ICONS = ['<path d="M4 5h16v11H10l-6 4z"/>', '<path d="M7 7h11v5M17 17H6v-5M15 4l3 3-3 3M9 20l-3-3 3-3"/>', '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>', '<path d="M12 3v12M7 8l5-5 5 5M5 14v6h14v-6"/>']
+  .map((p) => `<svg viewBox="0 0 24 24">${p}</svg>`)
+  .join('');
+
+/** Quote-card geometry: one design that recomposes for square, 4:5 and 1.91:1. */
+const quoteBox = (ctx: RenderCtx) => {
+  const land = ctx.width / ctx.height > 1.4;
+  // 4:5 has a fifth more height than square: spend it on bigger type rather than empty card.
+  return { land, u: land ? 0.72 : ctx.height / ctx.width > 1.2 ? 1.1 : 1, pad: land ? 64 : 96 };
+};
 
 export const CARD_LAYOUTS: Layout[] = [
   {
@@ -194,6 +263,159 @@ ${f.cta ? `<span class="pill" style="font-size:34px;padding:22px 36px">${esc(f.c
 ${logo(ctx)}<div><div style="font:900 220px/.7 var(--font-display);color:var(--accent)">“</div>
 <h1 style="font-size:${fit(f.quote, [[60, 76], [110, 62], [160, 52], [200, 46]], 42)}px;line-height:1.12;font-weight:700;margin-top:10px">${rich(f.quote)}</h1></div>
 <p style="font-size:30px;color:var(--fg)"><b>${esc(f.name)}</b>${f.role ? ` · ${esc(f.role)}` : ''}</p></div>`,
+  },
+  {
+    id: 'pull-quote',
+    label: 'Pull quote',
+    use: 'One striking line from the brief, a founder post, a review or an article, set big with its source. Square, 4:5 or 1.91:1.',
+    fields: [
+      { id: 'quote', type: 'longtext', label: 'Quote (exact words)', max: 180, help: '*word* = accent' },
+      { id: 'source', type: 'text', label: 'Who said it / where', max: 60, help: 'e.g. "Jane Doe, CTO at Acme" or "From our launch post"' },
+      { id: 'kicker', type: 'text', label: 'Kicker', max: 32, optional: true },
+      { id: 'sample', type: 'enum', label: 'Sample copy', choices: ['no', 'yes'], optional: true, help: 'yes = placeholder words, labelled on the image' },
+    ],
+    html: (f, ctx) => {
+      const { land, u, pad } = quoteBox(ctx);
+      const q = Math.round(fit(f.quote, [[50, 96], [90, 80], [130, 68], [180, 58]], 52) * u);
+      return `<div class="c" style="flex-direction:column;justify-content:space-between;padding:${pad}px;gap:${Math.round(28 * u)}px;--k:${Math.round(28 * u)}px;--s:${Math.round(30 * u)}px">
+<div class="hd">${logo(ctx)}${f.kicker ? `<span class="kick">${rich(f.kicker)}</span>` : ''}</div>
+<div class="pq-body" style="${land ? 'flex-direction:row;gap:28px' : ''}"><div class="pq-mark" style="font-size:${Math.round(220 * u)}px">“</div>
+<h1 class="pq-q" data-min-font="${Math.round(q * 0.72)}" style="font-size:${q}px">${rich(f.quote)}</h1></div>
+<div class="ft"><span class="src"><span class="rule"></span><span>${esc(f.source)}</span></span>${sampleTag(f)}</div></div>`;
+    },
+  },
+  {
+    id: 'testimonial',
+    label: 'Customer testimonial',
+    use: 'A real customer quote with name, role and company, on a card with an initials avatar (or their photo if the brief has one). Only quotes found in the brief/source; otherwise set sample: yes.',
+    fields: [
+      { id: 'quote', type: 'longtext', label: 'Quote (exact words)', max: 220 },
+      { id: 'name', type: 'text', label: 'Name', max: 40 },
+      { id: 'role', type: 'text', label: 'Role', max: 50, optional: true },
+      { id: 'company', type: 'text', label: 'Company', max: 40, optional: true },
+      { id: 'initials', type: 'text', label: 'Avatar initials', max: 3, optional: true, help: 'defaults to the name' },
+      { id: 'avatar', type: 'image', label: 'Photo from the brief', optional: true },
+      { id: 'sample', type: 'enum', label: 'Sample copy', choices: ['no', 'yes'], optional: true, help: 'yes = placeholder quote, labelled on the image' },
+    ],
+    html: (f, ctx) => {
+      const { land, u, pad } = quoteBox(ctx);
+      const q = Math.round(fit(f.quote, [[60, 64], [110, 54], [160, 46], [220, 40]], 38) * u);
+      const who = [f.role, f.company].filter(Boolean).map(esc).join(' · ');
+      return `<div class="c" style="flex-direction:column;justify-content:center;padding:${pad}px;gap:${Math.round(36 * u)}px;--s:${Math.round(22 * u)}px">
+<div class="hd">${logo(ctx)}${sampleTag(f)}</div>
+<div class="tm" style="padding:${Math.round((land ? 44 : 64) * u)}px;gap:${Math.round(40 * u)}px;${land ? '' : 'flex:1;min-height:0;justify-content:center'}">
+<div class="pq-mark" style="font-size:${Math.round(150 * u)}px">“</div>
+<p class="tm-q" data-min-font="${Math.round(q * 0.72)}" style="font-size:${q}px;color:var(--fg)">${rich(f.quote)}</p>
+<div class="tm-who" style="gap:${Math.round(24 * u)}px;font-size:${Math.round(32 * u)}px">${avatar(f, ctx, Math.round(96 * u))}<span><b>${esc(f.name)}</b>${who ? `<small>${who}</small>` : ''}</span></div></div></div>`;
+    },
+  },
+  {
+    id: 'post-card',
+    label: 'Post screenshot card',
+    use: 'Looks like a generic social post (avatar, name, handle, text, optional image, reply/share/like icons) with no platform logo. For the brand\'s own posts or a real post quoted in the brief; otherwise set sample: yes.',
+    fields: [
+      { id: 'name', type: 'text', label: 'Display name', max: 32 },
+      { id: 'handle', type: 'text', label: 'Handle', max: 28, help: 'e.g. @acme' },
+      { id: 'text', type: 'longtext', label: 'Post text (exact words)', max: 280 },
+      { id: 'time', type: 'text', label: 'Time label', max: 12, optional: true, help: 'e.g. 2h, Mar 4' },
+      { id: 'image', type: 'image', label: 'Attached image', optional: true },
+      { id: 'avatar', type: 'image', label: 'Avatar ("logo" = brand logo)', optional: true },
+      { id: 'initials', type: 'text', label: 'Avatar initials', max: 3, optional: true },
+      { id: 'look', type: 'enum', label: 'Post look', choices: ['light', 'dark'], optional: true },
+      { id: 'sample', type: 'enum', label: 'Sample copy', choices: ['no', 'yes'], optional: true, help: 'yes = placeholder post, labelled on the image' },
+    ],
+    html: (f, ctx) => {
+      const { land, u, pad } = quoteBox(ctx);
+      const n = String(f.text ?? '').length;
+      const t = Math.round(fit(f.text, [[80, 52], [140, 46], [210, 40], [280, 36]], 34) * u * (f.image && !land ? 0.86 : 1));
+      const side = land && f.image;
+      const pp = Math.round(48 * u);
+      const head = `<header style="font-size:${Math.round(32 * u)}px">${avatar(f, ctx, Math.round(84 * u))}<span class="pn"><b>${esc(f.name)}</b><span>${esc(f.handle)}${f.time ? ` · ${esc(f.time)}` : ''}</span></span><i class="dots">•••</i></header>`;
+      const text = `<p class="pt" data-min-font="${Math.round(t * 0.72)}" style="font-size:${t}px">${rich(f.text)}</p>`;
+      const pic = f.image ? `<div class="pimg" style="${side ? 'grid-row:1 / span 3;grid-column:2;align-self:center' : `max-height:${Math.round(ctx.height * (n > 160 ? 0.3 : 0.4))}px`}"><img src="${img(f.image, ctx)}"></div>` : '';
+      const foot = `<footer style="font-size:${Math.round(34 * u)}px">${POST_ICONS}</footer>`;
+      return `<div class="c" style="flex-direction:column;align-items:center;justify-content:center;padding:${pad}px;gap:${Math.round(28 * u)}px;--s:${Math.round(22 * u)}px">
+<article class="post${f.look === 'dark' ? ' dk' : ''}" style="width:100%;min-height:0;padding:${pp}px;gap:${Math.round(28 * u)}px;${side ? `grid-template-columns:1fr 0.82fr;column-gap:${pp}px;align-items:start` : ''}">${head}${text}${side ? foot + pic : pic + foot}</article>${sampleTag(f)}</div>`;
+    },
+  },
+  {
+    id: 'app-screen',
+    label: 'App store screenshot',
+    use: 'App Store / Google Play screen: a caption headline above a real product screenshot in a neutral phone frame. Presets app-store-ios (1290×2796) and play-store (1080×1920).',
+    fields: [
+      { id: 'headline', type: 'text', label: 'Caption (benefit, ≤ 5 words)', max: 32, help: '*word* = accent; must fit 2 lines' },
+      { id: 'sub', type: 'text', label: 'Supporting line', max: 60, optional: true },
+      { id: 'image', type: 'image', label: 'Phone screenshot (crop with #crop=x,y,w,h)' },
+      { id: 'frame', type: 'enum', label: 'Device', choices: ['auto', 'full', 'bleed'], optional: true, help: 'bleed = the phone runs off the bottom for a bigger screen; auto = bleed on 9:16, full on taller canvases' },
+    ],
+    html: (f, ctx) => {
+      const W = ctx.width;
+      const pad = Math.round(W * 0.075);
+      const hl = Math.round(fit(f.headline, [[14, W * 0.11], [22, W * 0.094], [32, W * 0.078]], W * 0.07));
+      const bleed = f.frame === 'bleed' || (f.frame !== 'full' && ctx.height / W < 2);
+      return `<div class="app" style="padding:${Math.round(pad * 1.25)}px ${pad}px ${bleed ? 0 : pad}px;gap:${Math.round(W * 0.05)}px">
+<div style="display:flex;flex-direction:column;gap:${Math.round(W * 0.022)}px;width:100%"><h1 data-fit-lines="2" data-min-font="${Math.round(W * 0.06)}" style="font-size:${hl}px">${rich(f.headline)}</h1>${f.sub ? `<p class="sub" style="font-size:${Math.round(W * 0.04)}px">${rich(f.sub)}</p>` : ''}</div>
+<div class="stage"><div class="dev${bleed ? ' bleed' : ''}"><i class="cam"></i><div class="scr"><img src="${img(f.image, ctx)}" alt=""></div></div></div></div>`;
+    },
+  },
+  {
+    id: 'gallery-shot',
+    label: 'Launch gallery: headline + product',
+    use: 'Launch-page gallery image (preset producthunt-gallery, 1270×760): one benefit headline over a big real screenshot that runs off the bottom. Use for the first image and most of the set.',
+    fields: [
+      { id: 'title', type: 'text', label: 'Headline (≤ 8 words)', max: 56, help: '*word* = accent' },
+      { id: 'sub', type: 'text', label: 'Supporting line', max: 90, optional: true },
+      { id: 'kicker', type: 'text', label: 'Kicker', max: 28, optional: true },
+      { id: 'image', type: 'image', label: 'Screenshot (crop with #crop=x,y,w,h)' },
+    ],
+    html: (f, ctx) => {
+      const pad = Math.round(ctx.width * 0.06);
+      const t = fit(f.title, [[24, 76], [40, 64], [56, 54]], 48);
+      return `<div class="c" style="flex-direction:column;padding:${pad}px ${pad}px 0;gap:22px;--k:26px">
+<div class="hd">${logo(ctx)}${f.kicker ? `<span class="kick">${rich(f.kicker)}</span>` : ''}</div>
+<h1 data-fit-lines="2" data-min-font="44" style="font-size:${t}px">${rich(f.title)}</h1>${f.sub ? `<p style="font-size:28px;line-height:1.3;margin-top:-6px">${rich(f.sub)}</p>` : ''}
+<div class="frame" style="flex:1;min-height:0;margin:8px 0 -30px"><div class="bar"><i></i><i></i><i></i></div><img src="${img(f.image, ctx)}"></div></div>`;
+    },
+  },
+  {
+    id: 'gallery-points',
+    label: 'Launch gallery: three reasons',
+    use: 'A gallery image with a headline and three numbered reasons ("Title — detail"). Use once, mid-set, for the "why it\'s different" beat.',
+    fields: [
+      { id: 'title', type: 'text', label: 'Headline', max: 56 },
+      { id: 'items', type: 'list', label: 'Reasons ("Title — detail", 3)', max: 3 },
+    ],
+    html: (f, ctx) => {
+      const pad = Math.round(ctx.width * 0.06);
+      const items = list(f.items).slice(0, 3);
+      return `<div class="c" style="flex-direction:column;padding:${pad}px;gap:44px;justify-content:center">
+<div class="hd">${logo(ctx)}</div>
+<h1 data-fit-lines="2" data-min-font="44" style="font-size:${fit(f.title, [[24, 72], [40, 62], [56, 54]], 48)}px">${rich(f.title)}</h1>
+<div style="display:grid;grid-template-columns:repeat(${Math.max(1, items.length)},1fr);gap:24px">${items
+        .map((it, i) => {
+          const [t, d] = it.split(/\s+[—–-]\s+/);
+          return `<div style="background:var(--card);border-radius:24px;padding:32px;box-shadow:0 0 0 1px color-mix(in srgb,var(--rule) 45%,transparent)"><b style="display:block;font:800 40px/1 var(--font-display);color:var(--accent);margin-bottom:18px">${String(i + 1).padStart(2, '0')}</b><h3 style="font:700 32px/1.15 var(--font-display);letter-spacing:-.02em">${rich(t)}</h3>${d ? `<p style="font-size:24px;line-height:1.35;margin-top:10px">${rich(d)}</p>` : ''}</div>`;
+        })
+        .join('')}</div></div>`;
+    },
+  },
+  {
+    id: 'launch-thumb',
+    label: 'Launch thumbnail (logo mark)',
+    use: 'The 240×240 product thumbnail (preset producthunt-thumb): the brand mark alone, big and centred. No words — it is shown at 80 px.',
+    fields: [
+      { id: 'mark', type: 'text', label: 'Monogram if there is no logo', max: 2, optional: true },
+      { id: 'bg', type: 'enum', label: 'Background', choices: ['light', 'dark', 'brand'], optional: true },
+    ],
+    html: (f, ctx) => {
+      const bg = { dark: '#0f1115', brand: 'var(--brand-primary)' }[f.bg as string] ?? '#ffffff';
+      const fg = f.bg === 'brand' ? 'var(--brand-on-primary)' : f.bg === 'dark' ? 'var(--accent-on-dark)' : 'var(--accent-on-light)';
+      const s = Math.min(ctx.width, ctx.height);
+      const mark = ctx.brand.logo
+        ? `<img src="${img(ctx.brand.logo, ctx)}" alt="" style="width:${Math.round(s * 0.66)}px;height:${Math.round(s * 0.66)}px;object-fit:contain">`
+        : `<span style="font:800 ${Math.round(s * 0.5)}px/1 var(--font-display);letter-spacing:-.05em;color:${fg}">${esc(String(f.mark ?? '').slice(0, 2) || initials(ctx.brand.name))}</span>`;
+      return `<div class="c" style="align-items:center;justify-content:center;background:${bg}">${mark}</div>`;
+    },
   },
 ];
 

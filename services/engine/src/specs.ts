@@ -162,7 +162,8 @@ export async function catalogMarkdown(kind: SpecKind): Promise<string> {
       '# Carousel catalog',
       '',
       `Themes: ${Object.entries(c.carousel.themes).map(([k, v]) => `\`${k}\` — ${v}`).join('; ')}`,
-      'Presets: `linkedin-carousel` (1080×1350, default), `instagram-carousel` (1080×1350), `1080x1080`',
+      'Presets: `linkedin-carousel` (1080×1350, default), `instagram-carousel` (1080×1350), `tiktok-photo` (1080×1920, TikTok photo mode), `1080x1080`',
+      'Several sizes at once: `"sizes": ["tiktok-photo", "instagram-carousel"]` renders the same slides into one folder per size (`out/<size>/slides/`). On `tiktok-photo` keep text out of the top 150 px, the right 140 px and the bottom 420 px — the template pads for it; long copy that overflows comes back to you.',
       'Motion: add `"motion": "chill"` (or any music mood) to also get carousel.mp4 — slides with push-ins, transitions and an original bed, for Reels / LinkedIn video.',
       'Rich text in any text field: `*word*` accent · `**word**` bold · `==word==` highlight.',
       '',
@@ -174,7 +175,10 @@ export async function catalogMarkdown(kind: SpecKind): Promise<string> {
     '# Graphics catalog',
     '',
     'Each item: `{ "type": "thumbnail"|"card", "layout": "<id>", "theme"?: "editorial|swiss|bold|midnight", "preset": "<preset id>", "name": "file.png", "fields": {…} }`',
-    'Presets: `youtube-thumbnail` 1280×720 · `og-card` 1200×630 · `github-banner` 1280×640 · `x-image` 1600×900 · `instagram-post` 1080×1080 · `linkedin-image` 1080×1350 · `story-image` 1080×1920 · `x-header` 1500×500 · `linkedin-banner` 1584×396 · `youtube-banner` 2560×1440',
+    'Presets: `youtube-thumbnail` 1280×720 · `og-card` 1200×630 · `github-banner` 1280×640 · `x-image` 1600×900 · `instagram-post` 1080×1080 · `linkedin-image` 1080×1350 · `linkedin-landscape` 1200×627 · `story-image` 1080×1920 · `x-header` 1500×500 · `linkedin-banner` 1584×396 · `youtube-banner` 2560×1440 · `app-store-ios` 1290×2796 · `play-store` 1080×1920 · `producthunt-gallery` 1270×760 · `producthunt-thumb` 240×240',
+    'File names may carry one folder (`ios/01-track.png`) to keep sets apart. Images that fail to load come back to you.',
+    'App store screens (`app-screen`): the caption must stay on 2 lines at ≥ 6% of the canvas width — a caption that shrinks further comes back to you. The screenshot fills the phone\'s width and is cut at the bottom, so use a phone-shaped screenshot or crop a desktop one to a tall region about 1 wide by 2 high in pixels (for a 1440×900 capture: `#crop=x,0,0.29,1`). No real device art or store badges — the frame is generic.',
+    'Quotes and people: `pull-quote`, `testimonial`, `quote-post` and `post-card` carry exact words from the brief or source only, attributed to the real person or post. With no real quote, write clearly placeholder words and set `"sample": "yes"` — the image is then labelled "Sample copy — not a real customer". Never invent a named customer, a rating or a platform logo.',
     '',
     '## Thumbnail layouts',
     ...c.thumbnail.layouts.map((l: any) => `### \`${l.id}\` — ${l.label}\n${l.use}\n${l.fields.map(fieldLine).join('\n')}`),
@@ -210,37 +214,60 @@ export async function renderSpec(kind: SpecKind, cwd: string, briefDir: string, 
   if (Object.keys(opts.force ?? {}).length) await writeFile(file, JSON.stringify(spec, null, 2));
   try {
     if (kind === 'deck') {
-      const r = await callService('stills', 'deck', { ...spec, handle: spec.handle ?? opts.handle, brandDir: briefDir, outDir: out });
-      // Motion version: slides → MP4 with push-ins and slide transitions over an original bed.
-      if (spec.motion) {
-        const slides = r.slides.map((x: any) => x.file);
-        const hold = 2.6;
-        const seconds = slides.length * hold + 0.35;
-        const bed = await callService('media', 'music', { mood: spec.motion === true ? 'chill' : String(spec.motion), seconds, out: join(out, 'work-bed.wav'), sfx: slides.slice(1).map((_: string, i: number) => ({ kind: 'whoosh', at: (i + 1) * hold, gain: 0.25 })) });
-        const silent = join(out, 'carousel.silent.mp4');
-        const mv = await run('node', [join(PLUGIN_DIR, 'scripts', 'slides-to-video.mjs'), '--out', silent, '--size', `${r.width}x${r.height}`, '--hold', String(hold), '--transition', 'slideleft', ...slides], { timeoutMs: 600_000 });
-        if (mv.code === 0) {
-          const mix = await callService('media', 'mix', { music: bed.file, out: join(out, 'carousel.m4a'), seconds });
-          await run('ffmpeg', ['-y', '-v', 'error', '-i', silent, '-i', mix.file, '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'copy', '-shortest', '-movflags', '+faststart', join(out, 'carousel.mp4')]);
+      // Photo carousels list several platform sizes: each renders into its own folder (no PDF — those apps take images).
+      const asked: string[] = Array.isArray(spec.sizes) ? spec.sizes.map(String).filter((x: string) => /^[\w-]+$/.test(x)) : [];
+      const sets: (string | undefined)[] = asked.length ? asked : [undefined];
+      const fb: string[] = [];
+      let count = 0;
+      let bed: { file: string; seconds: number } | undefined;
+      for (const preset of sets) {
+        const dir = preset ? join(out, preset) : out;
+        const r = await callService('stills', 'deck', { ...spec, preset: preset ?? spec.preset, handle: spec.handle ?? opts.handle, brandDir: briefDir, outDir: dir, pdf: !preset });
+        count = r.slides.length;
+        // Motion version: slides → MP4 with push-ins and slide transitions over an original bed (one bed shared by every size).
+        if (spec.motion) {
+          const slides = r.slides.map((x: any) => x.file);
+          const hold = 2.6;
+          const seconds = slides.length * hold + 0.35;
+          bed ??= { seconds, file: (await callService('media', 'music', { mood: spec.motion === true ? 'chill' : String(spec.motion), seconds, out: join(out, 'work-bed.wav'), sfx: slides.slice(1).map((_: string, i: number) => ({ kind: 'whoosh', at: (i + 1) * hold, gain: 0.25 })) })).file };
+          const silent = join(dir, 'carousel.silent.mp4');
+          const mv = await run('node', [join(PLUGIN_DIR, 'scripts', 'slides-to-video.mjs'), '--out', silent, '--size', `${r.width}x${r.height}`, '--hold', String(hold), '--transition', 'slideleft', ...slides], { timeoutMs: 600_000 });
+          if (mv.code === 0) {
+            const mix = await callService('media', 'mix', { music: bed.file, out: join(dir, 'carousel.m4a'), seconds });
+            await run('ffmpeg', ['-y', '-v', 'error', '-i', silent, '-i', mix.file, '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'copy', '-shortest', '-movflags', '+faststart', join(dir, 'carousel.mp4')]);
+          }
+          await run('rm', ['-f', silent, join(dir, 'carousel.m4a')]);
         }
-        await run('rm', ['-f', silent, join(out, 'carousel.m4a'), bed.file]);
+        const tag = preset && sets.length > 1 ? `${preset} slide` : 'Slide';
+        // Full-screen 9:16 slides sit under the app's overlays and are read on a phone: safe zone and a larger type floor.
+        const tall = r.height / r.width > 1.6;
+        const floor = tall ? 28 : 24;
+        fb.push(
+          ...r.slides.flatMap((s: any, i: number) => [
+            ...s.audit.overflow.map((x: string) => `${tag} ${i + 1}: text overflows its box (${x}). Shorten it.`),
+            ...s.audit.offCanvas.map((x: string) => `${tag} ${i + 1}: text runs off the canvas (${x}). Shorten it.`),
+            ...(tall ? s.audit.unsafe.slice(0, 1).map((x: string) => `${tag} ${i + 1}: ${x} sits where the app's caption, sound or buttons cover it. Shorten it.`) : []),
+            ...(s.audit.minFont && s.audit.minFont < floor ? [`${tag} ${i + 1}: smallest text is ${s.audit.minFont}px — too small for mobile.`] : []),
+            ...(s.audit.tinyShots?.length ? [`${tag} ${i + 1}: ${s.audit.tinyShots[0]}`] : []),
+          ]),
+        );
       }
-      const fb = r.slides.flatMap((s: any, i: number) => [
-        ...s.audit.overflow.map((x: string) => `Slide ${i + 1}: text overflows its box (${x}). Shorten it.`),
-        ...s.audit.offCanvas.map((x: string) => `Slide ${i + 1}: text runs off the canvas (${x}). Shorten it.`),
-        ...(s.audit.minFont && s.audit.minFont < 24 ? [`Slide ${i + 1}: smallest text is ${s.audit.minFont}px — too small for mobile.`] : []),
-        ...(s.audit.tinyShots?.length ? [`Slide ${i + 1}: ${s.audit.tinyShots[0]}`] : []),
-      ]);
-      return { ok: !fb.length, feedback: fb, summary: `${r.slides.length} slides + PDF` };
+      if (bed) await run('rm', ['-f', bed.file]);
+      return { ok: !fb.length, feedback: fb, summary: sets[0] ? `${count} slides × ${sets.length} size${sets.length === 1 ? '' : 's'}` : `${count} slides + PDF` };
     }
     if (kind === 'graphics') {
       const r = await callService('stills', 'graphics', { ...spec, brandDir: briefDir, outDir: out, handle: opts.handle });
-      const fb = r.items.flatMap((g: any) => [
-        ...g.audit.overflow.map((x: string) => `${g.file.split('/').pop()}: text overflows (${x}).`),
-        ...g.audit.offCanvas.map((x: string) => `${g.file.split('/').pop()}: text runs off the canvas (${x}).`),
-        ...g.audit.unsafe.slice(0, 2).map((x: string) => `${g.file.split('/').pop()}: ${x} sits inside the ${g.preset} safe margin — platform UI may cover it.`),
-        ...(g.audit.tinyShots?.length && !/-(portrait|wide|story)\./.test(g.file) ? [`${g.file.split('/').pop().replace(/-feed(?=\.)/, '')} (every size): ${g.audit.tinyShots[0]}`] : []),
-      ]);
+      const fb = r.items.flatMap((g: any) => {
+        const at = g.file.slice(out.length + 1);
+        return [
+          ...g.audit.overflow.map((x: string) => `${at}: text overflows (${x}).`),
+          ...g.audit.offCanvas.map((x: string) => `${at}: text runs off the canvas (${x}).`),
+          ...g.audit.unsafe.slice(0, 2).map((x: string) => `${at}: ${x} sits inside the ${g.preset} safe margin — platform UI may cover it.`),
+          ...(g.audit.tinyShots?.length && !/-(portrait|wide|story)\./.test(g.file) ? [`${at.replace(/-feed(?=\.)/, '')} (every size): ${g.audit.tinyShots[0]}`] : []),
+          ...(g.audit.small ?? []).slice(0, 1).map((x: string) => `${at}: ${x} had to shrink below its readable size to fit — shorten it.`),
+          ...(g.audit.broken?.length ? [`${at}: image ${g.audit.broken[0]} didn't load — use a real file from assets/ (path relative to the brief folder).`] : []),
+        ];
+      });
       return { ok: !fb.length, feedback: fb, summary: `${r.items.length} graphics` };
     }
     if (kind === 'document') {
@@ -307,6 +334,29 @@ export const BANNED_PHRASES = [
   'excited to announce', 'excited to share', 'thrilled to', 'game-changer', 'game changer', 'revolutionize', 'revolutionary', 'unlock', 'supercharge',
   'seamless', 'streamline your workflow', "in today's fast-paced", 'leverage', 'elevate', 'delve', 'empower', 'cutting-edge', 'next-level', 'harness the power',
 ];
+
+/**
+ * Product Hunt launch copy (out/launch-copy.md, one `## ` section per field):
+ * the listing's own limits, checked before anyone pastes it into the form.
+ */
+export function checkLaunchCopy(md: string | null): string[] {
+  if (!md?.trim()) return ['out/launch-copy.md was not written.'];
+  const sections = md.split(/^##\s+/m).slice(1).map((p) => ({ head: p.split('\n')[0].trim().toLowerCase(), body: p.split('\n').slice(1).join('\n').trim() }));
+  const get = (k: string) => sections.find((x) => x.head.startsWith(k))?.body ?? '';
+  const out: string[] = [];
+  for (const [k, label] of [['name', 'Name'], ['tagline', 'Tagline'], ['description', 'Description'], ['maker', "Maker's first comment"], ['topics', 'Topics']]) if (!get(k)) out.push(`launch-copy.md: the "## ${label}" section is missing or empty.`);
+  const tagline = get('tagline').replace(/\s+/g, ' ');
+  if (tagline.length > 60) out.push(`launch-copy.md: the tagline is ${tagline.length} characters; Product Hunt allows 60.`);
+  const desc = get('description').replace(/\s+/g, ' ');
+  if (desc.length > 260) out.push(`launch-copy.md: the description is ${desc.length} characters; Product Hunt allows 260.`);
+  const topics = get('topics').split('\n').map((l) => l.replace(/^\s*(?:[-*]|\d+\.)\s*/, '').trim()).filter(Boolean);
+  if (topics.length && topics.length !== 3) out.push(`launch-copy.md: list exactly 3 topics (one per line), not ${topics.length}.`);
+  const comment = get('maker');
+  if (comment && comment.length < 300) out.push("launch-copy.md: the maker's first comment is too thin — say who you are, why you built it, what's in it today and what feedback you want (100–300 words).");
+  const all = [tagline, desc, comment].join(' ').toLowerCase();
+  for (const p of BANNED_PHRASES) if (all.includes(p)) out.push(`launch-copy.md: uses "${p}" — rewrite it in plain, specific words.`);
+  return out.slice(0, 12);
+}
 
 /** Platform limits for the copy kit; returns problems to send back to Claude. */
 export function checkCopy(copy: Record<string, { label: string; text: string }[]>): string[] {

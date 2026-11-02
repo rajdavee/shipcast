@@ -49,7 +49,7 @@ export interface SlideSpec {
 
 export interface DeckSpec {
   theme: string;
-  /** Preset id: linkedin-carousel (default), instagram-carousel, or a WxH. */
+  /** Preset id: linkedin-carousel (default), instagram-carousel, tiktok-photo, or a WxH. */
   preset?: string;
   handle?: string;
   slides: SlideSpec[];
@@ -503,7 +503,7 @@ export function createStillsService() {
           }
           ctx.progress(i / input.slides.length, `slide ${i + 1}`);
           const s = input.slides[i];
-          const rctx: RenderCtx = { brand, width, height, page: i + 1, pages: input.slides.length, assetsDir, handle: input.handle, icons };
+          const rctx: RenderCtx = { brand, width, height, page: i + 1, pages: input.slides.length, assetsDir, handle: input.handle, icons, safe };
           results.push(await capture(renderCarouselSlide(s.layout, input.theme, s.fields ?? {}, rctx), file, width, height, safe));
         }
         const pdf = input.pdf === false ? undefined : await pdfFromImages(results.map((r) => r.file), join(outDir, 'carousel.pdf'), width, height);
@@ -521,7 +521,8 @@ export function createStillsService() {
           const { width, height, safe } = size(g.preset);
           const rctx: RenderCtx = { brand, width, height, assetsDir, handle: input.handle };
           const html = g.type === 'thumbnail' ? renderThumbnail(g.layout, g.fields ?? {}, rctx) : renderCard(g.layout, g.theme ?? 'editorial', g.fields ?? {}, rctx);
-          const name = String(g.name || `${g.layout}-${i + 1}.png`).replace(/[^\w.-]/g, '_');
+          // One folder level is allowed (ios/01-hero.png) so store sets stay apart; nothing can climb out of outDir.
+          const name = String(g.name || `${g.layout}-${i + 1}.png`).replace(/[^\w./-]/g, '_').split('/').filter((x) => x && !/^\.+$/.test(x)).slice(-2).join('/') || `${g.layout}-${i + 1}.png`;
           results.push({ ...(await capture(html, join(outDir, /\.(png|jpe?g)$/.test(name) ? name : `${name}.png`), width, height, safe)), preset: g.preset, layout: g.layout });
         }
         return { items: results };

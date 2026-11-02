@@ -363,5 +363,20 @@ export function renderCarouselSlide(layoutId: string, theme: string, fields: Rec
   const square = ctx.height <= ctx.width;
   const html = layout.html(fields, ctx);
   const hand = /sticky/.test(html) ? `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kalam:wght@700&display=swap">` : '';
-  return page(hand + html, ctx, t.css, BASE + VISUAL_CSS + (square ? '.slide{padding:80px}.title{zoom:.86}.sub{font-size:32px}.points{gap:20px;margin-top:32px}' : ''));
+  return page(hand + html, ctx, t.css, BASE + VISUAL_CSS + (square ? '.slide{padding:80px}.title{zoom:.86}.sub{font-size:32px}.points{gap:20px;margin-top:32px}' : '') + (ctx.height / ctx.width > 1.6 ? tallCss(ctx) : ''));
+}
+
+/**
+ * Photo-mode slides (9:16) are read full-screen on a phone under the app's own
+ * overlays: pad to the safe zone so nothing hides under the caption, sound or
+ * button column, and lift the supporting type, which the 4:5 scale sets for
+ * a slide seen inside a feed.
+ */
+function tallCss(ctx: RenderCtx): string {
+  const s = ctx.safe ?? { top: 150, right: 140, bottom: 420, left: 60 };
+  return `.slide{padding:${s.top + 24}px ${s.right + 16}px ${s.bottom + 24}px ${s.left + 24}px}
+.top,.bottom{font-size:30px}.logo{height:48px}.kicker{font-size:38px}.sub{font-size:46px;max-width:none}
+.points{gap:40px}.points h4{font-size:50px}.points p{font-size:36px}.caption,.col li{font-size:38px}.col h5{font-size:32px}
+.stepnum{font-size:40px}.swipe{font-size:36px}.nudges span{font-size:30px}.cta-btn{font-size:42px}.url{font-size:36px}
+.quote{line-height:1.2}.who{font-size:34px}.who small{font-size:30px}.jdet p{font-size:38px}.lchip{font-size:32px}.ui-label{font-size:28px}`;
 }
