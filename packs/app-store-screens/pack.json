@@ -1,0 +1,19 @@
+{
+  "id": "app-store-screens",
+  "name": "App Store Screenshots",
+  "tagline": "5–8 store screenshots for iOS (1290×2796) and Google Play (1080×1920): a benefit caption over your real screens in a neutral phone frame, plus the store listing copy.",
+  "category": "design",
+  "order": 10,
+  "estimate": "3–6 min",
+  "accent": "#0ea5e9",
+  "spec": "graphics",
+  "options": [
+    { "key": "screens", "label": "Screens", "type": "number", "default": "6", "min": 5, "max": 8 },
+    { "key": "stores", "label": "Stores", "type": "select", "choices": ["both", "ios", "android"], "default": "both" },
+    { "key": "theme", "label": "Theme", "type": "select", "choices": ["auto", "editorial", "swiss", "bold", "midnight"], "default": "auto" }
+  ],
+  "outputs": ["ios/*.png", "android/*.png", "graphics.json", "store-copy.md", "*.md"],
+  "skills": [],
+  "tools": ["chrome"],
+  "roles": ["design-taste", "copy", "humanize"]
+}

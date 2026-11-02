@@ -137,6 +137,38 @@ test('quote, testimonial and post cards render at square, 4:5 and 1.91:1 without
   assert.ok(!/data-sample>/.test(fs.readFileSync(join(out, 'pull-quote-instagram-post.html'), 'utf8')), 'real quotes carry no sample label');
 });
 
+test('app store screens: captions over real screens in a phone frame for iOS and Play, with readability checks', { skip: !hasChrome && 'no Chrome' }, async () => {
+  const out = join(home, 'appstore');
+  const shot = join(process.cwd(), 'docs', 'assets', 'studio-run.png');
+  const { execFileSync } = await import('node:child_process');
+  const wide = join(home, 'wide-desktop.png');
+  let hasWide = true;
+  try {
+    execFileSync('ffmpeg', ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'color=c=white:s=2880x1800', '-frames:v', '1', wide]);
+  } catch {
+    hasWide = false;
+  }
+  const screen = (preset: string, name: string, fields: Record<string, unknown>) => ({ type: 'card', layout: 'app-screen', theme: 'midnight', preset, name, fields });
+  const items = [
+    screen('app-store-ios', 'ios/01-launch.png', { headline: 'Paste a link. Get a *launch*.', sub: 'Videos, carousels and posts from one URL', image: `${shot}#crop=0.08,0,0.29,1` }),
+    screen('app-store-ios', 'ios/02-box.png', { headline: 'One *box*', image: `${shot}#crop=0.5,0,0.29,1`, frame: 'bleed' }),
+    screen('play-store', 'android/01-launch.png', { headline: 'Paste a link. Get a *launch*.', image: `${shot}#crop=0.08,0,0.29,1` }),
+    screen('play-store', 'android/02-box.png', { headline: 'One *box*', image: `${shot}#crop=0.5,0,0.29,1`, frame: 'full' }),
+    screen('play-store', '../../escape.png', { headline: 'Supercalifragilisticexpialidocious', image: hasWide ? wide : shot }),
+    screen('play-store', 'android/missing.png', { headline: 'Gone', image: join(home, 'nope.png') }),
+  ];
+  const job = await run('graphics', { brand: { name: 'Shipcast', colors: { background: '#0b0d12', primary: '#2b3bff' } }, outDir: out, items });
+  assert.equal(job.status, 'done', job.error);
+  const [ios1, ios2, and1, and2, bad, missing] = job.output.items;
+  for (const it of [ios1, ios2, and1, and2]) for (const k of ['overflow', 'offCanvas', 'unsafe', 'tinyShots', 'small', 'broken']) assert.deepEqual(it.audit[k], [], `${it.file} ${k}`);
+  assert.ok(existsSync(join(out, 'ios', '01-launch.png')) && existsSync(join(out, 'android', '02-box.png')), 'one folder per store');
+  assert.equal(bad.file, join(out, 'escape.png'), 'file names cannot leave the output folder');
+  assert.equal(bad.audit.small.length, 1, 'a caption that shrinks past its floor is reported');
+  if (hasWide) assert.equal(bad.audit.tinyShots.length, 1, 'a whole desktop page squeezed into a phone is unreadable');
+  assert.equal(missing.audit.broken.length, 1);
+  assert.ok(!/apple|iphone|android|google/i.test((await import('node:fs')).readFileSync(ios1.html, 'utf8').split('<body>')[1].replace(/src="[^"]*"/g, '')), 'no platform names drawn on the screen');
+});
+
 test('stills audit catches text that overflows', { skip: !hasChrome && 'no Chrome' }, async () => {
   const f = join(home, 'bad.html');
   writeFileSync(f, '<html><body style="margin:0"><div style="width:200px;overflow:hidden;white-space:nowrap;font-size:40px">This headline is far too long for its box</div></body></html>');

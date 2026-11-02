@@ -175,7 +175,9 @@ export async function catalogMarkdown(kind: SpecKind): Promise<string> {
     '# Graphics catalog',
     '',
     'Each item: `{ "type": "thumbnail"|"card", "layout": "<id>", "theme"?: "editorial|swiss|bold|midnight", "preset": "<preset id>", "name": "file.png", "fields": {…} }`',
-    'Presets: `youtube-thumbnail` 1280×720 · `og-card` 1200×630 · `github-banner` 1280×640 · `x-image` 1600×900 · `instagram-post` 1080×1080 · `linkedin-image` 1080×1350 · `linkedin-landscape` 1200×627 · `story-image` 1080×1920 · `x-header` 1500×500 · `linkedin-banner` 1584×396 · `youtube-banner` 2560×1440',
+    'Presets: `youtube-thumbnail` 1280×720 · `og-card` 1200×630 · `github-banner` 1280×640 · `x-image` 1600×900 · `instagram-post` 1080×1080 · `linkedin-image` 1080×1350 · `linkedin-landscape` 1200×627 · `story-image` 1080×1920 · `x-header` 1500×500 · `linkedin-banner` 1584×396 · `youtube-banner` 2560×1440 · `app-store-ios` 1290×2796 · `play-store` 1080×1920',
+    'File names may carry one folder (`ios/01-track.png`) to keep sets apart. Images that fail to load come back to you.',
+    'App store screens (`app-screen`): the caption must stay on 2 lines at ≥ 6% of the canvas width — a caption that shrinks further comes back to you. The screenshot fills the phone\'s width and is cut at the bottom, so use a phone-shaped screenshot or crop a desktop one to a tall region about 1 wide by 2 high in pixels (for a 1440×900 capture: `#crop=x,0,0.29,1`). No real device art or store badges — the frame is generic.',
     'Quotes and people: `pull-quote`, `testimonial`, `quote-post` and `post-card` carry exact words from the brief or source only, attributed to the real person or post. With no real quote, write clearly placeholder words and set `"sample": "yes"` — the image is then labelled "Sample copy — not a real customer". Never invent a named customer, a rating or a platform logo.',
     '',
     '## Thumbnail layouts',
@@ -255,13 +257,17 @@ export async function renderSpec(kind: SpecKind, cwd: string, briefDir: string, 
     }
     if (kind === 'graphics') {
       const r = await callService('stills', 'graphics', { ...spec, brandDir: briefDir, outDir: out, handle: opts.handle });
-      const fb = r.items.flatMap((g: any) => [
-        ...g.audit.overflow.map((x: string) => `${g.file.split('/').pop()}: text overflows (${x}).`),
-        ...g.audit.offCanvas.map((x: string) => `${g.file.split('/').pop()}: text runs off the canvas (${x}).`),
-        ...g.audit.unsafe.slice(0, 2).map((x: string) => `${g.file.split('/').pop()}: ${x} sits inside the ${g.preset} safe margin — platform UI may cover it.`),
-        ...(g.audit.tinyShots?.length ? [`${g.file.split('/').pop()}: the screenshot is shrunk past readability — crop it with #crop=x,y,w,h.`] : []),
-        ...(g.audit.small ?? []).slice(0, 1).map((x: string) => `${g.file.split('/').pop()}: ${x} had to shrink below its readable size to fit — shorten it.`),
-      ]);
+      const fb = r.items.flatMap((g: any) => {
+        const at = g.file.slice(out.length + 1);
+        return [
+          ...g.audit.overflow.map((x: string) => `${at}: text overflows (${x}).`),
+          ...g.audit.offCanvas.map((x: string) => `${at}: text runs off the canvas (${x}).`),
+          ...g.audit.unsafe.slice(0, 2).map((x: string) => `${at}: ${x} sits inside the ${g.preset} safe margin — platform UI may cover it.`),
+          ...(g.audit.tinyShots?.length ? [`${at}: the screenshot is shrunk past readability — crop it with #crop=x,y,w,h.`] : []),
+          ...(g.audit.small ?? []).slice(0, 1).map((x: string) => `${at}: ${x} had to shrink below its readable size to fit — shorten it.`),
+          ...(g.audit.broken?.length ? [`${at}: image ${g.audit.broken[0]} didn't load — use a real file from assets/ (path relative to the brief folder).`] : []),
+        ];
+      });
       return { ok: !fb.length, feedback: fb, summary: `${r.items.length} graphics` };
     }
     if (kind === 'document') {

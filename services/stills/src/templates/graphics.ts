@@ -142,6 +142,20 @@ em{font-style:normal;color:var(--accent)}
 .post .pimg{border-radius:20px;overflow:hidden;box-shadow:0 0 0 1px rgba(0,0,0,.08);min-height:0}
 .post .pimg img{width:100%;height:auto}
 .post footer{display:flex;justify-content:space-between;color:#69707d}
+.app{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;text-align:center}
+.app h1{max-width:100%;font-family:var(--font-display);font-weight:800;letter-spacing:-.04em;line-height:1.02;text-wrap:balance}
+.app .sub{font-family:var(--font-body);font-weight:500;color:var(--muted);line-height:1.3;text-wrap:balance}
+.app .stage{position:relative;flex:1;width:100%;min-height:0;container-type:size}
+.dev{--dw:min(96cqw,calc(100cqh / 2.08));position:absolute;left:50%;top:0;transform:translateX(-50%);width:var(--dw);height:calc(var(--dw) * 2.08);padding:calc(var(--dw) * .03);border-radius:calc(var(--dw) * .13);background:#15171c;
+  box-shadow:inset 0 0 0 calc(var(--dw) * .006) #3b3f48,0 calc(var(--dw) * .06) calc(var(--dw) * .12) calc(var(--dw) * -.04) rgba(0,0,0,.5)}
+.dev.bleed{--dw:92cqw}
+.dev::before,.dev::after{content:"";position:absolute;width:calc(var(--dw) * .012);border-radius:3px;background:#2b2e35}
+.dev::before{right:calc(var(--dw) * -.011);top:calc(var(--dw) * .42);height:calc(var(--dw) * .2)}
+.dev::after{left:calc(var(--dw) * -.011);top:calc(var(--dw) * .34);height:calc(var(--dw) * .28)}
+.dev .scr{position:relative;width:100%;height:100%;border-radius:calc(var(--dw) * .105);overflow:hidden;background:#fff}
+.dev .scr>img{width:100%;height:auto}
+.dev .cam{position:absolute;z-index:6;left:50%;top:calc(var(--dw) * .055);width:calc(var(--dw) * .04);height:calc(var(--dw) * .04);margin-left:calc(var(--dw) * -.02);border-radius:50%;background:#0b0c0f;box-shadow:0 0 0 calc(var(--dw) * .006) #23262c}
+.dev .ui-label{font-size:calc(var(--dw) * .028)}
 .post footer svg{width:1.15em;height:1.15em;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
 `;
 
@@ -322,6 +336,26 @@ ${logo(ctx)}<div><div style="font:900 220px/.7 var(--font-display);color:var(--a
       const foot = `<footer style="font-size:${Math.round(34 * u)}px">${POST_ICONS}</footer>`;
       return `<div class="c" style="flex-direction:column;align-items:center;justify-content:center;padding:${pad}px;gap:${Math.round(28 * u)}px;--s:${Math.round(22 * u)}px">
 <article class="post${f.look === 'dark' ? ' dk' : ''}" style="width:100%;min-height:0;padding:${pp}px;gap:${Math.round(28 * u)}px;${side ? `grid-template-columns:1fr 0.82fr;column-gap:${pp}px;align-items:start` : ''}">${head}${text}${side ? foot + pic : pic + foot}</article>${sampleTag(f)}</div>`;
+    },
+  },
+  {
+    id: 'app-screen',
+    label: 'App store screenshot',
+    use: 'App Store / Google Play screen: a caption headline above a real product screenshot in a neutral phone frame. Presets app-store-ios (1290×2796) and play-store (1080×1920).',
+    fields: [
+      { id: 'headline', type: 'text', label: 'Caption (benefit, ≤ 5 words)', max: 32, help: '*word* = accent; must fit 2 lines' },
+      { id: 'sub', type: 'text', label: 'Supporting line', max: 60, optional: true },
+      { id: 'image', type: 'image', label: 'Phone screenshot (crop with #crop=x,y,w,h)' },
+      { id: 'frame', type: 'enum', label: 'Device', choices: ['auto', 'full', 'bleed'], optional: true, help: 'bleed = the phone runs off the bottom for a bigger screen; auto = bleed on 9:16, full on taller canvases' },
+    ],
+    html: (f, ctx) => {
+      const W = ctx.width;
+      const pad = Math.round(W * 0.075);
+      const hl = Math.round(fit(f.headline, [[14, W * 0.11], [22, W * 0.094], [32, W * 0.078]], W * 0.07));
+      const bleed = f.frame === 'bleed' || (f.frame !== 'full' && ctx.height / W < 2);
+      return `<div class="app" style="padding:${Math.round(pad * 1.25)}px ${pad}px ${bleed ? 0 : pad}px;gap:${Math.round(W * 0.05)}px">
+<div style="display:flex;flex-direction:column;gap:${Math.round(W * 0.022)}px;width:100%"><h1 data-fit-lines="2" data-min-font="${Math.round(W * 0.06)}" style="font-size:${hl}px">${rich(f.headline)}</h1>${f.sub ? `<p class="sub" style="font-size:${Math.round(W * 0.04)}px">${rich(f.sub)}</p>` : ''}</div>
+<div class="stage"><div class="dev${bleed ? ' bleed' : ''}"><i class="cam"></i><div class="scr"><img src="${img(f.image, ctx)}" alt=""></div></div></div></div>`;
     },
   },
 ];

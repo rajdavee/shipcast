@@ -515,7 +515,8 @@ export function createStillsService() {
           const { width, height, safe } = size(g.preset);
           const rctx: RenderCtx = { brand, width, height, assetsDir, handle: input.handle };
           const html = g.type === 'thumbnail' ? renderThumbnail(g.layout, g.fields ?? {}, rctx) : renderCard(g.layout, g.theme ?? 'editorial', g.fields ?? {}, rctx);
-          const name = String(g.name || `${g.layout}-${i + 1}.png`).replace(/[^\w.-]/g, '_');
+          // One folder level is allowed (ios/01-hero.png) so store sets stay apart; nothing can climb out of outDir.
+          const name = String(g.name || `${g.layout}-${i + 1}.png`).replace(/[^\w./-]/g, '_').split('/').filter((x) => x && !/^\.+$/.test(x)).slice(-2).join('/') || `${g.layout}-${i + 1}.png`;
           results.push({ ...(await capture(html, join(outDir, /\.(png|jpe?g)$/.test(name) ? name : `${name}.png`), width, height, safe)), preset: g.preset, layout: g.layout });
         }
         return { items: results };
