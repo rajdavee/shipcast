@@ -1,4 +1,4 @@
-import { blockedReason, createService, foregroundBusy, logRun, pickDue, readJobs, readSettings, updateJob, type AgentJob, type AgentKind } from '@shipcast/engine';
+import { blockedReason, createService, foregroundBusy, learnOnce, logRun, pickDue, readJobs, readSettings, updateJob, type AgentJob, type AgentKind } from '@shipcast/engine';
 
 /**
  * The agents service: wakes every 20 seconds, starts at most one background
@@ -27,6 +27,15 @@ export const HANDLERS: Partial<Record<AgentKind, AgentHandler>> = {};
 export function registerAgent(kind: AgentKind, h: AgentHandler) {
   HANDLERS[kind] = h;
 }
+
+registerAgent('learn', async (ctx) => {
+  const r = await learnOnce({ now: ctx.now, shouldYield: ctx.shouldYield });
+  const parts = [`${r.incidents} incidents read`];
+  if (r.added.length) parts.push(`${r.added.length} new lesson${r.added.length === 1 ? '' : 's'}`);
+  if (r.kept.length) parts.push(`${r.kept.length} kept`);
+  if (r.retired.length) parts.push(`${r.retired.length} retired`);
+  return { summary: parts.join(' · '), claudeRuns: r.claudeRuns };
+});
 
 export interface TickDeps {
   now?: () => Date;

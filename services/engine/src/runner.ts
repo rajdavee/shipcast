@@ -1,3 +1,4 @@
+import { lessonsBrief } from './learn.ts';
 import { cp, mkdir, writeFile, rm } from 'node:fs/promises';
 import { catalogMarkdown, checkCopy, renderSpec, SPEC_FILE, type SpecKind } from './specs.ts';
 import { readFile, readdir, rename, stat } from 'node:fs/promises';
@@ -328,7 +329,9 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
         await mkdir(cwd, { recursive: true });
         variantKind = (await prepareVariants(campaign, step, cwd)).kind;
       }
-      prompt = packPrompt(campaign, pack, step, await campaignTone(campaign)) + hubNote;
+      // Lessons the learning loop drew from earlier runs of this format (none for render-only or hidden helpers).
+      const lessons = await lessonsBrief(pack.id).catch(() => '');
+      prompt = packPrompt(campaign, pack, step, await campaignTone(campaign)) + hubNote + (lessons ? `\n\n${lessons}` : '');
       if (pack.context) {
         const earlier = campaign.steps.filter((s) => s.kind === 'pack' && s.status === 'done' && s.id !== step.id);
         if (earlier.length) prompt += `\n\n## Earlier steps in this campaign\n${earlier.map((s) => `- ${s.pack}: ${join(dir, 'deliverables', s.id, 'out')}/`).join('\n')}`;

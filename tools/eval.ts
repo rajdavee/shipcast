@@ -13,7 +13,7 @@ import { existsSync } from 'node:fs';
 import { mkdtemp, readdir, rm, writeFile, copyFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
-import { campaignDir, readCampaign, runClaude, getPack, run } from '@shipcast/engine';
+import { campaignDir, readCampaign, runClaude, getPack, run, saveEval } from '@shipcast/engine';
 
 const RUBRIC = {
   realism: 'Looks real and professionally made (photos, people, product shots, motion) — not AI-looking or templated',
@@ -102,7 +102,7 @@ Reply with only JSON: {"scores": {${Object.keys(RUBRIC).map((k) => `"${k}": n`).
   }
 }
 
-const rows: { campaign: string; pack: string; title: string; scores: Record<Crit, number>; avg: number; notes: string; fix: string }[] = [];
+const rows: { campaignId: string; step: string; campaign: string; pack: string; title: string; scores: Record<Crit, number>; avg: number; notes: string; fix: string }[] = [];
 for (const id of ids) {
   const c = await readCampaign(id);
   if (!c) {
@@ -125,7 +125,7 @@ for (const id of ids) {
     const vals = Object.keys(RUBRIC).map((k) => Number(v.scores[k as Crit]) || 0);
     const avg = +(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2);
     console.log(avg);
-    rows.push({ campaign: c.name, pack: pack.id, title, scores: v.scores, avg, notes: v.notes, fix: v.fix });
+    rows.push({ campaignId: id, step: s.id, campaign: c.name, pack: pack.id, title, scores: v.scores, avg, notes: v.notes, fix: v.fix });
   }
 }
 
@@ -146,4 +146,6 @@ const md = [
   '',
 ].join('\n');
 await writeFile(outFile, md);
+// The learning loop reads these: low criteria become incidents for that format.
+if (rows.length) await saveEval({ at: new Date().toISOString(), pieces: rows.map((r) => ({ campaign: r.campaignId, step: r.step, pack: r.pack, scores: r.scores, avg: r.avg, fix: r.fix })) });
 console.log(`\n${md.split('\n')[2]}\nReport: ${outFile}`);
