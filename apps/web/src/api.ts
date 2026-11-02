@@ -210,6 +210,8 @@ export const api = {
   answer: (id: string, step: string, values: Record<string, string>, note?: string) => call<Campaign>('POST', `/api/campaigns/${id}/steps/${step}/answer`, { values, note }),
   envKeys: (id: string) => call<{ keys: string[] }>('GET', `/api/campaigns/${id}/env`),
   saveEnv: (id: string, text: string) => call<{ keys: string[] }>('PUT', `/api/campaigns/${id}/env`, { text }),
+  takes: (id: string, step: string) => call<{ id: string; label: string; kind: string; files: string[]; posters: string[]; chosen: number }[]>('GET', `/api/campaigns/${id}/steps/${step}/takes`),
+  chooseTake: (id: string, step: string, take: string, choose: number) => call<Campaign>('POST', `/api/campaigns/${id}/steps/${step}/takes`, { id: take, choose }),
   variants: (id: string, step: string, count = 4) => call<Campaign>('POST', `/api/campaigns/${id}/steps/${step}/variants`, { count }),
   revise: (id: string, step: string, note: string) => call<Campaign>('POST', `/api/campaigns/${id}/steps/${step}/revise`, { note }),
   app: (id: string) => call<AppState>('GET', `/api/campaigns/${id}/app`),

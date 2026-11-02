@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api, fileUrl, fmtDuration, type Campaign, type CampaignEvent, type Pack, type Step } from '../api.ts';
-import { toast } from '../hooks.ts';
+import { toast, useLoad } from '../hooks.ts';
 import { CopyKit, Docs, MediaStage, isImage, isText, isVideo, useText } from './OutputViewer.tsx';
 import { SpecEditor } from './SpecEditor.tsx';
 import { Notes, QualityReport } from './StepDetails.tsx';
 
-type Panel = 'post' | 'edit' | 'checks' | 'activity';
+type Panel = 'post' | 'edit' | 'checks' | 'activity' | 'takes';
 
 /** The one file someone most likely wants to download. */
 export function mainFile(step: Step): string | undefined {
@@ -35,6 +35,7 @@ const label = (f: string) => {
 
 export function Lightbox({ campaign, step, pack, events, onClose, onChange, onPrev, onNext }: { campaign: Campaign; step: Step; pack?: Pack; events: CampaignEvent[]; onClose: () => void; onChange: (c: Campaign) => void; onPrev?: () => void; onNext?: () => void }) {
   const [panel, setPanel] = useState<Panel>('post');
+  const takes = useLoad(() => (step.status === 'done' ? api.takes(campaign.id, step.id) : Promise.resolve([])), [step.id, step.status, step.endedAt]);
   const [note, setNote] = useState('');
   const prefix = `deliverables/${step.id}/`;
   const version = step.endedAt ?? '';
@@ -144,6 +145,7 @@ export function Lightbox({ campaign, step, pack, events, onClose, onChange, onPr
             <button aria-pressed={panel === 'post'} onClick={() => setPanel('post')}>{post ? 'Post' : 'Details'}</button>
             {editable && <button aria-pressed={panel === 'edit'} onClick={() => setPanel('edit')}>Edit</button>}
             {hasQa && <button aria-pressed={panel === 'checks'} onClick={() => setPanel('checks')}>Checks</button>}
+            {!!takes.data?.length && <button aria-pressed={panel === 'takes'} onClick={() => setPanel('takes')}>Takes</button>}
             <button aria-pressed={panel === 'activity'} onClick={() => setPanel('activity')}>Activity</button>
           </nav>
 
@@ -162,6 +164,24 @@ export function Lightbox({ campaign, step, pack, events, onClose, onChange, onPr
             )}
             {panel === 'edit' && pack?.spec && pack.spec !== 'infographic' && <SpecEditor campaign={campaign} step={step} kind={pack.spec} images={images} onSaved={(c) => { onChange(c); setPanel('post'); }} />}
             {panel === 'checks' && <QualityReport campaign={campaign} step={step} />}
+            {panel === 'takes' && (
+              <div className="takes">
+                <p className="muted">Generated shots with alternatives. Pick a take and the piece re-renders with it — no new Claude run.</p>
+                {takes.data?.map((t) => (
+                  <div key={t.id} className="take-row">
+                    <h4>{t.label}</h4>
+                    <div className="take-grid">
+                      {t.posters.map((poster, k) => (
+                        <button key={k} className={`take ${k === t.chosen ? 'on' : ''}`} aria-pressed={k === t.chosen} disabled={step.status !== 'done'} onClick={() => act(() => api.chooseTake(campaign.id, step.id, t.id, k), `Take ${k + 1} chosen — re-rendering`)}>
+                          <img src={fileUrl(campaign.id, poster)} alt={`Take ${k + 1}`} loading="lazy" />
+                          <span>{k === t.chosen ? 'In use' : `Use take ${k + 1}`}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             {panel === 'activity' && (
               <>
                 <Notes campaign={campaign} step={step} />

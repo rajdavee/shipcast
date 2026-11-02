@@ -89,3 +89,8 @@ Render, then look at the contact sheet like a viewer: does each beat read
 without explanation? Is anything static or confusing? Fix and re-render once
 if needed. Write out/NOTES.md: genre, playbook, engines used per beat, any
 substitutions or medium limits, credits.
+
+## Takes
+
+For any generated shot that carries the piece (the hero image, a presenter, a key B-roll moment), ask for 2–3 takes: `media.mjs gen … --takes 3 --label "scene 2 hero"`. Use the first take in the spec; the others are recorded in `out/takes.json` so the person can swap a take on the campaign page and re-render without another Claude run. Takes cost per take — keep it to the shots that matter.
+

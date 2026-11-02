@@ -5,7 +5,7 @@
 //   node media.mjs stock video "rain on a tram window at night" --seconds 6 --orientation landscape --out work/assets
 //   node media.mjs stock image "misty pine forest at dawn" --orientation landscape --out work/assets [--provider pixabay|unsplash|pexels]
 //   node media.mjs gen image "<cinematographer prompt>" --aspect 16:9 --out work/assets [--model fal-ai/flux/schnell]
-//   node media.mjs gen video "<prompt>" --seconds 5 --aspect 16:9 [--image start.png] [--end-image last.png] [--audio voice.wav] --out work/assets [--model …] [--tier draft|standard|premium] [--placeholder]
+//   node media.mjs gen video "<prompt>" --seconds 5 --aspect 16:9 [--image start.png] [--end-image last.png] [--audio voice.wav] --out work/assets [--model …] [--tier draft|standard|premium] [--placeholder] [--takes 1-3 --label "scene 2 hero"]
 //   node media.mjs sfx "magic sparkle whoosh" --seconds 4 --out work/assets
 //
 // Keys come from Shipcast's Setup page (stored in $SHIPCAST_HOME/secrets.json); nothing is
@@ -265,16 +265,28 @@ async function genViaService(kind, prompt) {
     ...(flags.model ? { model: String(flags.model) } : {}),
     ...(flags.tier ? { tier: String(flags.tier) } : {}),
     ...(flags.placeholder ? { provider: 'fake' } : {}),
+    ...(flags.takes ? { takes: Math.min(3, Math.max(1, Number(flags.takes))) } : {}),
     budgetKey: campaign ?? 'adhoc',
     out: join(out, `gen-${kind}-${slug(prompt)}-${Date.now().toString(36)}`),
   };
   const r = await fetch(`${base}/run`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'generate', input }) });
   const j = await r.json().catch(() => ({}));
   if (j.status !== 'done') die(j.error || `generation failed (${r.status})`, /cap|budget/i.test(j.error || '') ? 5 : 1);
-  const o = j.output;
-  const c = `Generated with ${o.model}${o.cached ? ' (cached)' : ''} — ${(o.disclosure || ['AI-generated']).join(', ')}`;
-  await credit(c);
-  emit({ file: o.file, credit: c, model: o.model, usd: o.usd, cached: o.cached, prompt: o.prompt, disclosure: o.disclosure });
+  const takes = j.output.takes ?? [j.output];
+  for (const o of takes) {
+    const c = `Generated with ${o.model}${o.cached ? ' (cached)' : ''} — ${(o.disclosure || ['AI-generated']).join(', ')}`;
+    await credit(c);
+    emit({ file: o.file, poster: o.poster, credit: c, model: o.model, usd: o.usd, cached: o.cached, prompt: o.prompt, disclosure: o.disclosure });
+  }
+  if (takes.length > 1) {
+    // Record the alternatives so the person can swap takes on the campaign page without another Claude run.
+    const reg = resolve('out', 'takes.json');
+    let all = [];
+    try { all = JSON.parse(await readFile(reg, 'utf8')); } catch {}
+    all.push({ id: `${slug(prompt)}-${Date.now().toString(36)}`, label: String(flags.label || prompt).slice(0, 80), kind, files: takes.map((t) => t.file), posters: takes.map((t) => t.poster ?? t.file), chosen: 0 });
+    await mkdir(resolve('out'), { recursive: true });
+    await writeFile(reg, JSON.stringify(all, null, 2));
+  }
   return true;
 }
 

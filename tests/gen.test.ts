@@ -68,3 +68,13 @@ test('budgets refuse spend over the per-project and monthly caps', async () => {
   await assert.rejects(checkBudget('camp-3', 1, { perKey: 5, perMonth: 25 }), /monthly cap/);
   writeFileSync(join(home, 'touch'), '');
 });
+
+test('takes: three alternatives of one shot with different seeds, video takes get posters, budgeted as a set', async () => {
+  const { generateTakes } = await import('../services/gen/src/index.ts');
+  const r = await generateTakes({ capability: 'i2v', prompt: 'slow push on a desk', seconds: 1, takes: 3, out: join(home, 'c9', 'hero') });
+  assert.equal(r.takes.length, 3);
+  assert.deepEqual(r.takes.map((t: any) => t.file.match(/-t(\d)\.mp4$/)?.[1]), ['1', '2', '3']);
+  for (const t of r.takes) assert.ok(t.poster && existsSync(t.poster), 'poster frame');
+  await record('c-takes', 'kling3-i2v', 4.9);
+  await assert.rejects(generateTakes({ capability: 'i2v', prompt: 'x', seconds: 5, takes: 3, provider: 'fal', budgetKey: 'c-takes', out: join(home, 'c9', 'y') }), /cap/);
+});

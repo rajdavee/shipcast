@@ -743,6 +743,52 @@ router.put('/api/campaigns/:id/steps/:step/spec', async (req, _r, p) => {
   return c;
 });
 
+// ── takes: alternative generated shots; pick one and the piece re-renders without Claude ──
+interface Take { id: string; label: string; kind: string; files: string[]; posters: string[]; chosen: number }
+const takesFile = (id: string, step: string) => join(campaignDir(id), 'deliverables', step, 'out', 'takes.json');
+const rel = (id: string, f: string) => (f.startsWith(campaignDir(id)) ? f.slice(campaignDir(id).length + 1) : f);
+router.get('/api/campaigns/:id/steps/:step/takes', async (_q, _r, p) => {
+  await mustCampaign(p.id);
+  try {
+    const all = JSON.parse(await readFile(takesFile(p.id, p.step), 'utf8')) as Take[];
+    return all.map((t) => ({ ...t, files: t.files.map((f) => rel(p.id, f)), posters: t.posters.map((f) => rel(p.id, f)) }));
+  } catch {
+    return [];
+  }
+});
+router.post('/api/campaigns/:id/steps/:step/takes', async (req, _r, p) => {
+  const b = await readJson(req);
+  const { file, step } = await specPath(p.id, p.step);
+  if (step.status === 'running' || step.status === 'queued') throw new HttpError(409, 'wait for the current run to finish');
+  const all = JSON.parse(await readFile(takesFile(p.id, p.step), 'utf8').catch(() => '[]')) as Take[];
+  const t = all.find((x) => x.id === b.id);
+  const k = Number(b.choose);
+  if (!t || !Number.isInteger(k) || k < 0 || k >= t.files.length) throw new HttpError(400, 'unknown take');
+  if (k === t.chosen) return mustCampaign(p.id);
+  // Swap every reference to the current take (absolute or relative) for the chosen one.
+  const from = t.files[t.chosen];
+  const to = t.files[k];
+  let spec = await readFile(file, 'utf8');
+  const variants = [from, rel(p.id, from), from.split('/out/').pop()!].filter(Boolean);
+  let hit = false;
+  for (const v of variants) if (spec.includes(JSON.stringify(v).slice(1, -1))) {
+    spec = spec.split(JSON.stringify(v).slice(1, -1)).join(JSON.stringify(to).slice(1, -1));
+    hit = true;
+    break;
+  }
+  if (!hit) throw new HttpError(409, 'that take is no longer used in the piece — edit it in the spec instead');
+  await writeFileP(file, spec);
+  t.chosen = k;
+  await writeFileP(takesFile(p.id, p.step), JSON.stringify(all, null, 2));
+  const c = await mutateStep(p.id, p.step, (s) => {
+    s.status = 'queued';
+    s.renderOnly = true;
+    s.error = undefined;
+  });
+  await appendEvent(p.id, { step: p.step, type: 'log', text: `Take ${k + 1} chosen for “${t.label}” — re-rendering` });
+  return c;
+});
+
 // Quick look: compile an edited storyboard and snapshot each scene (no full render).
 router.post('/api/campaigns/:id/steps/:step/preview', async (req, _r, p) => {
   const { kind } = await specPath(p.id, p.step);

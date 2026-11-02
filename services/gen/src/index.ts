@@ -1,6 +1,6 @@
 import { copyFile, mkdir, writeFile } from 'node:fs/promises';
 import { dirname, extname, join } from 'node:path';
-import { assertInHome, createService, getSecret, readSettings } from '@shipcast/engine';
+import { assertInHome, createService, getSecret, readSettings, run } from '@shipcast/engine';
 import { fakeAdapter, falAdapter, fetchTo, fileHash, replicateAdapter, type Adapter } from './adapters.ts';
 import { guard } from './guard.ts';
 import { estimate, isVideo, MODELS, type Capability, type GenRequest, type ModelInfo, type Provider } from './registry.ts';
@@ -40,6 +40,8 @@ export interface GenerateInput {
   consent?: string;
   /** Allow models whose licence forbids commercial use (default false). */
   nonCommercial?: boolean;
+  /** Alternatives of the same shot (different seeds) to pick from; 1–3. */
+  takes?: number;
 }
 
 async function providers(force?: Provider): Promise<Provider[]> {
@@ -119,6 +121,27 @@ export async function generate(i: GenerateInput, progress: (f: number, m: string
   return { file: target, model: m.id, usd: plan.usd, cached: false, prompt: plan.prompt, disclosure: verdict.disclose };
 }
 
+/** Several takes of one shot: same prompt and inputs, different seeds; video takes get a poster frame. */
+export async function generateTakes(i: GenerateInput, progress: (f: number, m: string) => void = () => {}) {
+  const n = Math.min(3, Math.max(1, Math.round(i.takes ?? 1)));
+  const plan = await planGeneration(i);
+  // Budget the whole set up front so a cap never leaves you with one and a half takes.
+  await checkBudget(i.budgetKey ?? 'adhoc', plan.usd * n, await caps());
+  const base = i.seed ?? 1000 + Math.floor(Math.random() * 9000);
+  const out = [];
+  for (let k = 0; k < n; k++) {
+    progress(k / n, `take ${k + 1} of ${n}`);
+    const r = await generate({ ...i, takes: 1, seed: base + k * 7919, out: n === 1 ? i.out : `${i.out}-t${k + 1}` }, (f, m) => progress((k + f) / n, m));
+    let poster: string | undefined;
+    if (r.file.endsWith('.mp4')) {
+      poster = r.file.replace(/\.mp4$/, '.jpg');
+      await run('ffmpeg', ['-y', '-v', 'error', '-ss', '0.4', '-i', r.file, '-frames:v', '1', '-q:v', '3', poster]).catch(() => null);
+    }
+    out.push({ ...r, poster });
+  }
+  return { takes: out, usd: out.reduce((a, t) => a + t.usd, 0) };
+}
+
 export function createGenService() {
   return createService({
     name: 'gen',
@@ -132,7 +155,7 @@ export function createGenService() {
         models: MODELS.filter((m) => m.provider !== 'fake').map(({ build, parse, ...m }) => m),
       }),
       plan: async (input: Omit<GenerateInput, 'out'>) => planGeneration(input),
-      generate: async (input: GenerateInput, ctx) => generate(input, ctx.progress),
+      generate: async (input: GenerateInput, ctx) => ((input.takes ?? 1) > 1 ? generateTakes(input, ctx.progress) : generate(input, ctx.progress)),
       spend: async ({ key }: { key?: string }) => ({ ...(await spent(key)), caps: await caps() }),
     },
   });

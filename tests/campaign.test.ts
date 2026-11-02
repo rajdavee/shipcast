@@ -184,3 +184,33 @@ test('hook variants only start from a finished piece that has a spec', async () 
   assert.equal(r.status, 400, 'a copy kit has no spec to vary');
   assert.match(r.body.error, /videos, carousels, decks/);
 });
+
+test('choosing a take swaps it into the spec and re-renders without Claude', async () => {
+  const c = await api('/api/campaigns', { method: 'POST', json: { name: 'Takes', source: { type: 'url', value: 'example.com' }, deliverables: [{ pack: 'reel' }] } });
+  const id = c.body.id;
+  const done = await waitFor(id, (x) => x.steps[1].status === 'done' || x.steps[1].status === 'failed', 30_000);
+  const step = done.steps[1];
+  const { writeFileSync, mkdirSync, readFileSync } = await import('node:fs');
+  const out = join(home, 'campaigns', id, 'deliverables', step.id, 'out');
+  mkdirSync(out, { recursive: true });
+  const t1 = join(out, 'gen-video-hero-t1.mp4');
+  const t2 = join(out, 'gen-video-hero-t2.mp4');
+  writeFileSync(join(out, 'storyboard.json'), JSON.stringify({ preset: 'vertical', scenes: [{ scene: 'broll', fields: { query: 'x', video: t1 } }] }));
+  writeFileSync(join(out, 'takes.json'), JSON.stringify([{ id: 'hero', label: 'Hero', kind: 'video', files: [t1, t2], posters: [t1, t2], chosen: 0 }]));
+  // No render service in tests: mark the piece finished so the swap path runs for real.
+  const cf = join(home, 'campaigns', id, 'campaign.json');
+  const cj = JSON.parse(readFileSync(cf, 'utf8'));
+  cj.steps.find((x: any) => x.id === step.id).status = 'done';
+  writeFileSync(cf, JSON.stringify(cj));
+  step.status = 'done';
+  const list = (await api(`/api/campaigns/${id}/steps/${step.id}/takes`)).body;
+  assert.equal(list[0].files[1], `deliverables/${step.id}/out/gen-video-hero-t2.mp4`, 'paths come back relative to the campaign');
+  {
+    const r = await api(`/api/campaigns/${id}/steps/${step.id}/takes`, { method: 'POST', json: { id: 'hero', choose: 1 } });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.match(readFileSync(join(out, 'storyboard.json'), 'utf8'), /hero-t2\.mp4/);
+    const s = r.body.steps.find((x: any) => x.id === step.id);
+    assert.equal(s.renderOnly, true);
+    assert.equal((await api(`/api/campaigns/${id}/steps/${step.id}/takes`, { method: 'POST', json: { id: 'nope', choose: 0 } })).status, 409, 'queued step refuses another swap');
+  }
+});
