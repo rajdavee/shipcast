@@ -257,6 +257,8 @@ export function layoutAuditScript(safe: { top: number; right: number; bottom: nu
     }
     // Screenshots shown far below their real size: readable UI needs a crop, not a shrink.
     out.tinyShots = [...document.querySelectorAll('img')].filter((im) => !im.closest('.logo, .tag, .ic, .who, .lchip, .run') && !im.classList.contains('logo') && im.naturalWidth >= 1000 && im.getBoundingClientRect().width > 160 && im.getBoundingClientRect().width / im.naturalWidth < 0.3).map((im) => (im.getAttribute('src') || '').split('/').pop().slice(0, 60));
+    // Templates mark text that must stay big (data-min-font); auto-fit shrinking it below that means the copy is too long.
+    out.small = [...document.querySelectorAll('[data-min-font]')].filter((el) => parseFloat(getComputedStyle(el).fontSize) < Number(el.dataset.minFont)).map((el) => label(el) + ' ' + Math.round(parseFloat(getComputedStyle(el).fontSize)) + 'px');
     if (out.minFont === 999) out.minFont = 0;
     out.overflow = out.overflow.slice(0, 20); out.offCanvas = out.offCanvas.slice(0, 20); out.unsafe = out.unsafe.slice(0, 20);
     return out;
@@ -271,6 +273,8 @@ export interface LayoutAudit {
   textCount: number;
   /** Large screenshots shown below ~30% of their real width (unreadable UI). */
   tinyShots?: string[];
+  /** Text marked data-min-font that auto-fit had to shrink below its floor. */
+  small?: string[];
 }
 
 /**

@@ -1,0 +1,20 @@
+{
+  "id": "quote-cards",
+  "name": "Quote & Testimonial Cards",
+  "tagline": "Pull quotes, customer testimonials and post-style cards in square, 4:5 and 1.91:1 — real words from your brief, sample copy clearly labelled — with captions and alt text.",
+  "category": "design",
+  "order": 9,
+  "estimate": "2–4 min",
+  "accent": "#7c3aed",
+  "spec": "graphics",
+  "options": [
+    { "key": "cards", "label": "Cards", "type": "number", "default": "3", "min": 1, "max": 6 },
+    { "key": "kind", "label": "Cards to make", "type": "select", "choices": ["mix", "pull-quote", "testimonial", "post-card"], "default": "mix" },
+    { "key": "theme", "label": "Theme", "type": "select", "choices": ["auto", "editorial", "swiss", "bold", "midnight"], "default": "auto" },
+    { "key": "quotes", "label": "Quotes to use (optional)", "type": "text", "default": "", "placeholder": "Paste real quotes with names — otherwise they come from the brief" }
+  ],
+  "outputs": ["*.png", "graphics.json", "captions.md", "*.md"],
+  "skills": [],
+  "tools": ["chrome"],
+  "roles": ["design-taste", "copy", "social", "humanize"]
+}

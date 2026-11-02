@@ -116,12 +116,36 @@ test('photo carousel renders one deck at TikTok 9:16 and Instagram 4:5, clear of
   assert.equal(getPreset('tiktok-photo')?.height, 1920);
 });
 
+test('quote, testimonial and post cards render at square, 4:5 and 1.91:1 without overflow; sample copy is labelled', { skip: !hasChrome && 'no Chrome' }, async () => {
+  const out = join(home, 'quotes');
+  const shot = join(process.cwd(), 'docs', 'assets', 'studio-new.png');
+  const cards: [string, Record<string, unknown>][] = [
+    ['pull-quote', { kicker: 'Paste a link. Get a launch.', quote: 'Shipcast makes *all of it* from one URL, on your own machine.', source: 'Shipcast README' }],
+    ['testimonial', { quote: 'We went from launch-day panic to a full set of posts in an afternoon. The carousel alone saved us two days.', name: 'Sample Person', role: 'Founder', company: 'Sample Co', sample: 'yes' }],
+    ['post-card', { name: 'Shipcast', handle: '@shipcast', time: '2h', avatar: 'logo', text: 'Paste a link → get a launch campaign. Videos, carousels, decks and posts — *open source*.', image: `${shot}#crop=0.3,0.12,0.4,0.3` }],
+  ];
+  const items = cards.flatMap(([layout, fields]) => ['instagram-post', 'linkedin-image', 'linkedin-landscape'].map((preset) => ({ type: 'card', layout, theme: 'editorial', preset, name: `${layout}-${preset}.png`, fields })));
+  const job = await run('graphics', { brand: { name: 'Shipcast', colors: { background: '#0b0d12', primary: '#2b3bff' } }, outDir: out, items });
+  assert.equal(job.status, 'done', job.error);
+  assert.equal(job.output.items.length, 9);
+  for (const it of job.output.items) {
+    const where = it.file.split('/').pop();
+    for (const k of ['overflow', 'offCanvas', 'unsafe', 'tinyShots', 'small']) assert.deepEqual(it.audit[k], [], `${where} ${k}`);
+  }
+  const fs = await import('node:fs');
+  assert.match(fs.readFileSync(join(out, 'testimonial-linkedin-image.html'), 'utf8'), /data-sample>Sample copy — not a real customer/);
+  assert.ok(!/data-sample>/.test(fs.readFileSync(join(out, 'pull-quote-instagram-post.html'), 'utf8')), 'real quotes carry no sample label');
+});
+
 test('stills audit catches text that overflows', { skip: !hasChrome && 'no Chrome' }, async () => {
   const f = join(home, 'bad.html');
   writeFileSync(f, '<html><body style="margin:0"><div style="width:200px;overflow:hidden;white-space:nowrap;font-size:40px">This headline is far too long for its box</div></body></html>');
   const job = await run('html', { file: f, out: join(home, 'bad.png'), width: 600, height: 400 });
   assert.equal(job.status, 'done', job.error);
   assert.equal(job.output.audit.overflow.length, 1);
+  writeFileSync(f, '<html><body style="margin:0"><h1 data-min-font="80" style="font-size:40px">Shrunk</h1><p data-min-font="20" style="font-size:30px">Fine</p></body></html>');
+  const small = await run('html', { file: f, out: join(home, 'small.png'), width: 600, height: 400 });
+  assert.deepEqual(small.output.audit.small, ['h1 "Shrunk" 40px'], 'text pushed below its floor is reported');
 });
 
 test('stills renders a document to a real-text PDF, previews and a page audit', { skip: !hasChrome && 'no Chrome' }, async () => {

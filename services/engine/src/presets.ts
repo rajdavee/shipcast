@@ -60,6 +60,7 @@ export const PRESETS: PlatformPreset[] = [
   { id: 'tiktok-photo', label: 'TikTok photo carousel (9:16)', kind: 'image', width: 1080, height: 1920, safe: { top: 150, right: 140, bottom: 420, left: 60 }, notes: 'Tabs on top, the button column on the right, caption, sound and slide dots at the bottom.' },
   { id: 'instagram-post', label: 'Feed post (1:1)', kind: 'image', width: 1080, height: 1080, safe: box(60), notes: 'Instagram, Facebook and LinkedIn feed.' },
   { id: 'linkedin-image', label: 'LinkedIn image (4:5)', kind: 'image', width: 1080, height: 1350, safe: box(60) },
+  { id: 'linkedin-landscape', label: 'Landscape post (1.91:1)', kind: 'image', width: 1200, height: 627, safe: box(48), notes: 'LinkedIn and Facebook shared-image size.' },
   { id: 'youtube-thumbnail', label: 'YouTube thumbnail', kind: 'image', width: 1280, height: 720, maxBytes: 2 * MB, safe: { top: 36, right: 200, bottom: 90, left: 36 }, notes: 'Bottom-right holds the duration badge; must read at 160 px wide.' },
   { id: 'og-card', label: 'Link preview (OG)', kind: 'image', width: 1200, height: 630, safe: { top: 65, right: 100, bottom: 65, left: 100 } },
   { id: 'x-image', label: 'X image (16:9)', kind: 'image', width: 1600, height: 900, maxBytes: 5 * MB, safe: box(60) },

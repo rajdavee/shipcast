@@ -6,6 +6,7 @@ export const FORMATS: { id: string; title: string; line: string; img?: string; r
   { id: 'infographic', title: 'Infographic post', line: 'Animated framework post with real logos', img: '/formats/infographic.jpg', ratio: 4 / 5 },
   { id: 'carousel', title: 'Carousel', line: 'Swipe slides for LinkedIn and Instagram', img: '/formats/carousel.jpg', ratio: 4 / 5 },
   { id: 'photo-carousel', title: 'Photo carousel', line: 'TikTok photo mode and Instagram 4:5 slides, with music', img: '/formats/photo-carousel.jpg', ratio: 9 / 16 },
+  { id: 'quote-cards', title: 'Quote cards', line: 'Pull quotes, testimonials and post-style cards', img: '/formats/quote-cards.jpg', ratio: 4 / 5 },
   { id: 'presentation', title: 'Presentation', line: 'Pitch or sales deck — PDF and editable PowerPoint', img: '/formats/presentation.jpg', ratio: 16 / 9 },
   { id: 'ad-set', title: 'Ad set', line: 'Hook variants in every ad size, with upload sheet', img: '/formats/ad-set.jpg', ratio: 1 },
   { id: 'landing', title: 'Landing page', line: 'Responsive page + section snippets for any site builder', img: '/formats/landing.jpg', ratio: 4 / 5 },
@@ -46,6 +47,7 @@ export function shape(pack: Pack | undefined, step?: Step): number {
   if (pack?.id === 'infographic') return pick('size') === '1080x1080' ? 1 : 4 / 5;
   if (pack?.id === 'carousel') return pick('platform') === '1080x1080' ? 1 : 4 / 5;
   if (pack?.id === 'photo-carousel') return pick('platform') === 'instagram' ? 4 / 5 : 9 / 16;
+  if (pack?.id === 'quote-cards') return 4 / 5;
   if (pack?.id === 'document') return 0.707;
   if (pack?.id === 'ad-set') return 1;
   if (pack?.id === 'print') return 0.707;

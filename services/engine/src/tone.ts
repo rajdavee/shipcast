@@ -342,6 +342,7 @@ export async function deleteTone(id: string): Promise<void> {
 export const PACK_CHANNEL: Record<string, Channel> = {
   carousel: 'linkedin',
   'photo-carousel': 'tiktok',
+  'quote-cards': 'linkedin',
   'social-post': 'linkedin',
   reel: 'tiktok',
   'social-short': 'tiktok',
