@@ -121,7 +121,8 @@ function candidates(name: string): string[] {
   if (ALIASES[n]) return [ALIASES[n]];
   const slug = n.replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   const compact = slug.replace(/-/g, '');
-  return [`logos:${slug}-icon`, `logos:${slug}`, `simple-icons:${compact}`];
+  // Brands first; plain words ("inbox", "shield-check") fall through to a generic line icon.
+  return [`logos:${slug}-icon`, `logos:${slug}`, `simple-icons:${compact}`, `lucide:${slug}`];
 }
 
 const fileFor = (id: string) => join(cacheDir(), `${createHash('sha1').update(id).digest('hex').slice(0, 16)}.svg`);

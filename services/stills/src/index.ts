@@ -1,12 +1,29 @@
 import { mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { assertInHome, browser, createService, FIT_SCRIPT, run, TIDY_PAGE_SCRIPT, getPreset, layoutAuditScript, loadBrand, normalizeBrand, presetForSize, resolveIcons, SERVICE_PORTS, type BrandKit, type LayoutAudit } from '@shipcast/engine';
+import { assertInHome, browser, writePptx, type PptxSlide, createService, FIT_SCRIPT, run, TIDY_PAGE_SCRIPT, getPreset, layoutAuditScript, loadBrand, normalizeBrand, presetForSize, resolveIcons, SERVICE_PORTS, type BrandKit, type LayoutAudit } from '@shipcast/engine';
 import { CAROUSEL_LAYOUTS, carouselIconNames, renderCarouselSlide, THEMES } from './templates/carousel.ts';
 import type { RenderCtx } from './templates/common.ts';
 import { CARD_LAYOUTS, renderCard, renderThumbnail, THUMBNAIL_LAYOUTS } from './templates/graphics.ts';
+import { HIDE_TEXT_CSS, MEASURE_TEXT_SCRIPT, renderSlide, SLIDE_LAYOUTS, SLIDE_THEMES, slideIconNames, type SlidePage } from './templates/slides.ts';
+import { DOC_AUDIT_SCRIPT, DOC_LAYOUTS, DOC_THEMES, docIconNames, PAGE_SIZES, renderDocument, type DocPage } from './templates/document.ts';
 
-export { CAROUSEL_LAYOUTS, THEMES, CARD_LAYOUTS, THUMBNAIL_LAYOUTS };
+export { CAROUSEL_LAYOUTS, THEMES, CARD_LAYOUTS, THUMBNAIL_LAYOUTS, DOC_LAYOUTS, DOC_THEMES, PAGE_SIZES, SLIDE_LAYOUTS, SLIDE_THEMES };
+
+export interface SlidesSpec {
+  title?: string;
+  theme?: string;
+  slides: SlidePage[];
+}
+
+export interface DocumentSpec {
+  title?: string;
+  /** a4 (default) or letter. */
+  size?: string;
+  theme?: string;
+  footer?: string;
+  pages: DocPage[];
+}
 
 export interface GraphicSpec {
   type: 'thumbnail' | 'card';
@@ -126,7 +143,111 @@ export function createStillsService() {
         carousel: { themes: Object.fromEntries(Object.entries(THEMES).map(([k, v]) => [k, v.label])), layouts: CAROUSEL_LAYOUTS.map(({ html, ...l }) => l) },
         thumbnail: { layouts: THUMBNAIL_LAYOUTS.map(({ html, ...l }) => l) },
         card: { layouts: CARD_LAYOUTS.map(({ html, ...l }) => l) },
+        slides: { themes: Object.fromEntries(Object.entries(SLIDE_THEMES).map(([k, v]) => [k, v.label])), layouts: SLIDE_LAYOUTS.map(({ html, ...l }) => l) },
+        document: { themes: Object.fromEntries(Object.entries(DOC_THEMES).map(([k, v]) => [k, v.label])), sizes: Object.fromEntries(Object.entries(PAGE_SIZES).map(([k, v]) => [k, v.label])), layouts: DOC_LAYOUTS.map(({ html, ...l }) => l) },
       }),
+
+      /**
+       * A presentation → slide PNGs, a PDF and an editable PPTX: each PPTX slide is a
+       * text-free render of the design with the measured text rebuilt as real text boxes.
+       */
+      slides: async (input: SlidesSpec & { brandDir?: string; brand?: Partial<BrandKit>; outDir: string; name?: string }, ctx) => {
+        const outDir = assertInHome(input.outDir, 'outDir');
+        const { brand, assetsDir } = await brandFrom(input);
+        if (!Array.isArray(input.slides) || !input.slides.length) throw new Error('slides are required');
+        const W = 1920;
+        const H = 1080;
+        const PX = 13.333 / W; // inches per pixel on a 16:9 PowerPoint slide
+        const names = slideIconNames(input.slides);
+        const icons = names.length ? await resolveIcons(names) : {};
+        const base = String(input.name ?? 'presentation').replace(/[^\w-]/g, '_');
+        await mkdir(join(outDir, 'slides'), { recursive: true });
+        await mkdir(join(outDir, 'work', 'pptx'), { recursive: true });
+        const results = [];
+        const pptxSlides: PptxSlide[] = [];
+        for (let i = 0; i < input.slides.length; i++) {
+          ctx.progress((0.85 * i) / input.slides.length, `slide ${i + 1}`);
+          const s = input.slides[i];
+          const html = renderSlide(s, input.theme ?? 'brand', { brand, width: W, height: H, page: i + 1, pages: input.slides.length, assetsDir, icons });
+          const file = join(outDir, 'slides', `slide-${String(i + 1).padStart(2, '0')}.png`);
+          const shot = await capture(html, file, W, H, { top: 40, right: 60, bottom: 40, left: 60 });
+          // Second pass on the same HTML: measure the text, then render the design without it.
+          const tmp = join(outDir, 'work', 'pptx', `slide-${i + 1}.html`);
+          await writeFile(tmp, html.replace('</style>', `${HIDE_TEXT_CSS}</style>`).replace('<body>', '<body data-measure="1">'));
+          await writeFile(tmp.replace('.html', '.measure.html'), html);
+          const pm = await browser().open(pathToFileURL(tmp.replace('.html', '.measure.html')).href, { width: W, height: H, settleMs: 200 });
+          let boxes: any[] = [];
+          try {
+            await pm.eval('document.fonts.ready.then(() => true)');
+            boxes = await pm.eval<any[]>(MEASURE_TEXT_SCRIPT);
+          } finally {
+            await pm.close();
+          }
+          const pb = await browser().open(pathToFileURL(tmp).href, { width: W, height: H, settleMs: 200 });
+          const bg = join(outDir, 'work', 'pptx', `bg-${i + 1}.png`);
+          try {
+            await pb.eval('document.fonts.ready.then(() => true)');
+            await writeFile(bg, await pb.screenshot('png'));
+          } finally {
+            await pb.close();
+          }
+          pptxSlides.push({
+            background: { image: bg },
+            items: boxes.map((b) => ({ type: 'text' as const, text: b.text, x: b.x * PX, y: b.y * PX, w: Math.max(0.3, b.w * PX + 0.08), h: Math.max(0.2, b.h * PX), size: Math.max(6, Math.round(b.size * PX * 72 * 10) / 10), bold: b.bold, color: b.color, font: b.font, align: b.align, bullets: b.bullets, lineSpacing: b.lineSpacing, valign: 'top' as const })),
+            notes: s.notes,
+          });
+          results.push({ ...shot, notes: !!s.notes });
+        }
+        ctx.progress(0.9, 'PDF and PPTX');
+        const pdf = await pdfFromImages(results.map((r) => r.file), join(outDir, `${base}.pdf`), W, H);
+        const pptx = join(outDir, `${base}.pptx`);
+        await writePptx({ title: input.title, author: brand.name, slides: pptxSlides, fonts: { heading: brand.fonts?.display, body: brand.fonts?.body } }, pptx);
+        return { slides: results, pdf, pptx, width: W, height: H };
+      },
+
+      /** A print document → one PDF with real text, page previews and a per-page fit audit. */
+      document: async (input: DocumentSpec & { brandDir?: string; brand?: Partial<BrandKit>; outDir: string; name?: string }, ctx) => {
+        const outDir = assertInHome(input.outDir, 'outDir');
+        const { brand, assetsDir } = await brandFrom(input);
+        if (!Array.isArray(input.pages) || !input.pages.length) throw new Error('pages are required');
+        const sz = PAGE_SIZES[input.size ?? 'a4'] ?? PAGE_SIZES.a4;
+        const names = docIconNames(input.pages);
+        const icons = names.length ? await resolveIcons(names) : {};
+        const html = renderDocument(input, { brand, width: sz.width, height: sz.height, assetsDir, icons });
+        const base = String(input.name ?? 'document').replace(/[^\w-]/g, '_');
+        await mkdir(join(outDir, 'pages'), { recursive: true });
+        const htmlFile = join(outDir, `${base}.html`);
+        await writeFile(htmlFile, html);
+        const open = () => browser().open(pathToFileURL(htmlFile).href, { width: sz.width, height: sz.height, scale: 1.5, settleMs: 300 });
+        let page = await open().catch(async () => (await browser().restart(), open()));
+        try {
+          await page.eval('document.fonts.ready.then(() => true)');
+          const audit = await page.eval<{ page: number; overflow: number; wide: boolean; brokenImages: number; fill: number }[]>(DOC_AUDIT_SCRIPT);
+          ctx.progress(0.3, 'printing the PDF');
+          const pdf = join(outDir, `${base}.pdf`);
+          await writeFile(pdf, await page.pdf());
+          const previews: string[] = [];
+          for (let i = 0; i < input.pages.length; i++) {
+            ctx.progress(0.4 + (0.5 * i) / input.pages.length, `page ${i + 1}`);
+            await page.eval(`(() => { document.querySelectorAll('section.pg').forEach((p, j) => p.style.display = j === ${i} ? '' : 'none'); window.scrollTo(0, 0); return true; })()`);
+            const file = join(outDir, 'pages', `page-${String(i + 1).padStart(2, '0')}.png`);
+            await writeFile(file, await page.screenshot('png'));
+            previews.push(file);
+          }
+          const sheet = join(outDir, `${base}.sheet.jpg`);
+          const cols = Math.min(4, previews.length);
+          await run('ffmpeg', ['-y', '-v', 'error', '-pattern_type', 'glob', '-i', join(outDir, 'pages', 'page-*.png'), '-vf', `scale=360:-2,tile=${cols}x${Math.ceil(previews.length / cols)}:padding=12:margin=12:color=0xdddddd`, '-frames:v', '1', sheet]);
+          const problems = audit.flatMap((a) => [
+            ...(a.overflow > 2 ? [`page ${a.page} (${input.pages[a.page - 1]?.layout}) overflows by ${Math.round(a.overflow)}px — shorten the copy or split it onto another page`] : []),
+            ...(a.wide ? [`page ${a.page} has a heading or table wider than the page`] : []),
+            ...(a.brokenImages ? [`page ${a.page} has ${a.brokenImages} image(s) that didn't load — check the paths`] : []),
+            ...(a.fill < 0.55 && input.pages.length > 1 ? [`page ${a.page} (${input.pages[a.page - 1]?.layout}) is only ${Math.round(a.fill * 100)}% full — add substance (a paragraph, an image, a chart) or merge it with a neighbouring page`] : []),
+          ]);
+          return { pdf, html: htmlFile, pages: previews, sheet, width: sz.width, height: sz.height, audit, problems };
+        } finally {
+          await page.close();
+        }
+      },
 
       /** A carousel deck → slide PNGs, one PDF, and per-slide audits. */
       deck: async (input: DeckSpec & { brandDir?: string; brand?: Partial<BrandKit>; outDir: string; pdf?: boolean; only?: number[] }, ctx) => {

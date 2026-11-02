@@ -13,9 +13,9 @@ import { KNOWN_ICONS } from './icons.ts';
  * actionable feedback.
  */
 
-export type SpecKind = 'deck' | 'graphics' | 'storyboard' | 'infographic';
+export type SpecKind = 'deck' | 'graphics' | 'storyboard' | 'infographic' | 'document' | 'slides';
 
-export const SPEC_FILE: Record<SpecKind, string> = { deck: 'deck.json', graphics: 'graphics.json', storyboard: 'storyboard.json', infographic: 'infographic.json' };
+export const SPEC_FILE: Record<SpecKind, string> = { deck: 'deck.json', graphics: 'graphics.json', storyboard: 'storyboard.json', infographic: 'infographic.json', document: 'document.json', slides: 'slides.json' };
 
 type FieldDoc = { id: string; type: string; label: string; optional?: boolean; max?: number; help?: string; choices?: string[] };
 const fieldLine = (f: FieldDoc) =>
@@ -63,6 +63,34 @@ export async function catalogMarkdown(kind: SpecKind): Promise<string> {
     ].join('\n');
   }
   const c = await callService('stills', 'catalog', {});
+  if (kind === 'document') {
+    return [
+      '# Document catalog',
+      '',
+      'Spec: `{ "title": "running head", "size": "a4|letter", "theme": "<theme>", "footer": "url or line on every page", "pages": [ { "layout": "<id>", "fields": {…} } ] }`',
+      `Themes: ${Object.entries(c.document.themes).map(([k, v]) => `\`${k}\` — ${v}`).join('; ')}`,
+      `Sizes: ${Object.entries(c.document.sizes).map(([k, v]) => `\`${k}\` ${v}`).join(' · ')} (Letter for US audiences, A4 elsewhere).`,
+      'Rich text: `*word*` accent · `**word**` bold · `==word==` highlight. Body fields take light markdown: blank-line paragraphs, `- ` bullets, `1. ` steps, `### ` subheads, `> ` callouts.',
+      'Images: paths relative to the brief folder (e.g. `assets/screens/home.png`). Icons: a brand name ("Slack") or a plain icon word ("shield-check").',
+      'Every page is checked after rendering: overflow, images that did not load, and pages under ~55% full come back to you to fix.',
+      '',
+      '## Layouts',
+      ...c.document.layouts.map((l: any) => `### \`${l.id}\` — ${l.label}\n${l.use}\n${l.fields.map(fieldLine).join('\n')}`),
+    ].join('\n');
+  }
+  if (kind === 'slides') {
+    return [
+      '# Presentation catalog',
+      '',
+      'Spec: `{ "title": "deck title", "theme": "<theme>", "slides": [ { "layout": "<id>", "fields": {…}, "notes": "speaker notes" } ] }` — 16:9 (1920×1080). Output: slide PNGs, a PDF and an editable PPTX with your notes.',
+      `Themes: ${Object.entries(c.slides.themes).map(([k, v]) => `\`${k}\` — ${v}`).join('; ')}`,
+      'Rich text: `*word*` accent · `**word**` bold · `==word==` highlight. One message per slide; the headline states the takeaway.',
+      'Images: paths relative to the brief folder. Icons: a brand name or a plain icon word ("inbox", "shield-check").',
+      '',
+      '## Layouts',
+      ...c.slides.layouts.map((l: any) => `### \`${l.id}\` — ${l.label}\n${l.use}\n${l.fields.map(fieldLine).join('\n')}`),
+    ].join('\n');
+  }
   if (kind === 'deck') {
     return [
       '# Carousel catalog',
@@ -146,6 +174,19 @@ export async function renderSpec(kind: SpecKind, cwd: string, briefDir: string, 
         ...g.audit.unsafe.slice(0, 2).map((x: string) => `${g.file.split('/').pop()}: ${x} sits inside the ${g.preset} safe margin — platform UI may cover it.`),
       ]);
       return { ok: !fb.length, feedback: fb, summary: `${r.items.length} graphics` };
+    }
+    if (kind === 'document') {
+      const r = await callService('stills', 'document', { ...spec, brandDir: briefDir, outDir: out, name: 'document' });
+      return { ok: !r.problems.length, feedback: r.problems, summary: `${r.pages.length}-page PDF` };
+    }
+    if (kind === 'slides') {
+      const r = await callService('stills', 'slides', { ...spec, brandDir: briefDir, outDir: out, name: 'presentation' });
+      const fb = r.slides.flatMap((s: any, i: number) => [
+        ...s.audit.overflow.map((x: string) => `Slide ${i + 1}: text overflows its box (${x}). Shorten it or split the slide.`),
+        ...s.audit.offCanvas.map((x: string) => `Slide ${i + 1}: text runs off the slide (${x}). Shorten it.`),
+        ...(s.audit.minFont && s.audit.minFont < 20 ? [`Slide ${i + 1}: smallest text is ${s.audit.minFont}px — too small to read from the back of a room.`] : []),
+      ]);
+      return { ok: !fb.length, feedback: fb, summary: `${r.slides.length} slides · PDF + PPTX` };
     }
     if (kind === 'infographic') {
       const v = await callService('render', 'validateInfographic', { spec });

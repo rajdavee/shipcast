@@ -32,3 +32,4 @@ export * from './usage.ts';
 export * from './scan.ts';
 export * from './tone.ts';
 export * from './tone-learn.ts';
+export * from './pptx.ts';

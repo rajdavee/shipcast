@@ -91,3 +91,48 @@ test('stills audit catches text that overflows', { skip: !hasChrome && 'no Chrom
   assert.equal(job.status, 'done', job.error);
   assert.equal(job.output.audit.overflow.length, 1);
 });
+
+test('stills renders a document to a real-text PDF, previews and a page audit', { skip: !hasChrome && 'no Chrome' }, async () => {
+  const out = join(home, 'doc');
+  const job = await run('document', {
+    title: 'Acme guide',
+    size: 'letter',
+    theme: 'editorial',
+    brand: { name: 'Acme', colors: { background: '#ffffff', primary: '#3355ff' } },
+    outDir: out,
+    pages: [
+      { layout: 'cover', fields: { kicker: 'Guide', title: 'Ship *faster*' } },
+      { layout: 'toc', fields: {} },
+      { layout: 'article', fields: { heading: 'Why it matters', body: '### Three habits\n- One\n- Two\n- Three' } },
+      { layout: 'chart', fields: { heading: 'It adds up', chart: '{"type":"bar","data":[{"label":"A","value":3},{"label":"B","value":5}]}' } },
+    ],
+  });
+  assert.equal(job.status, 'done', job.error);
+  assert.equal(job.output.pages.length, 4);
+  assert.ok(existsSync(join(out, 'document.pdf')) && existsSync(join(out, 'document.sheet.jpg')));
+  const html = (await import('node:fs')).readFileSync(join(out, 'document.html'), 'utf8');
+  assert.match(html, /<ul><li>One<\/li>/, 'subhead + list parses as a list');
+  assert.match(html, /Why it matters<span class="lead"><\/span><span class="pn">3<\/span>/, 'contents carry real page numbers');
+  assert.ok(job.output.problems.some((p: string) => /page 3 .* full/.test(p)), 'a near-empty article page is flagged');
+});
+
+test('stills renders slides to PNGs, a PDF and an editable PPTX with notes', { skip: !hasChrome && 'no Chrome' }, async () => {
+  const out = join(home, 'slides');
+  const job = await run('slides', {
+    theme: 'dark',
+    brand: { name: 'Acme', colors: { background: '#0b0d12', primary: '#3355ff' } },
+    outDir: out,
+    slides: [
+      { layout: 'title', fields: { title: 'R&D <2026>' } },
+      { layout: 'bullets', fields: { heading: 'Three points', points: ['One', 'Two', 'Three'] }, notes: 'Say why.' },
+    ],
+  });
+  assert.equal(job.status, 'done', job.error);
+  assert.ok(existsSync(join(out, 'presentation.pptx')) && existsSync(join(out, 'presentation.pdf')));
+  const { execFileSync } = await import('node:child_process');
+  const list = execFileSync('unzip', ['-l', join(out, 'presentation.pptx')]).toString();
+  assert.match(list, /ppt\/slides\/slide2\.xml/);
+  assert.match(list, /notesSlide2\.xml/);
+  const xml = execFileSync('unzip', ['-p', join(out, 'presentation.pptx'), 'ppt/slides/slide1.xml']).toString();
+  assert.match(xml, /R&amp;D &lt;2026&gt;/, 'title is editable text');
+});

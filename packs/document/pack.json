@@ -1,0 +1,22 @@
+{
+  "id": "document",
+  "name": "Documents & PDFs",
+  "tagline": "One-pagers, sales sheets, case studies, datasheets, ebooks, whitepapers and reports — a print-ready PDF with real text, page previews and a share blurb.",
+  "category": "design",
+  "order": 7,
+  "estimate": "4–10 min",
+  "accent": "#3f6b5c",
+  "spec": "document",
+  "options": [
+    { "key": "type", "label": "Document", "type": "select", "choices": ["one-pager", "sales-sheet", "case-study", "datasheet", "ebook", "whitepaper", "report"], "default": "one-pager" },
+    { "key": "pages", "label": "Pages (long documents)", "type": "number", "default": "10", "min": 1, "max": 24 },
+    { "key": "theme", "label": "Theme", "type": "select", "choices": ["auto", "clean", "editorial", "dark"], "default": "auto" },
+    { "key": "size", "label": "Paper", "type": "select", "choices": ["auto", "a4", "letter"], "default": "auto" },
+    { "key": "topic", "label": "Topic or angle (optional)", "type": "text", "default": "", "placeholder": "e.g. The 2026 guide to evidence-backed trust decisions" }
+  ],
+  "outputs": ["document.pdf", "pages/*.png", "document.sheet.jpg", "document.json", "summary.md", "*.md"],
+  "skills": [],
+  "tools": ["chrome"],
+  "roles": ["design-taste", "copy", "humanize"],
+  "timeoutMinutes": 40
+}

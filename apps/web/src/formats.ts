@@ -5,6 +5,8 @@ export const FORMATS: { id: string; title: string; line: string; img?: string; r
   { id: 'custom-video', title: 'Anything', line: 'Describe any video — Claude builds it from scratch', ratio: 16 / 9 },
   { id: 'infographic', title: 'Infographic post', line: 'Animated framework post with real logos', img: '/formats/infographic.jpg', ratio: 4 / 5 },
   { id: 'carousel', title: 'Carousel', line: 'Swipe slides for LinkedIn and Instagram', img: '/formats/carousel.jpg', ratio: 4 / 5 },
+  { id: 'presentation', title: 'Presentation', line: 'Pitch or sales deck — PDF and editable PowerPoint', img: '/formats/presentation.jpg', ratio: 16 / 9 },
+  { id: 'document', title: 'PDF document', line: 'One-pager, case study, ebook or whitepaper', img: '/formats/document.jpg', ratio: 0.707 },
   { id: 'reel', title: 'Reel', line: 'Vertical video with captions', img: '/formats/reel.jpg', ratio: 9 / 16 },
   { id: 'launch-film', title: 'Launch film', line: '30-second video for launch day', img: '/formats/launch-film.jpg', ratio: 16 / 9 },
   { id: 'youtube-video', title: 'YouTube video', line: '3–10 minutes in chapters, with timestamps', img: '/formats/youtube-video.jpg', ratio: 16 / 9 },
@@ -33,6 +35,7 @@ export function shape(pack: Pack | undefined, step?: Step): number {
   if (preset === 'square-video') return 1;
   if (pack?.id === 'infographic') return pick('size') === '1080x1080' ? 1 : 4 / 5;
   if (pack?.id === 'carousel') return pick('platform') === '1080x1080' ? 1 : 4 / 5;
+  if (pack?.id === 'document') return 0.707;
   if (pack?.category === 'copy') return 4 / 5;
   return 16 / 9;
 }

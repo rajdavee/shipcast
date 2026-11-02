@@ -1,0 +1,21 @@
+{
+  "id": "presentation",
+  "name": "Presentation · PPTX",
+  "tagline": "A designed 16:9 deck — pitch, sales, webinar, investor or board — as slides, a PDF and an editable PowerPoint with speaker notes.",
+  "category": "design",
+  "order": 8,
+  "estimate": "5–10 min",
+  "accent": "#c4501c",
+  "spec": "slides",
+  "options": [
+    { "key": "type", "label": "Deck", "type": "select", "choices": ["pitch", "sales", "webinar", "investor-update", "board", "conference-talk", "product-launch"], "default": "pitch" },
+    { "key": "slides", "label": "Slides", "type": "number", "default": "12", "min": 5, "max": 24 },
+    { "key": "theme", "label": "Theme", "type": "select", "choices": ["auto", "brand", "light", "dark"], "default": "auto" },
+    { "key": "audience", "label": "Audience (optional)", "type": "text", "default": "", "placeholder": "e.g. heads of trust operations at family offices" }
+  ],
+  "outputs": ["presentation.pptx", "presentation.pdf", "slides/*.png", "slides.json", "*.md"],
+  "skills": [],
+  "tools": ["chrome"],
+  "roles": ["design-taste", "copy", "humanize"],
+  "timeoutMinutes": 40
+}
