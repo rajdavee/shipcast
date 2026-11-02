@@ -346,6 +346,7 @@ figcaption,.src{font-size:11.5px;color:var(--soft)}
 .stat{background:var(--tint);border-radius:18px;padding:26px 22px}
 .stat .big{font:800 64px/1 var(--font-display);letter-spacing:-.045em;color:var(--brand-primary)}
 .stat-grid.tight .stat .big{font-size:40px}
+.stat-grid.n4 .stat .big{font-size:46px;white-space:nowrap}.stat-grid.n4 .stat{padding:22px 16px}
 .stat .lbl{margin-top:10px;font:600 15px/1.35 var(--font-body)}
 .stat .src{margin-top:6px}
 .chart-box{background:var(--tint);border-radius:18px;padding:28px}
