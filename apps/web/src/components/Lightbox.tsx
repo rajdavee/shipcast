@@ -131,6 +131,9 @@ export function Lightbox({ campaign, step, pack, events, onClose, onChange, onPr
               {main && <a className="btn primary" href={url(prefix + main) + '&download'} download>Download {label(main)}</a>}
               {postText && <button className="btn" onClick={() => navigator.clipboard.writeText(postText).then(() => toast('Post text copied'))}>Copy post text</button>}
               {step.pack === 'youtube-video' && <button className="btn" onClick={() => act(() => api.addStep(campaign.id, 'shorts', { source: step.id }), 'Cutting 3 Shorts from this video')}>Cut 3 Shorts</button>}
+              {editable && step.status === 'done' && !['ad-set', 'landing', 'print', 'infographic', 'hook-variants'].includes(step.pack ?? '') && (
+                <button className="btn" title="The same piece with 4 different openings, rendered side by side for an A/B test" onClick={() => act(() => api.variants(campaign.id, step.id, 4), 'Writing 4 hook variants')}>Hook variants</button>
+              )}
             </div>
           )}
 

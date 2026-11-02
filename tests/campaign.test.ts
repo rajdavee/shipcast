@@ -175,3 +175,12 @@ test('voice profiles: save, score, pick for a campaign', async () => {
   for (const x of [c.body, bogus.body]) await api(`/api/campaigns/${x.id}/steps/brief/cancel`, { method: 'POST', json: {} });
   assert.equal((await api('/api/tones/default', { method: 'DELETE' })).status, 400);
 });
+
+test('hook variants only start from a finished piece that has a spec', async () => {
+  const list = (await api('/api/campaigns')).body;
+  const c = list.find((x: any) => x.name === 'Plan');
+  const copy = c.steps.find((s: any) => s.pack === 'copy-kit');
+  const r = await api(`/api/campaigns/${c.id}/steps/${copy.id}/variants`, { method: 'POST', json: { count: 3 } });
+  assert.equal(r.status, 400, 'a copy kit has no spec to vary');
+  assert.match(r.body.error, /videos, carousels, decks/);
+});

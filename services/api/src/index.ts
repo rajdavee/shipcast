@@ -25,6 +25,7 @@ import {
   newId,
   parseRepo,
   readCampaign,
+  variantSource,
   readEvents,
   readSettings,
   SETUPS,
@@ -588,6 +589,26 @@ router.post('/api/campaigns/:id/steps/:step/revise', async (req, _r, p) => {
   });
   await appendEvent(p.id, { step: p.step, type: 'log', text: `Revision queued: ${note}` });
   return c;
+});
+
+/** Hook variants: a new step that rewrites only the opening of a finished piece, N ways, and renders each. */
+router.post('/api/campaigns/:id/steps/:step/variants', async (req, _r, p) => {
+  const b = await readJson(req);
+  const c = await mustCampaign(p.id);
+  try {
+    await variantSource(c, p.step);
+  } catch (e) {
+    throw new HttpError(400, (e as Error).message);
+  }
+  const src = c.steps.find((s) => s.id === p.step)!;
+  const count = String(Math.min(8, Math.max(2, Number(b.count) || 4)));
+  const title = `Hook variants · ${src.options._title ?? (await getPack(src.pack!))?.name ?? src.pack}`;
+  const step = makeStep('pack', 'hook-variants', { of: p.step, count, _title: title });
+  const { campaign } = await updateCampaign(p.id, (x) => {
+    x.steps.push(step);
+  });
+  await appendEvent(p.id, { step: step.id, type: 'log', text: `${count} hook variants queued for ${title.replace('Hook variants · ', '')}` });
+  return campaign;
 });
 
 router.post('/api/campaigns/:id/steps/:step/retry', async (_q, _r, p) =>

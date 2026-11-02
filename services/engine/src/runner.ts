@@ -1,5 +1,5 @@
 import { cp, mkdir, writeFile, rm } from 'node:fs/promises';
-import { catalogMarkdown, checkCopy, renderSpec, SPEC_FILE } from './specs.ts';
+import { catalogMarkdown, checkCopy, renderSpec, SPEC_FILE, type SpecKind } from './specs.ts';
 import { readFile, readdir, rename, stat } from 'node:fs/promises';
 import { shortsFromStoryboard } from './shorts.ts';
 import { recentPatterns, scenePattern, varietyFeedback } from './variety.ts';
@@ -21,6 +21,7 @@ import { installSkill, isSkillInstalled } from './skills.ts';
 import { ensureForRoles, hubPluginDir, rolesPrompt } from './skillhub.ts';
 import { readCampaignEnv, scrubSecrets } from './campaignenv.ts';
 import type { Campaign, Pack, Step } from './types.ts';
+import { prepareVariants, renderVariants } from './variants.ts';
 import { DEFAULT_TONE, getTone, normalizeTone, outputText, PACK_CHANNEL, scoreText, toneBrief, type ToneProfile } from './tone.ts';
 
 export const WORKER_ID = `${hostname()}:${process.pid}`;
@@ -291,6 +292,7 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
     let prompt: string;
     let outputs: string[];
     let resume: string | undefined;
+    let variantKind: SpecKind | undefined;
     let allowSubagents = false;
     let appEnv: Record<string, string> | undefined;
     const note = step.pendingNote;
@@ -321,6 +323,10 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
         if (!r.ok) throw new Error(`Couldn't install the ${dep.name} skill from ${dep.source}. Run: npx skills add ${dep.source} -g -a claude-code\n${r.log.slice(-400)}`);
       }
       cwd = join(dir, 'deliverables', step.id);
+      if (pack.id === 'hook-variants' && !step.renderOnly) {
+        await mkdir(cwd, { recursive: true });
+        variantKind = (await prepareVariants(campaign, step, cwd)).kind;
+      }
       prompt = packPrompt(campaign, pack, step, await campaignTone(campaign)) + hubNote;
       if (pack.context) {
         const earlier = campaign.steps.filter((s) => s.kind === 'pack' && s.status === 'done' && s.id !== step.id);
@@ -600,6 +606,19 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
           break;
         }
         const fix = await execClaude(`The render service checked your ${SPEC_FILE[specKind]} and found these problems:\n${r.feedback.map((f) => `- ${f}`).join('\n')}\n\nEdit out/${SPEC_FILE[specKind]} to fix every one of them (shorter text, different layout, valid fields). Don't render anything yourself — just update the JSON.`, sessionId);
+        if (!fix.result?.ok) break;
+      }
+    }
+
+    // Hook variants: render every variant from the original spec; fix what fails (≤ 2 rounds).
+    if (ok && pack?.id === 'hook-variants' && !canceled && !timedOut) {
+      const kind = variantKind ?? ((await readFile(join(cwd, 'variant-kind.txt'), 'utf8').catch(() => '')).split('\n')[0] as SpecKind);
+      for (let round = 0; round < 2 && kind; round++) {
+        await phase(round ? 'Re-rendering variants' : 'Rendering variants');
+        const r = await renderVariants(cwd, join(dir, 'brief'), kind);
+        await log({ step: step.id, type: 'log', text: `Variants: ${r.rendered.length} rendered${r.feedback.length ? ` · ${r.feedback.length} issue(s)` : ''}` });
+        if (r.ok || !sessionId || Date.now() > deadline) break;
+        const fix = await execClaude(`Rendering the variants found:\n${r.feedback.map((f) => `- ${f}`).join('\n')}\n\nFix those variants in out/hooks.json (shorter text, same shape as base.json). Don't render anything.`, sessionId);
         if (!fix.result?.ok) break;
       }
     }

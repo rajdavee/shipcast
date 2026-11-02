@@ -1,0 +1,19 @@
+{
+  "id": "hook-variants",
+  "name": "Hook variants",
+  "tagline": "The same piece with 3–8 different openings, rendered side by side for an A/B test.",
+  "category": "copy",
+  "order": 90,
+  "hidden": true,
+  "estimate": "3–15 min",
+  "accent": "#0ea5e9",
+  "options": [
+    { "key": "of", "label": "Piece", "type": "text", "default": "" },
+    { "key": "count", "label": "Variants", "type": "number", "default": "4", "min": 2, "max": 8 }
+  ],
+  "outputs": ["hooks.json", "variants.md", "variants.sheet.jpg", "variants/*/out/**/*", "*.md"],
+  "skills": [],
+  "tools": ["ffmpeg", "chrome"],
+  "roles": ["copy", "social"],
+  "timeoutMinutes": 60
+}
