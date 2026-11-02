@@ -94,3 +94,11 @@ substitutions or medium limits, credits.
 
 For any generated shot that carries the piece (the hero image, a presenter, a key B-roll moment), ask for 2–3 takes: `media.mjs gen … --takes 3 --label "scene 2 hero"`. Use the first take in the spec; the others are recorded in `out/takes.json` so the person can swap a take on the campaign page and re-render without another Claude run. Takes cost per take — keep it to the shots that matter.
 
+## Legibility over footage and photos
+
+On-screen text has to read on a phone at arm's length:
+- Body lines at least 3.5% of the frame height (≈ 38 px at 1080p, 67 px in 9:16); titles 6–9%.
+- Over photos or footage, put text on a soft scrim (a gradient behind the lower third) or give it a strong shadow; aim for 4.5:1 contrast against what's behind it.
+- Thin display serifs only at title sizes; captions and lines use a medium or bold weight.
+- Keep text inside the safe zone (5% from the edges; for 9:16, out of the bottom 20% and right 12%).
+
