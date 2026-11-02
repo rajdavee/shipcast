@@ -41,6 +41,25 @@ const AnythingMock = () => (
   </div>
 );
 
+const ResearchMock = ({ kind }: { kind: string }) => (
+  <div className="post-mock" aria-hidden="true">
+    <div className="pm-head"><i /><span><b /><small /></span></div>
+    {kind === 'teardown' ? (
+      <>
+        <p>Hook: a question in the first line.</p>
+        <p>Offer: free audit. Proof: one logo.</p>
+        <p className="pm-dim">Gap we can own: setup in minutes ↓</p>
+      </>
+    ) : (
+      <>
+        <p>This week: 3 signals your audience cares about.</p>
+        <p>Formats working now · hooks to borrow</p>
+        <p className="pm-dim">6 ideas ready to make ↓</p>
+      </>
+    )}
+  </div>
+);
+
 const PostMock = () => (
   <div className="post-mock" aria-hidden="true">
     <div className="pm-head"><i /><span><b /><small /></span></div>
@@ -302,7 +321,7 @@ export function Home({ status, services, campaigns }: { status: Status | null; s
               <button key={f.id} className="tile" aria-pressed={on} onClick={() => toggle(f.id)}>
                 <span className="tape" aria-hidden="true" />
                 <span className="tile-art">
-                  {f.id === 'custom-video' ? <AnythingMock /> : f.img ? <img src={f.img} alt="" style={{ aspectRatio: String(f.ratio) }} loading="lazy" /> : <PostMock />}
+                  {f.id === 'custom-video' ? <AnythingMock /> : f.id === 'trend-brief' || f.id === 'teardown' ? <ResearchMock kind={f.id} /> : f.img ? <img src={f.img} alt="" style={{ aspectRatio: String(f.ratio) }} loading="lazy" /> : <PostMock />}
                 </span>
                 <span className="tile-text">
                   <b>{f.title}</b>

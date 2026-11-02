@@ -1,0 +1,18 @@
+{
+  "id": "trend-brief",
+  "name": "Trend brief",
+  "tagline": "What your audience is paying attention to this week — signals with evidence, formats that work, hooks to borrow and 5–8 ready-to-make content ideas.",
+  "category": "copy",
+  "order": 20,
+  "estimate": "6–12 min",
+  "accent": "#d97706",
+  "options": [
+    { "key": "window", "label": "Look back", "type": "select", "choices": ["7", "30", "90"], "default": "30" },
+    { "key": "focus", "label": "Focus (optional)", "type": "text", "default": "", "placeholder": "e.g. LinkedIn for fintech CFOs, or a competitor to watch" }
+  ],
+  "outputs": ["trend-brief.md", "briefs.json", "*.md"],
+  "skills": [],
+  "tools": [],
+  "roles": ["social", "copy"],
+  "timeoutMinutes": 30
+}

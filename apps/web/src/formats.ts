@@ -17,6 +17,8 @@ export const FORMATS: { id: string; title: string; line: string; img?: string; r
   { id: 'explainer-video', title: 'Explainer', line: 'Narrated 60-second walkthrough', img: '/formats/explainer-video.jpg', ratio: 16 / 9 },
   { id: 'thumbnails', title: 'Thumbnails', line: 'YouTube, link cards and banners', img: '/formats/thumbnails.jpg', ratio: 16 / 9 },
   { id: 'copy-kit', title: 'Posts', line: 'Ready-to-paste posts for every channel', ratio: 4 / 5 },
+  { id: 'trend-brief', title: 'Trend brief', line: 'What your audience cares about this week, with ideas', ratio: 4 / 5 },
+  { id: 'teardown', title: 'Competitor teardown', line: 'Break down their ads and pages, then beat them', ratio: 4 / 5 },
 ];
 export const DEFAULT_FORMATS = ['infographic', 'carousel', 'copy-kit'];
 
@@ -26,6 +28,8 @@ PLAIN['feature-spotlight'] = 'A short silent clip that loops in the feed';
 PLAIN['short-film'] = 'A 45–120 s story shot like a film';
 PLAIN['shorts'] = 'Vertical Shorts cut from your long video';
 PLAIN['caption-video'] = 'Styled captions on a clip you upload';
+PLAIN['trend-brief'] = 'What your audience cares about this week, with ideas to make';
+PLAIN['teardown'] = 'Break down competitor ads and pages, then beat them';
 
 export const isStudio = (p: Pack) => !!p.spec || !!p.pipeline;
 

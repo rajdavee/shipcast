@@ -1,0 +1,17 @@
+{
+  "id": "teardown",
+  "name": "Competitor teardown",
+  "tagline": "Paste competitor ads, pages or posts — get hook, structure, offer and CTA broken down, the gaps you can own, and original briefs that beat them.",
+  "category": "copy",
+  "order": 21,
+  "estimate": "5–10 min",
+  "accent": "#7c3aed",
+  "options": [
+    { "key": "refs", "label": "Links to study (one per line or comma-separated)", "type": "text", "default": "", "placeholder": "https://competitor.com, https://www.linkedin.com/posts/…" }
+  ],
+  "outputs": ["teardown.md", "briefs.json", "refs/*", "*.md"],
+  "skills": [],
+  "tools": ["chrome"],
+  "roles": ["copy", "social"],
+  "timeoutMinutes": 30
+}

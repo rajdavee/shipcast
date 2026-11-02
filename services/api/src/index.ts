@@ -359,6 +359,14 @@ const PROVIDERS: Record<string, { label: string; check?: (key: string) => Promis
       if (!r.ok) throw new Error(`Replicate check failed (${r.status})`);
     },
   },
+  youtube: {
+    label: 'YouTube Data API',
+    check: async (key) => {
+      const r = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=id&chart=mostPopular&maxResults=1&key=${encodeURIComponent(key)}`, { signal: AbortSignal.timeout(15_000) });
+      if (r.status === 400 || r.status === 403) throw new Error('YouTube rejected that API key');
+      if (!r.ok) throw new Error(`YouTube check failed (${r.status})`);
+    },
+  },
   freesound: {
     label: 'Freesound',
     check: async (key) => {

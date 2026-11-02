@@ -334,6 +334,7 @@ function BrollSection() {
 const ENGINES: { id: string; title: string; what: string; where: string }[] = [
   { id: 'fal', title: 'fal.ai — generative video & images', what: 'Any shot no other engine can make: cinematic, painted or anime-style scenes (Wan, Kling, Veo, FLUX). You pay fal per clip.', where: 'fal.ai/dashboard/keys' },
   { id: 'replicate', title: 'Replicate — generative images (and video by model)', what: 'A second catalogue of open models, used when fal isn’t connected.', where: 'replicate.com/account/api-tokens' },
+  { id: 'youtube', title: 'YouTube Data API — trend research', what: 'Lets the Trend brief see which recent videos in your niche get views (free, 10,000 units a day).', where: 'console.cloud.google.com → APIs → YouTube Data API v3 → Credentials' },
   { id: 'freesound', title: 'Freesound — sound effects (CC0 only)', what: 'Whooshes, footsteps, magic, crowds — only public-domain sounds are used.', where: 'freesound.org/apiv2/apply' },
 ];
 
