@@ -1,0 +1,20 @@
+{
+  "id": "landing",
+  "name": "Landing page",
+  "tagline": "A responsive landing page in your brand — standalone HTML/CSS, section snippets for any site builder, a copy deck and desktop and phone previews.",
+  "category": "design",
+  "order": 11,
+  "estimate": "4–8 min",
+  "accent": "#5b3df5",
+  "spec": "landing",
+  "options": [
+    { "key": "type", "label": "Page", "type": "select", "choices": ["product", "waitlist", "feature", "event"], "default": "product" },
+    { "key": "goal", "label": "Primary action", "type": "text", "default": "", "placeholder": "e.g. Book a demo, Start free, Join the waitlist" },
+    { "key": "theme", "label": "Theme", "type": "select", "choices": ["auto", "brand", "light", "dark"], "default": "auto" }
+  ],
+  "outputs": ["landing/**/*", "landing.zip", "landing-desktop.png", "landing-mobile.png", "landing-copy.md", "landing.json", "*.md"],
+  "skills": [],
+  "tools": ["chrome"],
+  "roles": ["design-taste", "copy", "humanize"],
+  "timeoutMinutes": 30
+}

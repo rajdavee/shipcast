@@ -5,6 +5,7 @@ import { assertInHome, browser, writePptx, type PptxSlide, createService, FIT_SC
 import { CAROUSEL_LAYOUTS, carouselIconNames, renderCarouselSlide, THEMES } from './templates/carousel.ts';
 import type { RenderCtx } from './templates/common.ts';
 import { CARD_LAYOUTS, renderCard, renderThumbnail, THUMBNAIL_LAYOUTS } from './templates/graphics.ts';
+import { landingIconNames, renderLanding, type LandingSpec } from './templates/landing.ts';
 import { checkEmail, renderEmail, type EmailSetSpec } from './templates/email.ts';
 import { AD_SIZES, DEFAULT_AD_SIZES, renderAd, type AdSpec } from './templates/ads.ts';
 import { HIDE_TEXT_CSS, MEASURE_TEXT_SCRIPT, renderSlide, SLIDE_LAYOUTS, SLIDE_THEMES, slideIconNames, type SlidePage } from './templates/slides.ts';
@@ -170,6 +171,45 @@ export function createStillsService() {
         slides: { themes: Object.fromEntries(Object.entries(SLIDE_THEMES).map(([k, v]) => [k, v.label])), layouts: SLIDE_LAYOUTS.map(({ html, ...l }) => l) },
         document: { themes: Object.fromEntries(Object.entries(DOC_THEMES).map(([k, v]) => [k, v.label])), sizes: Object.fromEntries(Object.entries(PAGE_SIZES).map(([k, v]) => [k, v.label])), layouts: DOC_LAYOUTS.map(({ html, ...l }) => l) },
       }),
+
+      /** Landing-page sections → a standalone responsive page, per-section snippets, a copy deck and previews. */
+      landing: async (input: LandingSpec & { brandDir?: string; brand?: Partial<BrandKit>; outDir: string }, ctx) => {
+        const outDir = assertInHome(input.outDir, 'outDir');
+        const { brand, assetsDir } = await brandFrom(input);
+        if (!Array.isArray(input.sections) || !input.sections.length) throw new Error('sections are required');
+        const names = landingIconNames(input);
+        const icons = names.length ? await resolveIcons(names) : {};
+        const r = renderLanding(input, brand, (p) => (p.startsWith('/') ? p : join(assetsDir ?? outDir, p)), icons);
+        const dir = join(outDir, 'landing');
+        await mkdir(join(dir, 'images'), { recursive: true });
+        await mkdir(join(dir, 'sections'), { recursive: true });
+        const problems: string[] = [];
+        for (const im of r.images) await copyFile(im.src, join(dir, im.name)).catch(() => problems.push(`image ${im.src} not found`));
+        const index = join(dir, 'index.html');
+        await writeFile(index, r.html);
+        const css = r.html.match(/<style>([\s\S]*?)<\/style>/)?.[1] ?? '';
+        await writeFile(join(dir, 'styles.css'), css);
+        for (const [i, sec] of r.sections.entries()) await writeFile(join(dir, 'sections', `${String(i + 1).padStart(2, '0')}-${sec.type}.html`), `<!-- Needs styles.css from this folder (or paste its rules into your site). -->\n${sec.html}\n`);
+        await writeFile(join(outDir, 'landing-copy.md'), r.copy + '\n');
+        const previews: Record<string, string> = {};
+        for (const [view, opts] of [['desktop', { width: 1440, height: 900, scale: 1 }], ['mobile', { width: 390, height: 844, scale: 2, mobile: true }]] as const) {
+          ctx.progress(view === 'desktop' ? 0.3 : 0.7, `${view} preview`);
+          const pg = await browser().open(pathToFileURL(index).href, { ...opts, settleMs: 300 });
+          try {
+            await pg.eval('document.fonts.ready.then(() => true)');
+            const audit = await pg.eval<{ wide: boolean; broken: number; tiny: number }>(`(() => ({ wide: document.documentElement.scrollWidth > innerWidth + 2, broken: [...document.images].filter((i) => !i.complete || !i.naturalWidth).length, tiny: [...document.querySelectorAll('p,li,a,dd,summary')].filter((e) => e.offsetParent && parseFloat(getComputedStyle(e).fontSize) < 13).length }))()`);
+            if (audit.wide) problems.push(`${view}: the page scrolls sideways — something is wider than the screen.`);
+            if (audit.broken) problems.push(`${view}: ${audit.broken} image(s) didn't load — check the paths.`);
+            if (view === 'mobile' && audit.tiny) problems.push(`mobile: ${audit.tiny} text element(s) under 13px.`);
+            previews[view] = join(outDir, `landing-${view}.png`);
+            await writeFile(previews[view], await pg.fullPage(16000));
+          } finally {
+            await pg.close();
+          }
+        }
+        await run('zip', ['-qr', join(outDir, 'landing.zip'), '.'], { cwd: dir });
+        return { index, previews, zip: join(outDir, 'landing.zip'), sections: r.sections.map((x) => x.type), problems };
+      },
 
       /** Marketing emails: inbox-safe HTML + plain text + images folder + zip, with desktop/phone previews and deliverability checks. */
       email: async (input: EmailSetSpec & { brandDir?: string; brand?: Partial<BrandKit>; outDir: string }, ctx) => {

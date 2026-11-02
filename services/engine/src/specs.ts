@@ -13,9 +13,9 @@ import { KNOWN_ICONS } from './icons.ts';
  * actionable feedback.
  */
 
-export type SpecKind = 'deck' | 'graphics' | 'storyboard' | 'infographic' | 'document' | 'slides' | 'ads' | 'email';
+export type SpecKind = 'deck' | 'graphics' | 'storyboard' | 'infographic' | 'document' | 'slides' | 'ads' | 'email' | 'landing';
 
-export const SPEC_FILE: Record<SpecKind, string> = { deck: 'deck.json', graphics: 'graphics.json', storyboard: 'storyboard.json', infographic: 'infographic.json', document: 'document.json', slides: 'slides.json', ads: 'ads.json', email: 'email.json' };
+export const SPEC_FILE: Record<SpecKind, string> = { deck: 'deck.json', graphics: 'graphics.json', storyboard: 'storyboard.json', infographic: 'infographic.json', document: 'document.json', slides: 'slides.json', ads: 'ads.json', email: 'email.json', landing: 'landing.json' };
 
 type FieldDoc = { id: string; type: string; label: string; optional?: boolean; max?: number; help?: string; choices?: string[] };
 const fieldLine = (f: FieldDoc) =>
@@ -76,6 +76,27 @@ export async function catalogMarkdown(kind: SpecKind): Promise<string> {
       '',
       '## Layouts',
       ...c.document.layouts.map((l: any) => `### \`${l.id}\` — ${l.label}\n${l.use}\n${l.fields.map(fieldLine).join('\n')}`),
+    ].join('\n');
+  }
+  if (kind === 'landing') {
+    return [
+      '# Landing page catalog',
+      '',
+      'Spec: `{ "title": "<title tag>", "description": "<meta description ≤ 155 chars>", "theme": "light|dark|brand", "nav": [{"label","href":"#features"}], "sections": [ … ], "footer"? }`',
+      '',
+      '## Sections (use 5–9, hero first, cta last)',
+      '- `hero` — `eyebrow?`, `headline` (≤ 10 words, the outcome), `sub` (≤ 30 words), `cta`, `url`, `secondary?`, `secondaryUrl?`, `note?` ("No credit card"), `image` (real screenshot), `alt`',
+      '- `logos` — `heading?` ("Works with" / "Trusted by" — real only), `items` (brand names; known logos render as images)',
+      '- `features` — `eyebrow?`, `heading`, `sub?`, `items`: ["icon | title | body", 3–6]',
+      '- `media` — `eyebrow?`, `heading`, `body`, `points?`, `image`, `alt`, `side`: "left|right" (screenshot beside copy)',
+      '- `how` — `eyebrow?`, `heading`, `sub?`, `steps`: ["title | body", 3–5]',
+      '- `stats` — `heading?`, `stats`: ["value | label | source", ≤ 4] — verified only',
+      '- `testimonials` — `heading?`, `items`: ["quote | name | role, company", ≤ 3] — real people only',
+      '- `comparison` — `heading`, `leftTitle`, `left`, `rightTitle`, `right`',
+      '- `pricing` — `heading`, `sub?`, `url`, `cta?`, `tiers`: ["*name | price | note | feature; feature | button text"] (leading * = recommended) — real prices only',
+      '- `faq` — `heading?`, `items`: ["question | answer", 4–8] — answer real objections',
+      '- `cta` — `heading`, `sub?`, `cta`, `url`, `note?`',
+      'Rich text: `*word*` accent · `**word**` bold. Icons: brand names or plain icon words ("shield-check"). Images: paths relative to the brief folder.',
     ].join('\n');
   }
   if (kind === 'email') {
@@ -208,6 +229,10 @@ export async function renderSpec(kind: SpecKind, cwd: string, briefDir: string, 
     if (kind === 'document') {
       const r = await callService('stills', 'document', { ...spec, brandDir: briefDir, outDir: out, name: 'document' });
       return { ok: !r.problems.length, feedback: r.problems, summary: `${r.pages.length}-page PDF` };
+    }
+    if (kind === 'landing') {
+      const r = await callService('stills', 'landing', { ...spec, brandDir: briefDir, outDir: out });
+      return { ok: !r.problems.length, feedback: r.problems, summary: `landing page · ${r.sections.length} sections` };
     }
     if (kind === 'email') {
       const r = await callService('stills', 'email', { ...spec, brandDir: briefDir, outDir: out });

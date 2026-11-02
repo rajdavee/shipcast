@@ -178,3 +178,24 @@ test('stills renders inbox-safe email: HTML, text, zip, previews and deliverabil
   assert.match(p, /spam-trigger/);
   assert.match(p, /postal address/);
 });
+
+test('stills renders a landing page: page, snippets, copy deck, previews, no sideways scroll', { skip: !hasChrome && 'no Chrome' }, async () => {
+  const out = join(home, 'landing');
+  const job = await run('landing', {
+    title: 'Acme — invoices paid sooner',
+    theme: 'light',
+    brand: { name: 'Acme', colors: { background: '#ffffff', primary: '#3355ff' } },
+    outDir: out,
+    sections: [
+      { type: 'hero', headline: 'Get paid *sooner*', sub: 'Invoices that chase themselves.', cta: 'Start free', url: 'https://acme.test' },
+      { type: 'features', heading: 'Why teams switch', items: ['clock | Faster | Two days sooner.', 'shield-check | Safer | Bank-grade.', 'smile | Simpler | No setup.'] },
+      { type: 'faq', items: ['Is there a free plan? | Yes, forever.'] },
+      { type: 'cta', heading: 'Try it', cta: 'Start free', url: 'https://acme.test' },
+    ],
+  });
+  assert.equal(job.status, 'done', job.error);
+  assert.deepEqual(job.output.problems, []);
+  const fs = await import('node:fs');
+  assert.match(fs.readFileSync(join(out, 'landing', 'index.html'), 'utf8'), /<details><summary>Is there a free plan\?/);
+  assert.ok(existsSync(join(out, 'landing', 'sections', '02-features.html')) && existsSync(join(out, 'landing.zip')) && existsSync(join(out, 'landing-mobile.png')));
+});
