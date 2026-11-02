@@ -39,7 +39,7 @@ specific and varied:
   (`stat`, `chart`), real tools (`logos`), real commands (`terminal`).
 - Mix energy: calm explanation scenes, then a `kinetic` or `stack3d` beat.
 - Vary transitions; `fade` into chapters is automatic via chapter cards.
-- `broll` scenes (real stock footage behind one line) add texture to long videos — give a concrete visual `query`; about 1 in 4–6 scenes at most. Without a Pexels key they become cinematic shots automatically, so they're always safe.
+- `broll` scenes (real stock footage behind one line) add texture to long videos — give a concrete visual `query`; about 1 in 4–6 scenes at most. Without a stock key they become cinematic shots automatically, so they're always safe.
 
 ## Output
 

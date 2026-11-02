@@ -123,7 +123,7 @@ test('media.mjs refuses explicit prompts and explains missing keys', async () =>
   assert.match(bad.stderr, /sexual or explicit/);
   const nokey = await spawnCollect('node', [cli, 'stock', 'video', 'ocean waves'], { env });
   assert.equal(nokey.code, 2);
-  assert.match(nokey.stderr, /Pexels/);
+  assert.match(nokey.stderr, /Pixabay/);
   const st = JSON.parse((await spawnCollect('node', [cli, 'status'], { env })).stdout);
   assert.equal(st.generative.available, false);
   assert.ok(st.always.length >= 5);

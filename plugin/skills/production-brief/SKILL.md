@@ -73,7 +73,7 @@ serif for documentary…).
 |---|---|
 | `cartoon-kit` | original 2D characters (kids, robots, animals, creatures) acting, emoting, walking, flying, talking; illustrated worlds; magic effects |
 | `motion` | design-led motion graphics, kinetic type, title sequences, abstract visuals, particles, light, shaders |
-| `stock` | real footage/photos of real things (cities, nature, food, people working, sport) — needs a free Pexels key; otherwise skip |
+| `stock` | real footage/photos of real things (cities, nature, food, people working, sport) — needs a free Pixabay key (Unsplash/Pexels also work); otherwise skip |
 | `generative` | photoreal or painted shots no other engine can make (needs the user's fal/Replicate key or local ComfyUI; check availability before relying on it) |
 | `type` | lyrics, quotes, word-synced captions to a voice or song |
 | `data` | charts, maps, timelines, comparisons, maths |

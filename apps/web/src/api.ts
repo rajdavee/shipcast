@@ -127,6 +127,13 @@ export interface VoiceState {
   error?: string;
 }
 
+export type StockProvider = 'pixabay' | 'unsplash' | 'pexels';
+export interface StockState {
+  connected: boolean;
+  photos: boolean;
+  providers: Record<StockProvider, boolean>;
+}
+
 export const api = {
   status: () => call<Status>('GET', '/api/status'),
   doctor: () => call<Check[]>('GET', '/api/doctor'),
@@ -152,9 +159,9 @@ export const api = {
   providers: () => call<Record<string, { label: string; connected: boolean }>>('GET', '/api/providers'),
   saveProvider: (id: string, apiKey: string) => call<{ connected: boolean }>('PUT', `/api/providers/${id}`, { apiKey }),
   removeProvider: (id: string) => call<{ connected: boolean }>('DELETE', `/api/providers/${id}`),
-  broll: () => call<{ connected: boolean }>('GET', '/api/broll'),
-  saveBroll: (apiKey: string) => call<{ connected: boolean }>('PUT', '/api/broll', { apiKey }),
-  disconnectBroll: () => call<{ connected: boolean }>('DELETE', '/api/broll'),
+  broll: () => call<StockState>('GET', '/api/broll'),
+  saveBroll: (provider: StockProvider, apiKey: string) => call<StockState>('PUT', '/api/broll', { provider, apiKey }),
+  disconnectBroll: (provider: StockProvider) => call<StockState>('DELETE', `/api/broll/${provider}`),
   saveSettings: (s: Partial<Settings>) => call<Settings>('PUT', '/api/settings', s),
   campaigns: () => call<Campaign[]>('GET', '/api/campaigns'),
   campaign: (id: string) => call<Campaign>('GET', `/api/campaigns/${id}`),

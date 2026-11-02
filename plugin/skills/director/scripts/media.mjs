@@ -64,7 +64,11 @@ async function credit(line) {
 async function status() {
   const comfy = await fetch('http://127.0.0.1:8188/system_stats', { signal: AbortSignal.timeout(1500) }).then((r) => r.ok).catch(() => false);
   const s = {
-    stock: { available: !!key('pexels'), provider: 'pexels', note: key('pexels') ? 'real footage and photos' : 'add a free Pexels key in Setup to use real footage' },
+    stock: (() => {
+      const video = STOCK_ORDER.video.filter((p) => key(p));
+      const image = STOCK_ORDER.image.filter((p) => key(p));
+      return { available: image.length > 0, video: video.length > 0, providers: { video, image }, note: video.length ? 'real footage and photos' : image.length ? 'real photos only (add Pixabay for footage)' : 'add a free Pixabay key in Setup to use real footage and photos' };
+    })(),
     generative: {
       available: !!(key('fal') || key('replicate')),
       provider: key('fal') ? 'fal' : key('replicate') ? 'replicate' : null,
@@ -78,44 +82,118 @@ async function status() {
   console.log(JSON.stringify(s, null, 2));
 }
 
-// ── stock (Pexels) ───────────────────────────────────────────────────────
-async function stock(kind, query) {
-  const k = key('pexels');
-  guard(query);
-  if (!k) die('No Pexels key. Add one in Shipcast Setup → Stock footage, or use another engine.', 2);
-  const orientation = String(flags.orientation || 'landscape');
-  const count = Math.min(5, Number(flags.count) || 1);
-  if (kind === 'video') {
-    const seconds = Number(flags.seconds) || 5;
-    const r = await fetch(`https://api.pexels.com/videos/search?query=${encodeURIComponent(query)}&orientation=${orientation}&size=medium&per_page=20`, { headers: { Authorization: k } });
-    if (!r.ok) die(`Pexels search failed (${r.status})`);
-    const want = orientation === 'portrait' ? 1080 : 1920;
-    const vids = ((await r.json()).videos || []).filter((v) => v.duration >= Math.min(seconds, 20));
-    let n = 0;
-    for (const v of vids) {
-      const f = (v.video_files || []).filter((x) => x.file_type === 'video/mp4' && x.width).sort((a, b) => Math.abs(a.width - want) - Math.abs(b.width - want))[0];
-      if (!f) continue;
-      const file = join(out, `${slug(query)}-${v.id}.mp4`);
-      if (!existsSync(file)) await download(f.link, file);
-      const c = `Video by ${v.user?.name || 'a Pexels creator'} on Pexels — ${v.url}`;
-      await credit(c);
-      emit({ file, credit: c, url: v.url, width: f.width, height: f.height, duration: v.duration });
-      if (++n >= count) break;
+// ── stock (Pixabay first, then Unsplash for photos, then Pexels) ────────────
+// Pixabay: videos + photos, free for commercial use, no attribution required (we still credit).
+// Unsplash: photos only; its guidelines ask for credit and a ping to download_location.
+// Hotlinking is not allowed by Pixabay, so every file is downloaded into --out.
+const STOCK_ORDER = { video: ['pixabay', 'pexels'], image: ['pixabay', 'unsplash', 'pexels'] };
+const fits = (w, h, orientation) => (orientation === 'portrait' ? h > w : orientation === 'square' ? Math.abs(w - h) / Math.max(w, h) < 0.2 : w > h);
+
+const STOCK = {
+  async pixabay(kind, query, k, { orientation, seconds, count }) {
+    const q = encodeURIComponent(query.slice(0, 100));
+    if (kind === 'video') {
+      const r = await fetch(`https://pixabay.com/api/videos/?key=${encodeURIComponent(k)}&q=${q}&per_page=30&safesearch=true`, { signal: AbortSignal.timeout(20_000) });
+      if (!r.ok) throw new Error(`Pixabay search failed (${r.status})`);
+      const want = orientation === 'portrait' ? 1080 : 1920;
+      const hits = ((await r.json()).hits || []).filter((v) => v.duration >= Math.min(seconds, 20));
+      const pickFile = (v) => Object.values(v.videos || {}).filter((f) => f && f.url && f.width).sort((a, b) => Math.abs(a.width - want) - Math.abs(b.width - want))[0];
+      const ranked = [...hits.filter((v) => { const f = pickFile(v); return f && fits(f.width, f.height, orientation); }), ...hits];
+      const seen = new Set();
+      const outFiles = [];
+      for (const v of ranked) {
+        if (seen.has(v.id)) continue;
+        seen.add(v.id);
+        const f = pickFile(v);
+        if (!f) continue;
+        const file = join(out, `${slug(query)}-pixabay-${v.id}.mp4`);
+        if (!existsSync(file)) await download(f.url, file);
+        outFiles.push({ file, credit: `Video by ${v.user || 'a Pixabay creator'} on Pixabay — ${v.pageURL}`, url: v.pageURL, width: f.width, height: f.height, duration: v.duration });
+        if (outFiles.length >= count) break;
+      }
+      return outFiles;
     }
-    if (!n) die(`No Pexels video for "${query}" — try a more concrete query`, 4);
-  } else {
-    const r = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&orientation=${orientation}&per_page=15`, { headers: { Authorization: k } });
-    if (!r.ok) die(`Pexels search failed (${r.status})`);
-    const photos = (await r.json()).photos || [];
-    if (!photos.length) die(`No Pexels photo for "${query}"`, 4);
-    for (const p of photos.slice(0, count)) {
+    const o = orientation === 'portrait' ? 'vertical' : orientation === 'square' ? 'all' : 'horizontal';
+    const r = await fetch(`https://pixabay.com/api/?key=${encodeURIComponent(k)}&q=${q}&image_type=photo&orientation=${o}&per_page=20&safesearch=true`, { signal: AbortSignal.timeout(20_000) });
+    if (!r.ok) throw new Error(`Pixabay search failed (${r.status})`);
+    const hits = (await r.json()).hits || [];
+    const outFiles = [];
+    for (const p of hits.slice(0, count)) {
+      const file = join(out, `${slug(query)}-pixabay-${p.id}.jpg`);
+      if (!existsSync(file)) await download(p.largeImageURL || p.webformatURL, file);
+      outFiles.push({ file, credit: `Photo by ${p.user || 'a Pixabay creator'} on Pixabay — ${p.pageURL}`, url: p.pageURL, width: p.imageWidth, height: p.imageHeight });
+    }
+    return outFiles;
+  },
+  async unsplash(kind, query, k, { orientation, count }) {
+    if (kind !== 'image') return [];
+    const o = orientation === 'portrait' ? 'portrait' : orientation === 'square' ? 'squarish' : 'landscape';
+    const auth = { Authorization: `Client-ID ${k}` };
+    const r = await fetch(`https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&orientation=${o}&per_page=15&content_filter=high`, { headers: auth, signal: AbortSignal.timeout(20_000) });
+    if (!r.ok) throw new Error(`Unsplash search failed (${r.status})`);
+    const outFiles = [];
+    for (const p of ((await r.json()).results || []).slice(0, count)) {
+      const file = join(out, `${slug(query)}-unsplash-${p.id}.jpg`);
+      if (!existsSync(file)) {
+        await download(`${p.urls.raw}&w=2400&q=85&fm=jpg`, file);
+        // Unsplash API guidelines: count the download.
+        await fetch(p.links.download_location, { headers: auth }).catch(() => {});
+      }
+      const by = p.user?.name || 'an Unsplash photographer';
+      outFiles.push({ file, credit: `Photo by ${by} on Unsplash — ${p.links.html}`, url: p.links.html, width: p.width, height: p.height });
+    }
+    return outFiles;
+  },
+  async pexels(kind, query, k, { orientation, seconds, count }) {
+    const outFiles = [];
+    if (kind === 'video') {
+      const r = await fetch(`https://api.pexels.com/videos/search?query=${encodeURIComponent(query)}&orientation=${orientation}&size=medium&per_page=20`, { headers: { Authorization: k }, signal: AbortSignal.timeout(20_000) });
+      if (!r.ok) throw new Error(`Pexels search failed (${r.status})`);
+      const want = orientation === 'portrait' ? 1080 : 1920;
+      for (const v of ((await r.json()).videos || []).filter((v) => v.duration >= Math.min(seconds, 20))) {
+        const f = (v.video_files || []).filter((x) => x.file_type === 'video/mp4' && x.width).sort((a, b) => Math.abs(a.width - want) - Math.abs(b.width - want))[0];
+        if (!f) continue;
+        const file = join(out, `${slug(query)}-${v.id}.mp4`);
+        if (!existsSync(file)) await download(f.link, file);
+        outFiles.push({ file, credit: `Video by ${v.user?.name || 'a Pexels creator'} on Pexels — ${v.url}`, url: v.url, width: f.width, height: f.height, duration: v.duration });
+        if (outFiles.length >= count) break;
+      }
+      return outFiles;
+    }
+    const r = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&orientation=${orientation}&per_page=15`, { headers: { Authorization: k }, signal: AbortSignal.timeout(20_000) });
+    if (!r.ok) throw new Error(`Pexels search failed (${r.status})`);
+    for (const p of ((await r.json()).photos || []).slice(0, count)) {
       const file = join(out, `${slug(query)}-${p.id}.jpg`);
       if (!existsSync(file)) await download(p.src.large2x || p.src.original, file);
-      const c = `Photo by ${p.photographer} on Pexels — ${p.url}`;
-      await credit(c);
-      emit({ file, credit: c, url: p.url, width: p.width, height: p.height });
+      outFiles.push({ file, credit: `Photo by ${p.photographer} on Pexels — ${p.url}`, url: p.url, width: p.width, height: p.height });
+    }
+    return outFiles;
+  },
+};
+
+async function stock(kind, query) {
+  guard(query);
+  const order = STOCK_ORDER[kind].filter((p) => key(p));
+  if (!order.length) die(`No stock ${kind === 'video' ? 'footage' : 'photo'} key. Add a free Pixabay key${kind === 'image' ? ' (or Unsplash)' : ''} in Shipcast Setup → Stock footage, or use another engine.`, 2);
+  const opts = { orientation: String(flags.orientation || 'landscape'), seconds: Number(flags.seconds) || 5, count: Math.min(5, Number(flags.count) || 1) };
+  const errors = [];
+  for (const p of order) {
+    try {
+      const files = await STOCK[p](kind, query, key(p), opts);
+      if (!files.length) {
+        errors.push(`${p}: nothing for "${query}"`);
+        continue;
+      }
+      for (const f of files) {
+        await credit(f.credit);
+        emit({ ...f, provider: p });
+      }
+      return;
+    } catch (e) {
+      errors.push(`${p}: ${e.message}`);
     }
   }
+  die(`No stock ${kind} for "${query}" (${errors.join('; ')}) — try a more concrete query`, 4);
 }
 
 // ── generative (fal.ai queue API, or Replicate) ──────────────────────────

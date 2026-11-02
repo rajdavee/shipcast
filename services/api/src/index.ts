@@ -64,6 +64,8 @@ import {
   chatterboxReady,
   brainstorm,
   pexelsCheck,
+  pixabayCheck,
+  unsplashCheck,
   getSecret,
   setSecret,
 } from '@shipcast/engine';
@@ -262,27 +264,43 @@ router.delete('/api/voice/elevenlabs', async () => {
   return { provider: 'kokoro', connected: false };
 });
 
-// ── stock B-roll (optional: your own free Pexels key) ─────────────────
-router.get('/api/broll', async () => ({ connected: !!(await getSecret('pexels')) }));
+// ── stock footage and photos (optional: your own free keys; Pixabay first) ──
+const STOCK_CHECKS: Record<string, (key: string) => Promise<void>> = { pixabay: pixabayCheck, unsplash: unsplashCheck, pexels: pexelsCheck };
+const stockState = async () => {
+  const providers: Record<string, boolean> = {};
+  for (const id of Object.keys(STOCK_CHECKS)) providers[id] = !!(await getSecret(id));
+  return { connected: providers.pixabay || providers.pexels, photos: Object.values(providers).some(Boolean), providers };
+};
+router.get('/api/broll', () => stockState());
 router.put('/api/broll', async (req) => {
   const b = await readJson(req);
+  const provider = typeof b.provider === 'string' ? b.provider : 'pixabay';
+  const check = STOCK_CHECKS[provider];
+  if (!check) throw new HttpError(400, 'provider must be pixabay, unsplash or pexels');
   const key = typeof b.apiKey === 'string' ? b.apiKey.trim() : '';
   if (!key) throw new HttpError(400, 'apiKey is required');
   try {
-    await pexelsCheck(key);
+    await check(key);
   } catch (e) {
     throw new HttpError(400, (e as Error).message);
   }
-  await setSecret('pexels', key);
-  return { connected: true };
+  await setSecret(provider, key);
+  return stockState();
+});
+router.delete('/api/broll/:provider', async (_q, _r, p) => {
+  if (!STOCK_CHECKS[p.provider]) throw new HttpError(404, 'unknown provider');
+  await setSecret(p.provider, null);
+  return stockState();
 });
 router.delete('/api/broll', async () => {
   await setSecret('pexels', null);
-  return { connected: false };
+  return stockState();
 });
 
 // ── media engines for "Anything": stock, generative, sound effects (all optional, your own keys) ──
 const PROVIDERS: Record<string, { label: string; check?: (key: string) => Promise<void> }> = {
+  pixabay: { label: 'Pixabay', check: pixabayCheck },
+  unsplash: { label: 'Unsplash', check: unsplashCheck },
   pexels: { label: 'Pexels', check: pexelsCheck },
   fal: { label: 'fal.ai' },
   replicate: {

@@ -168,7 +168,7 @@ reel — and Shipcast reads it as content, writes a production brief (genre,
 beats with timings, look, sound, original characters, sources for facts) and a
 director picks the engine for each shot: original rigged cartoon characters and
 illustrated worlds, motion graphics and kinetic type, charts and maps, live
-captures, your uploads — plus real footage (Pexels), generated shots (fal.ai or
+captures, your uploads — plus real footage (Pixabay, Unsplash or Pexels), generated shots (fal.ai or
 Replicate) and CC0 sound effects (Freesound) when you connect your own keys.
 
 <p align="center">

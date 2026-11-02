@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api, type LoginState, type Settings, type Status } from '../api.ts';
+import { api, type LoginState, type Settings, type Status, type StockProvider } from '../api.ts';
 import { toast, useLoad } from '../hooks.ts';
 
 const NAMES: Record<string, string> = { render: 'Video renderer', stills: 'Image & PDF renderer', media: 'Voice, captions & music', qa: 'Quality checks' };
@@ -289,31 +289,43 @@ function VoiceSection() {
   );
 }
 
-/** Optional stock footage for B-roll scenes, with the user's own free Pexels key. */
+const STOCK: { id: StockProvider; title: string; what: string; where: string }[] = [
+  { id: 'pixabay', title: 'Pixabay — footage and photos', what: 'Recommended. Free for commercial use, no attribution needed. Used first for B-roll and photos.', where: 'pixabay.com/api/docs (log in, the key is on that page)' },
+  { id: 'unsplash', title: 'Unsplash — photos', what: 'High-end photography. Photos only; credits are written next to each video.', where: 'unsplash.com/oauth/applications → Access Key' },
+  { id: 'pexels', title: 'Pexels — footage and photos', what: 'Used when Pixabay has nothing for a shot.', where: 'pexels.com/api' },
+];
+
+/** Optional stock footage and photos for B-roll scenes, with the user's own free keys. */
 function BrollSection() {
   const b = useLoad(() => api.broll());
-  const [key, setKey] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [keys, setKeys] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState<string | null>(null);
   return (
     <section className="setup-section">
       <h2>Stock footage</h2>
-      <p>Long videos and stories can use real B-roll. Add a free Pexels API key (pexels.com/api) — clips download to this computer, and credits are written next to each video.</p>
+      <p>Long videos and stories can use real B-roll and photos. Add a free key — clips download to this computer, and credits are written next to each video. Without one, B-roll scenes become cinematic shots instead.</p>
       <div className="rows">
-        <div className="srow">
-          <i className={`dot ${b.data?.connected ? 'ok' : ''}`} />
-          <div>
-            <h3>Pexels</h3>
-            <p>{b.data?.connected ? 'Connected — B-roll scenes use real footage.' : 'Not connected — B-roll scenes become cinematic shots instead.'}</p>
-          </div>
-          {b.data?.connected ? (
-            <button className="btn ghost" onClick={async () => { await api.disconnectBroll(); await b.reload(); toast('Pexels disconnected'); }}>Disconnect</button>
-          ) : (
-            <form className="row-actions" onSubmit={async (e) => { e.preventDefault(); if (!key.trim()) return; setBusy(true); try { await api.saveBroll(key.trim()); await b.reload(); setKey(''); toast('Pexels connected'); } catch (err) { toast(String((err as Error).message)); } finally { setBusy(false); } }}>
-              <input className="input" type="password" autoComplete="off" placeholder="Pexels API key" value={key} onChange={(e) => setKey(e.target.value)} style={{ width: 220 }} aria-label="Pexels API key" />
-              <button className="btn primary" disabled={busy || !key.trim()}>{busy ? 'Checking…' : 'Connect'}</button>
-            </form>
-          )}
-        </div>
+        {STOCK.map((s) => {
+          const on = !!b.data?.providers?.[s.id];
+          const key = keys[s.id] ?? '';
+          return (
+            <div className="srow" key={s.id}>
+              <i className={`dot ${on ? 'ok' : ''}`} />
+              <div>
+                <h3>{s.title}</h3>
+                <p>{on ? `Connected — ${s.what}` : `${s.what} Key: ${s.where}`}</p>
+              </div>
+              {on ? (
+                <button className="btn ghost" onClick={async () => { await api.disconnectBroll(s.id); await b.reload(); toast(`${s.title.split(' —')[0]} disconnected`); }}>Disconnect</button>
+              ) : (
+                <form className="row-actions" onSubmit={async (e) => { e.preventDefault(); if (!key.trim()) return; setBusy(s.id); try { await api.saveBroll(s.id, key.trim()); await b.reload(); setKeys((k) => ({ ...k, [s.id]: '' })); toast(`${s.title.split(' —')[0]} connected`); } catch (err) { toast(String((err as Error).message)); } finally { setBusy(null); } }}>
+                  <input className="input" type="password" autoComplete="off" placeholder="API key" value={key} onChange={(e) => setKeys((k) => ({ ...k, [s.id]: e.target.value }))} style={{ width: 220 }} aria-label={`${s.title} API key`} />
+                  <button className="btn primary" disabled={busy === s.id || !key.trim()}>{busy === s.id ? 'Checking…' : 'Connect'}</button>
+                </form>
+              )}
+            </div>
+          );
+        })}
       </div>
     </section>
   );
@@ -333,7 +345,7 @@ function EnginesSection() {
   return (
     <section className="setup-section">
       <h2>Media engines for “Anything”</h2>
-      <p>Optional. With these, Shipcast can make any kind of video — real footage (Pexels above), generated shots and sound effects. Keys stay on this computer; nothing is generated without one.</p>
+      <p>Optional. With these, Shipcast can make any kind of video — real footage (stock above), generated shots and sound effects. Keys stay on this computer; nothing is generated without one.</p>
       <div className="rows">
         {ENGINES.map((e) => {
           const on = !!p.data?.[e.id]?.connected;

@@ -65,7 +65,7 @@ export interface Compiled {
   captions?: string;
   words: Word[];
   preset: PlatformPreset;
-  /** Attribution lines for stock footage used (Pexels asks for credit). */
+  /** Attribution lines for stock footage used (we credit every clip, whichever provider). */
   credits: string[];
 }
 

@@ -667,7 +667,7 @@ for(let s=1;s<n;s++){const t=.4+s*${slot.toFixed(2)};
   {
     id: 'broll',
     label: 'Stock B-roll',
-    use: 'Real stock footage behind one line, for long videos and stories (a city at night, hands typing, a crowded inbox). Give a concrete visual search `query`. Needs a Pexels key in Setup; otherwise it becomes a cinematic shot automatically. Use sparingly: max ~1 in 4 scenes.',
+    use: 'Real stock footage behind one line, for long videos and stories (a city at night, hands typing, a crowded inbox). Give a concrete visual search `query`. Needs a stock key (Pixabay, or Pexels) in Setup; otherwise it becomes a cinematic shot automatically. Use sparingly: max ~1 in 4 scenes.',
     minSeconds: 3,
     fields: [
       { id: 'query', type: 'text', label: 'Footage search', max: 60, help: 'Concrete and visual: "developer typing at night", "busy train station"' },
