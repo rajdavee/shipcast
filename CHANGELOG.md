@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased — sprint v5: every marketing material
+
+- **Brand voice** — learn a voice from your own copy or links; sliders, lexicon, claims and per-channel rules; every asset scored and fixed against it; *Check any copy* with one-click rewrite.
+- **Presentation** — designed 16:9 decks as PDF and an editable PPTX (real text boxes over the design, speaker notes), written by Shipcast's own OOXML writer.
+- **PDF documents** — one-pagers, sales sheets, case studies, datasheets, ebooks, whitepapers and reports with contents, running heads, SVG charts, tables and a per-page overflow / empty-page audit.
+- **Ad sets** — hook variants × 13 placement sizes with auto-fitting type, disclosure lines and an ads.csv upload sheet.
+- **Email** — inbox-safe HTML (tables, inline styles, Outlook buttons, dark-mode hints), plain text, subject/preview variants, upload zip, and checks for Gmail clipping, spam phrasing, links and the postal address.
+- **Landing pages** — responsive page, per-section snippets, copy deck, phone/desktop previews.
+- **Print** — posters, flyers, roll-ups and booth banners with bleed and crop marks.
+- **UGC ad** — a labelled synthetic presenter for hook and CTA, real screens in between, one voice throughout.
+- **Trend brief and competitor teardown** — evidence-backed signals and original briefs; optional YouTube Data API key.
+- **Gen service** — model registry with real prices and licences, router by tier, safety guard, budgets, cache, disclosure sidecars, free placeholder mode.
+- **Zoomed screenshots** — `#crop=x,y,w,h` on any image path, in every format.
+- **Eval** — `node tools/eval.ts <campaign…>` scores finished work on a creative-director rubric.
+- **Fixes** — the supervisor restarts each service once with backoff and waits out a taken port (it could multiply renders before); content prompts pick Anything reliably; stock footage from Pixabay and Unsplash (Pexels as fallback).
+
 ## 1.1.0 — 2026-11-02
 
 Anything: make any kind of video, not just launch content.

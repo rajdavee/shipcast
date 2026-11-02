@@ -7,7 +7,7 @@
 <p align="center">
   <b>Paste a link. Get a launch.</b><br />
   A local-first studio that turns a website or a GitHub repo into a full campaign —<br />
-  launch videos, motion graphics, reels, carousels, thumbnails and posts.
+  videos, reels, decks, PDFs, ads, emails, landing pages, print, carousels and posts, in your brand voice.
 </p>
 
 <p align="center">
@@ -23,6 +23,9 @@
 </p>
 
 <p align="center"><img src="docs/assets/carousel.jpg" alt="An 8-slide LinkedIn carousel Shipcast made about itself" width="900" /></p>
+
+<p align="center"><img src="docs/assets/materials.jpg" alt="A pitch deck, a one-pager, an ad, an email and a poster Shipcast made about itself" width="900" /><br />
+<sub>Deck slide (with editable PPTX) · one-page PDF · ad (one of 13 sizes) · email on a phone · A3 poster with bleed — all from one brief, in one brand voice.</sub></p>
 
 ---
 
@@ -137,6 +140,15 @@ re-render without another Claude run.
 | **LinkedIn Carousel** | 6–10 slides in 4 themes × 9 layouts, upload-ready PDF, animated MP4 with music, post caption |
 | **Thumbnails & Cards** | 3 YouTube thumbnails for Test & Compare, OG / GitHub cards, X & LinkedIn images, stories, banners |
 | **Launch Copy Kit** | LinkedIn posts, X thread, YouTube metadata, Product Hunt, Show HN, newsletter, ads |
+| **Presentation** | Pitch, sales, webinar, investor or board deck: 16 designed 16:9 layouts, PDF and an **editable PowerPoint** with speaker notes |
+| **PDF document** | One-pager, sales sheet, case study, datasheet, ebook, whitepaper or report — print-ready PDF with real text, contents, running heads and charts |
+| **Ad set** | One concept × 3–10 hook variants × 13 placements (Meta feed and Stories, LinkedIn, X, Google Display banners) with auto-fitting type and an upload sheet |
+| **Email** | Launch email, newsletter or nurture sequence — inbox-safe HTML for Gmail and Outlook, plain text, subject and preview variants, upload zip, deliverability checks |
+| **Landing page** | Responsive HTML/CSS page in your brand, each section as a snippet for any site builder, a copy deck, phone and desktop previews |
+| **Print** | Posters, flyers, roll-ups and booth banners — press-ready PDFs with 3 mm bleed and crop marks, high-resolution PNGs |
+| **UGC ad** | Creator-style vertical ad: a synthetic, labelled presenter delivers the hook and CTA, intercut with your real screens in the same voice |
+| **Trend brief** | What your audience is paying attention to this week — signals with evidence, formats that work, hooks, ready-to-make ideas |
+| **Competitor teardown** | Paste competitor ads or pages: hook, structure, offer, CTA, the gaps you can own, and original briefs that beat them |
 
 **Freeform formats** — Claude builds directly with the open-source
 [HyperFrames](https://github.com/heygen-com/hyperframes) and
@@ -159,6 +171,34 @@ thumbnail. Stills are audited for overflow, safe margins and minimum type size.
 Copy is checked against platform limits (LinkedIn's "see more" fold, X's 280,
 YouTube's 60-character titles) and a list of AI clichés. Problems go back to
 Claude with the fix hint; you see what passed.
+
+## Brand voice
+
+Every format writes in one voice. Paste a few paragraphs you're proud of (or
+links to your site) and Shipcast hears the voice: sliders for formal ↔ casual,
+serious ↔ playful, reserved ↔ bold, technical ↔ simple and humour; reading
+level; who speaks; words to never use and words to always use; claims you can
+back and claims you never make; emoji, hashtag and CTA policy; per-channel
+overrides (LinkedIn more formal, TikTok more casual). Every finished asset is
+scored against it — banned words, unsupported numbers and superlatives,
+placeholders, reading level — and hard misses are rewritten before you see
+them. *Check any copy* scores anything you paste and rewrites it in the voice.
+
+## Realistic people and products
+
+The `gen` service routes generated images and video to the right model for the
+shot — photoreal stills, product-in-hand edits, image-to-video with the first
+and last frame pinned, talking presenters from a portrait and a voice,
+lip-sync, upscaling, background removal — across open-weights models (FLUX.2
+klein, Qwen-Image, Wan 2.2, LTX, InfiniteTalk, SeedVR2, BiRefNet) and premium
+hosted ones (FLUX.2 Pro, Kling 3, Seedance 2), all through your own fal.ai or
+Replicate key. Packs describe **shots** (subject, motion, scene, framing,
+lens, light, look), not prompts. Before anything is spent it estimates the
+cost and enforces your caps (per project and per month, in Setup); identical
+retakes come from cache for free. It refuses sexual content, public figures
+and real people's likeness without recorded consent, and labels every
+synthetic person as AI-generated. With no key connected it draws labelled
+placeholders, so whole pipelines can be reviewed before paying for anything.
 
 ## Anything — any kind of video
 
