@@ -126,6 +126,22 @@ export interface AgentJob {
   running?: boolean;
   waiting: string;
 }
+export interface Lesson {
+  id: string;
+  pack: string;
+  category: string;
+  rule: string;
+  createdAt: string;
+  status: 'trial' | 'kept' | 'retired' | 'off';
+  baseline: { rate: number; runs: number };
+  after?: { rate: number; runs: number };
+  examples: string[];
+}
+export interface LessonsState {
+  categories: { id: string; label: string }[];
+  packs: Record<string, { runs: number; categories: Record<string, number> }>;
+  lessons: Lesson[];
+}
 export interface AgentsState {
   paused: boolean;
   quiet: { start: string; end: string };
@@ -230,6 +246,8 @@ export const api = {
   agents: () => call<AgentsState>('GET', '/api/agents'),
   setAgent: (id: string, patch: { enabled?: boolean; every?: number }) => call<AgentJob[]>('PUT', `/api/agents/${id}`, patch),
   runAgent: (id: string) => call<AgentJob[]>('POST', `/api/agents/${id}/run`),
+  lessons: () => call<LessonsState>('GET', '/api/lessons'),
+  setLesson: (id: string, status: 'off' | 'trial') => call<unknown>('PUT', `/api/lessons/${id}`, { status }),
   campaigns: () => call<Campaign[]>('GET', '/api/campaigns'),
   campaign: (id: string) => call<Campaign>('GET', `/api/campaigns/${id}`),
   createCampaign: (body: unknown) => call<Campaign>('POST', '/api/campaigns', body),

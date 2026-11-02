@@ -208,3 +208,12 @@ test('background agents: list, switch off, change cadence, run now, settings', a
   assert.equal(s.body.agentsQuietStart, '22:30');
   assert.equal((await api('/api/agents')).body.jobs[0].waiting, 'Background agents are paused.');
 });
+
+test('lessons: list with per-format stats, and switch one off', async () => {
+  const r = await api('/api/lessons');
+  assert.equal(r.status, 200);
+  assert.ok(r.body.categories.some((c: any) => c.id === 'tiny-screenshot'));
+  assert.deepEqual(r.body.lessons, []);
+  assert.equal((await api('/api/lessons/nope', { method: 'PUT', json: { status: 'off' } })).status, 404);
+  assert.equal((await api('/api/lessons/nope', { method: 'PUT', json: { status: 'kept' } })).status, 400);
+});

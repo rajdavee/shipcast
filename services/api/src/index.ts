@@ -9,6 +9,10 @@ import { pipeline } from 'node:stream/promises';
 import {
   appendEvent,
   blockedReason,
+  CATEGORIES,
+  collectIncidents,
+  readLessons,
+  setLessonStatus,
   claudeRunsToday,
   readJobs,
   readRuns,
@@ -257,6 +261,33 @@ router.put('/api/agents/:id', async (req, _r, p) => {
   if (Number.isFinite(body.every)) patch.every = Number(body.every);
   try {
     return await updateJob(p.id, patch);
+  } catch (e) {
+    throw new HttpError(404, (e as Error).message);
+  }
+});
+// ── learning loop: lessons per format, with the incidents behind them ──
+router.get('/api/lessons', async () => {
+  const lessons = await readLessons();
+  const { incidents, runs } = await collectIncidents();
+  const packs: Record<string, { runs: number; categories: Record<string, number> }> = {};
+  for (const [p, r] of Object.entries(runs)) packs[p] = { runs: r.length, categories: {} };
+  for (const i of incidents) {
+    if (i.category === 'infra') continue;
+    const p = (packs[i.pack] ??= { runs: 0, categories: {} });
+    p.categories[i.category] = (p.categories[i.category] ?? 0) + 1;
+  }
+  const byId = new Map(incidents.map((i) => [i.id, i]));
+  return {
+    categories: CATEGORIES.map(({ id, label }) => ({ id, label })),
+    packs,
+    lessons: lessons.map((l) => ({ ...l, examples: l.evidence.map((id) => byId.get(id)?.text).filter(Boolean).slice(0, 3) })),
+  };
+});
+router.put('/api/lessons/:id', async (req, _r, p) => {
+  const { status } = await readJson(req);
+  if (status !== 'off' && status !== 'trial') throw new HttpError(400, 'status must be "off" or "trial"');
+  try {
+    return await setLessonStatus(p.id, status);
   } catch (e) {
     throw new HttpError(404, (e as Error).message);
   }
