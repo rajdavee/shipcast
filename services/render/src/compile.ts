@@ -459,7 +459,9 @@ function esc(s: string) {
 
 export const extOf = (f: string) => extname(f).slice(1).toLowerCase();
 
-const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9' ]+/g, ' ').split(/\s+/).filter((w) => w.length > 2);
+// Light stemming so "who's making" matches "who makes" on screen.
+const stem = (w: string) => w.replace(/'(s|re|ve|ll|d)$/, '').replace(/(ing|es|ed|s)$/, (m, _x, i) => (i >= 3 ? '' : m));
+const norm = (s: string) => s.toLowerCase().replace(/[’]/g, "'").replace(/[^a-z0-9' ]+/g, ' ').split(/\s+/).filter((w) => w.length > 2).map(stem);
 
 /** True when ≥60% of the spoken words in a scene are already on screen, so captions would only repeat them. */
 export function echoesVoice(fields: unknown, spoken: Pick<Word, 'text'>[]): boolean {

@@ -138,6 +138,7 @@ test('music follows the energy curve of the edit', () => {
 test('captions step aside when the scene already shows what the voice says', () => {
   const w = (s: string) => s.split(' ').map((text) => ({ text }));
   assert.equal(echoesVoice({ headline: 'Shipped it. Now who makes the launch video?' }, w('Shipped it. Now who makes the launch video?')), true);
+  assert.equal(echoesVoice({ lines: ['Shipped it.', 'Now who makes', '*the video?*'] }, w("Shipped it. Now who's making the launch video?")), true, 'stems and contractions match');
   assert.equal(echoesVoice({ headline: 'Eight tools.' }, w('You need eight different tools to launch one product properly')), false);
   assert.equal(echoesVoice({ image: 'shots/x.png', zoom: 1.3 }, w('Paste one link into Shipcast today')), false);
 });
