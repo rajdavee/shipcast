@@ -136,7 +136,7 @@ export const DOC_LAYOUTS: Layout[] = [
   {
     id: 'article',
     label: 'Article page',
-    use: 'The workhorse reading page: heading, body copy (markdown: blank-line paragraphs, "- " bullets, "### " subheads, "> " callouts), optional side note (a pull quote or one stat) and optional image. ~280 words max per page with an image, ~420 without; split longer text across pages. Fill the page: a page that is half empty looks unfinished.',
+    use: 'The workhorse reading page: heading, body copy (markdown: blank-line paragraphs, "- " bullets, "### " subheads, "> " callouts), optional side note (a pull quote or one stat) and optional image. ~240 words max per page with an image, ~360 without; split longer text across pages. Fill the page: a page that is half empty looks unfinished.',
     fields: [
       { id: 'heading', type: 'text', label: 'Heading', max: 80 },
       { id: 'body', type: 'longtext', label: 'Body (light markdown)', max: 3200 },
@@ -315,7 +315,7 @@ export function docIconNames(pages: DocPage[]): string[] {
 const DOC_CSS = (w: number, h: number) => `
 @page{size:${w}px ${h}px;margin:0}
 html,body{width:${w}px;height:auto!important;overflow:visible!important;background:#888}
-.pg{position:relative;width:${w}px;height:${h}px;overflow:hidden;background:var(--paper);color:var(--ink);page-break-after:always;break-after:page;padding:96px 64px 80px;font:400 15.5px/1.62 var(--font-body)}
+.pg{position:relative;width:${w}px;height:${h}px;overflow:hidden;background:var(--paper);color:var(--ink);page-break-after:always;break-after:page;padding:96px 64px 80px;font:400 16.5px/1.6 var(--font-body)}
 .pg:last-child{page-break-after:auto;break-after:auto}
 .pg-body{height:100%;display:flex;flex-direction:column;gap:24px;overflow:hidden}
 .pg-body.center{justify-content:center}

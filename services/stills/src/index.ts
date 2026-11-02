@@ -1,6 +1,7 @@
 import { copyFile, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { createHash } from 'node:crypto';
 import { assertInHome, browser, writePptx, type PptxSlide, createService, FIT_SCRIPT, run, TIDY_PAGE_SCRIPT, getPreset, layoutAuditScript, loadBrand, normalizeBrand, presetForSize, resolveIcons, SERVICE_PORTS, type BrandKit, type LayoutAudit } from '@shipcast/engine';
 import { CAROUSEL_LAYOUTS, carouselIconNames, renderCarouselSlide, THEMES } from './templates/carousel.ts';
 import type { RenderCtx } from './templates/common.ts';
@@ -50,6 +51,40 @@ export interface DeckSpec {
   preset?: string;
   handle?: string;
   slides: SlideSpec[];
+}
+
+/**
+ * Zoomed screenshots: any image path may end in "#crop=x,y,w,h" (fractions of
+ * the image). Crops are cut once with ffmpeg into the output's work folder and
+ * the spec is rewritten to point at them, so every template gets the detail
+ * that proves the point instead of a whole screen shrunk to illegibility.
+ */
+async function materializeCrops<T>(spec: T, assetsDir: string | undefined, outDir: string): Promise<T> {
+  const dir = join(outDir, 'work', 'crops');
+  const seen = new Map<string, string>();
+  const walk = async (v: unknown): Promise<unknown> => {
+    if (typeof v === 'string') {
+      const m = v.match(/^(.+\.(?:png|jpe?g|webp))#crop=([\d.]+),([\d.]+),([\d.]+),([\d.]+)$/i);
+      if (!m) return v;
+      if (seen.has(v)) return seen.get(v);
+      const src = m[1].startsWith('/') ? m[1] : join(assetsDir ?? outDir, m[1]);
+      const [x, y, w, h] = m.slice(2).map(Number).map((n) => Math.min(1, Math.max(0, n)));
+      const out = join(dir, `${createHash('sha1').update(v).digest('hex').slice(0, 12)}.png`);
+      await mkdir(dir, { recursive: true });
+      const r = await run('ffmpeg', ['-y', '-v', 'error', '-i', src, '-vf', `crop=iw*${Math.max(0.02, w)}:ih*${Math.max(0.02, h)}:iw*${x}:ih*${y},scale='min(iw*2,2400)':-2:flags=lanczos`, out]);
+      const res = r.code === 0 ? out : m[1];
+      seen.set(v, res);
+      return res;
+    }
+    if (Array.isArray(v)) return Promise.all(v.map(walk));
+    if (v && typeof v === 'object') {
+      const o: Record<string, unknown> = {};
+      for (const [k, x] of Object.entries(v)) o[k] = await walk(x);
+      return o;
+    }
+    return v;
+  };
+  return (await walk(spec)) as T;
 }
 
 async function brandFrom(input: { brandDir?: string; brand?: Partial<BrandKit> }): Promise<{ brand: BrandKit; assetsDir?: string }> {
@@ -178,6 +213,7 @@ export function createStillsService() {
       print: async (input: { pieces: (PrintSpec & { name: string })[]; brandDir?: string; brand?: Partial<BrandKit>; outDir: string }, ctx) => {
         const outDir = assertInHome(input.outDir, 'outDir');
         const { brand, assetsDir } = await brandFrom(input);
+        input = await materializeCrops(input, assetsDir, outDir);
         if (!Array.isArray(input.pieces) || !input.pieces.length) throw new Error('pieces are required');
         await mkdir(join(outDir, 'print'), { recursive: true });
         const results = [];
@@ -210,6 +246,7 @@ export function createStillsService() {
       landing: async (input: LandingSpec & { brandDir?: string; brand?: Partial<BrandKit>; outDir: string }, ctx) => {
         const outDir = assertInHome(input.outDir, 'outDir');
         const { brand, assetsDir } = await brandFrom(input);
+        input = await materializeCrops(input, assetsDir, outDir);
         if (!Array.isArray(input.sections) || !input.sections.length) throw new Error('sections are required');
         const names = landingIconNames(input);
         const icons = names.length ? await resolveIcons(names) : {};
@@ -249,6 +286,7 @@ export function createStillsService() {
       email: async (input: EmailSetSpec & { brandDir?: string; brand?: Partial<BrandKit>; outDir: string }, ctx) => {
         const outDir = assertInHome(input.outDir, 'outDir');
         const { brand, assetsDir } = await brandFrom(input);
+        input = await materializeCrops(input, assetsDir, outDir);
         if (!Array.isArray(input.emails) || !input.emails.length) throw new Error('emails are required');
         const slug = (x: string) => String(x).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'email';
         const resolve = (p: string) => (p.startsWith('/') ? p : join(assetsDir ?? outDir, p));
@@ -292,6 +330,7 @@ export function createStillsService() {
       ads: async (input: AdSpec & { brandDir?: string; brand?: Partial<BrandKit>; outDir: string }, ctx) => {
         const outDir = assertInHome(input.outDir, 'outDir');
         const { brand, assetsDir } = await brandFrom(input);
+        input = await materializeCrops(input, assetsDir, outDir);
         if (!Array.isArray(input.variants) || !input.variants.length) throw new Error('variants are required');
         const sizes = (input.sizes?.length ? input.sizes : DEFAULT_AD_SIZES).filter((x) => AD_SIZES[x]);
         const slug = (x: string) => String(x).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30) || 'v';
@@ -322,6 +361,7 @@ export function createStillsService() {
       slides: async (input: SlidesSpec & { brandDir?: string; brand?: Partial<BrandKit>; outDir: string; name?: string }, ctx) => {
         const outDir = assertInHome(input.outDir, 'outDir');
         const { brand, assetsDir } = await brandFrom(input);
+        input = await materializeCrops(input, assetsDir, outDir);
         if (!Array.isArray(input.slides) || !input.slides.length) throw new Error('slides are required');
         const W = 1920;
         const H = 1080;
@@ -377,6 +417,7 @@ export function createStillsService() {
       document: async (input: DocumentSpec & { brandDir?: string; brand?: Partial<BrandKit>; outDir: string; name?: string }, ctx) => {
         const outDir = assertInHome(input.outDir, 'outDir');
         const { brand, assetsDir } = await brandFrom(input);
+        input = await materializeCrops(input, assetsDir, outDir);
         if (!Array.isArray(input.pages) || !input.pages.length) throw new Error('pages are required');
         const sz = PAGE_SIZES[input.size ?? 'a4'] ?? PAGE_SIZES.a4;
         const names = docIconNames(input.pages);
@@ -421,6 +462,7 @@ export function createStillsService() {
       deck: async (input: DeckSpec & { brandDir?: string; brand?: Partial<BrandKit>; outDir: string; pdf?: boolean; only?: number[] }, ctx) => {
         const outDir = assertInHome(input.outDir, 'outDir');
         const { brand, assetsDir } = await brandFrom(input);
+        input = await materializeCrops(input, assetsDir, outDir);
         const { width, height, safe } = size(input.preset);
         if (!Array.isArray(input.slides) || !input.slides.length) throw new Error('slides are required');
         const results = [];
@@ -445,6 +487,7 @@ export function createStillsService() {
       graphics: async (input: { items: GraphicSpec[]; brandDir?: string; brand?: Partial<BrandKit>; outDir: string; handle?: string }, ctx) => {
         const outDir = assertInHome(input.outDir, 'outDir');
         const { brand, assetsDir } = await brandFrom(input);
+        input = await materializeCrops(input, assetsDir, outDir);
         const results = [];
         for (const [i, g] of (input.items ?? []).entries()) {
           ctx.progress(i / input.items.length, g.name);

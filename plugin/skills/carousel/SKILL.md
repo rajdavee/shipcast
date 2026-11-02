@@ -48,3 +48,4 @@ Pick one angle (the prompt may set it): `problem-solution`, `how-it-works`, `lis
 - Use the brand's own words and proof from the brief. No invented stats, quotes or customers.
 
 Finish with `out/NOTES.md`: the angle in one line and why this theme.
+- Screenshots: crop to the part that matters with `#crop=x,y,w,h` on the image path (fractions of the image). Readable UI beats a whole screen; never leave a slide or page as a wall of text when a cropped screen or chart can carry the point.

@@ -32,3 +32,4 @@ Don't render anything yourself — the worker renders `slides.json`, checks ever
 - Speaker notes on every content slide: 2–5 sentences of what to *say* (not what's on the slide), including the transition to the next slide.
 - Real screenshots from `assets/` wherever the product is the point. Never invent customers, logos, quotes, prices or numbers; label demo data as demo data.
 - Theme: `brand` (default — brand-colour title/section/closing, light content), `light` (conservative audiences), `dark` (launches, keynotes, developer audiences).
+- Screenshots: crop to the part that matters with `#crop=x,y,w,h` on the image path (fractions of the image). Readable UI beats a whole screen; never leave a slide or page as a wall of text when a cropped screen or chart can carry the point.

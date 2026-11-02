@@ -38,3 +38,4 @@ Don't render anything yourself — the worker renders `document.json`, checks ea
 - No placeholders: if the brief has no URL, use the product's domain from the brief or leave the field out. `[URL]`, TBD and lorem ipsum are flagged as errors.
 - Pick the theme for the audience: `clean` (most B2B), `editorial` (thought leadership, finance, legal, premium), `dark` (developer and security products, launches).
 - Size: `letter` for a US audience, otherwise `a4`.
+- Screenshots: crop to the part that matters with `#crop=x,y,w,h` on the image path (fractions of the image). Readable UI beats a whole screen; never leave a slide or page as a wall of text when a cropped screen or chart can carry the point.

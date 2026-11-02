@@ -39,3 +39,4 @@ Rules:
 - Use a real product screenshot from `assets/` with `imageStyle: "shot"`; use `"cover"` only for a real photo.
 - If the visual shows an AI-generated person or scene, set `disclosure` (e.g. "AI-generated image").
 - Theme: `brand` for awareness and feeds, `dark` for developer/tech audiences, `light` for conservative B2B and display networks.
+- Screenshots: crop to the part that matters with `#crop=x,y,w,h` on the image path (fractions of the image). Readable UI beats a whole screen; never leave a slide or page as a wall of text when a cropped screen or chart can carry the point.

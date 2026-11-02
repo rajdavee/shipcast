@@ -71,7 +71,7 @@ export async function catalogMarkdown(kind: SpecKind): Promise<string> {
       `Themes: ${Object.entries(c.document.themes).map(([k, v]) => `\`${k}\` — ${v}`).join('; ')}`,
       `Sizes: ${Object.entries(c.document.sizes).map(([k, v]) => `\`${k}\` ${v}`).join(' · ')} (Letter for US audiences, A4 elsewhere).`,
       'Rich text: `*word*` accent · `**word**` bold · `==word==` highlight. Body fields take light markdown: blank-line paragraphs, `- ` bullets, `1. ` steps, `### ` subheads, `> ` callouts.',
-      'Images: paths relative to the brief folder (e.g. `assets/screens/home.png`). Icons: a brand name ("Slack") or a plain icon word ("shield-check").',
+      'Images: paths relative to the brief folder (e.g. `assets/screens/home.png`). Zoom into the detail that proves the point by adding `#crop=x,y,w,h` (fractions of the image, e.g. `assets/screens/docket.png#crop=0.05,0.1,0.55,0.45`) — a whole screen shrunk into a box is unreadable. Icons: a brand name ("Slack") or a plain icon word ("shield-check").',
       'Every page is checked after rendering: overflow, images that did not load, and pages under ~55% full come back to you to fix.',
       '',
       '## Layouts',
@@ -111,7 +111,7 @@ export async function catalogMarkdown(kind: SpecKind): Promise<string> {
       '- `pricing` — `heading`, `sub?`, `url`, `cta?`, `tiers`: ["*name | price | note | feature; feature | button text"] (leading * = recommended) — real prices only',
       '- `faq` — `heading?`, `items`: ["question | answer", 4–8] — answer real objections',
       '- `cta` — `heading`, `sub?`, `cta`, `url`, `note?`',
-      'Rich text: `*word*` accent · `**word**` bold. Icons: brand names or plain icon words ("shield-check"). Images: paths relative to the brief folder.',
+      'Rich text: `*word*` accent · `**word**` bold. Icons: brand names or plain icon words ("shield-check"). Images: paths relative to the brief folder. Zoom into the detail that proves the point by adding `#crop=x,y,w,h` (fractions of the image, e.g. `assets/screens/docket.png#crop=0.05,0.1,0.55,0.45`) — a whole screen shrunk into a box is unreadable.',
     ].join('\n');
   }
   if (kind === 'email') {
@@ -129,7 +129,7 @@ export async function catalogMarkdown(kind: SpecKind): Promise<string> {
       '- `{ "type": "stats", "stats": ["value | label", …≤3] }` — verified numbers only.',
       '- `{ "type": "cta", "headline", "body"?, "cta", "url" }` — the closing ask.',
       '- `{ "type": "image", "image", "alt", "url"? }` · `{ "type": "divider" }`',
-      'Rich text: `*word*` accent · `**word**` bold. Images: paths relative to the brief folder; they are copied next to the HTML and zipped for upload.',
+      'Rich text: `*word*` accent · `**word**` bold. Images: paths relative to the brief folder; they are copied next to the HTML and zipped for upload. Zoom into the detail that proves the point by adding `#crop=x,y,w,h` (fractions of the image, e.g. `assets/screens/docket.png#crop=0.05,0.1,0.55,0.45`) — a whole screen shrunk into a box is unreadable.',
       'Checks after rendering: Gmail clipping (102 KB), subject and preheader length, link count, spam phrasing, phone width, footer address.',
     ].join('\n');
   }
@@ -141,7 +141,7 @@ export async function catalogMarkdown(kind: SpecKind): Promise<string> {
       `Sizes (default: ${c.ads.defaultSizes.join(', ')}):`,
       ...Object.entries(c.ads.sizes).map(([k, v]) => `- \`${k}\` ${v}`),
       'One template reflows per shape: strips (728×90, 320×50) show logo + headline + button only, so the headline must work alone; skyscrapers stack; stories keep text out of the top 270 px and bottom 380 px.',
-      '`imageStyle: "shot"` frames a product screenshot; `"cover"` fills the visual area with a photo. Use real screenshots from assets/.',
+      '`imageStyle: "shot"` frames a product screenshot; `"cover"` fills the visual area with a photo. Use real screenshots from assets/. Zoom into the detail that proves the point by adding `#crop=x,y,w,h` (fractions of the image, e.g. `assets/screens/docket.png#crop=0.05,0.1,0.55,0.45`) — a whole screen shrunk into a box is unreadable.',
     ].join('\n');
   }
   if (kind === 'slides') {
@@ -151,7 +151,7 @@ export async function catalogMarkdown(kind: SpecKind): Promise<string> {
       'Spec: `{ "title": "deck title", "theme": "<theme>", "slides": [ { "layout": "<id>", "fields": {…}, "notes": "speaker notes" } ] }` — 16:9 (1920×1080). Output: slide PNGs, a PDF and an editable PPTX with your notes.',
       `Themes: ${Object.entries(c.slides.themes).map(([k, v]) => `\`${k}\` — ${v}`).join('; ')}`,
       'Rich text: `*word*` accent · `**word**` bold · `==word==` highlight. One message per slide; the headline states the takeaway.',
-      'Images: paths relative to the brief folder. Icons: a brand name or a plain icon word ("inbox", "shield-check").',
+      'Images: paths relative to the brief folder. Icons: a brand name or a plain icon word ("inbox", "shield-check"). Zoom into the detail that proves the point by adding `#crop=x,y,w,h` (fractions of the image, e.g. `assets/screens/docket.png#crop=0.05,0.1,0.55,0.45`) — a whole screen shrunk into a box is unreadable.',
       '',
       '## Layouts',
       ...c.slides.layouts.map((l: any) => `### \`${l.id}\` — ${l.label}\n${l.use}\n${l.fields.map(fieldLine).join('\n')}`),

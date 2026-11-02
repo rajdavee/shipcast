@@ -33,3 +33,4 @@ Don't render anything yourself — the worker renders every email and sends prob
 - Footer: a real postal address from the brief if one exists (otherwise leave `address` out and say so in NOTES.md), and an honest reason they're receiving it.
 - Real screenshots from `assets/` in `hero` and `feature` blocks. Never invent quotes, customers or numbers.
 - Theme: `light` (most newsletters and B2B), `brand` (launches), `dark` (developer audiences).
+- Screenshots: crop to the part that matters with `#crop=x,y,w,h` on the image path (fractions of the image). Readable UI beats a whole screen; never leave a slide or page as a wall of text when a cropped screen or chart can carry the point.
