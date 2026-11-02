@@ -1,4 +1,4 @@
-import { esc, img, list, logo, page, rich, type Layout, type RenderCtx } from './common.ts';
+import { esc, iconTag, img, list, logo, page, rich, type Layout, type RenderCtx } from './common.ts';
 import { chartSvg } from './document.ts';
 
 /**
@@ -101,7 +101,7 @@ ul.bul li::before{content:"";position:absolute;left:0;top:.48em;width:16px;heigh
 
 const ic = (name: unknown, ctx: RenderCtx) => {
   const uri = ctx.icons?.[String(name ?? '')];
-  return uri ? `<img class="ic" src="${uri}" alt="">` : `<span class="ic mono">${esc(String(name ?? '•').slice(0, 1).toUpperCase())}</span>`;
+  return uri ? iconTag(uri, 'ic') : `<span class="ic mono">${esc(String(name ?? '•').slice(0, 1).toUpperCase())}</span>`;
 };
 const foot = (ctx: RenderCtx) => `<div class="foot"><span class="t">${logo(ctx)}</span><span class="t">${ctx.page ?? ''}</span></div>`;
 const split = (s: string) => s.split('|').map((x) => x.trim());

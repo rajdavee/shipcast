@@ -1,6 +1,6 @@
 import { basename } from 'node:path';
 import { brandCss, fontLinks, type BrandKit } from '@shipcast/engine';
-import { esc, list, rich } from './common.ts';
+import { esc, iconTag, list, rich } from './common.ts';
 
 /**
  * Landing-page sections: semantic, responsive HTML/CSS in the brand kit that a
@@ -26,7 +26,7 @@ const split = (s: string) => s.split('|').map((x) => x.trim());
 
 function icon(name: string, icons: Record<string, string | null>) {
   const uri = icons[name];
-  return uri ? `<img class="ic" src="${uri}" alt="" width="40" height="40">` : `<span class="ic mono" aria-hidden="true">${esc(name.slice(0, 1).toUpperCase())}</span>`;
+  return uri ? iconTag(uri, 'ic') : `<span class="ic mono" aria-hidden="true">${esc(name.slice(0, 1).toUpperCase())}</span>`;
 }
 
 function section(s: LandingSection, img: (p: string) => string, icons: Record<string, string | null>): string {
@@ -35,7 +35,7 @@ function section(s: LandingSection, img: (p: string) => string, icons: Record<st
     case 'hero':
       return `<section class="hero" id="top"><div class="wrap hero-grid"><div class="hero-copy">${s.eyebrow ? `<p class="eyebrow">${esc(s.eyebrow)}</p>` : ''}<h1>${rich(s.headline)}</h1>${s.sub ? `<p class="lede">${rich(s.sub)}</p>` : ''}<div class="actions">${s.cta ? `<a class="btn" href="${esc(s.url ?? '#')}">${esc(s.cta)}</a>` : ''}${s.secondary ? `<a class="btn ghost" href="${esc(s.secondaryUrl ?? '#')}">${esc(s.secondary)}</a>` : ''}</div>${s.note ? `<p class="note">${esc(s.note)}</p>` : ''}</div>${s.image ? `<figure class="shot"><img src="${img(s.image)}" alt="${esc(s.alt ?? 'Product screenshot')}" loading="eager"></figure>` : ''}</div></section>`;
     case 'logos':
-      return `<section class="logos"><div class="wrap">${s.heading ? `<p class="eyebrow center">${esc(s.heading)}</p>` : ''}<ul>${list(s.items).map((x) => `<li>${icons[x] ? `<img src="${icons[x]}" alt="${esc(x)}" height="28">` : esc(x)}</li>`).join('')}</ul></div></section>`;
+      return `<section class="logos"><div class="wrap">${s.heading ? `<p class="eyebrow center">${esc(s.heading)}</p>` : ''}<ul>${list(s.items).map((x) => `<li>${icons[x] ? iconTag(icons[x], 'lg-ic', 'var(--muted)', x) : esc(x)}</li>`).join('')}</ul></div></section>`;
     case 'features':
       return `<section class="features" id="features"><div class="wrap">${head(s.eyebrow, s.heading, s.sub)}<div class="grid g${Math.min(4, Math.max(2, list(s.items).length % 3 === 0 ? 3 : list(s.items).length >= 4 ? 4 : 2))}">${list(s.items).map((x) => { const [i, t, b] = split(x); return `<article class="card">${icon(i, icons)}<h3>${rich(t ?? '')}</h3><p>${rich(b ?? '')}</p></article>`; }).join('')}</div></div></section>`;
     case 'media':
@@ -81,7 +81,7 @@ em{font-style:normal;color:var(--accent)}mark{background:color-mix(in srgb,var(-
 .brandmark{display:flex;align-items:center;gap:10px;font:800 20px var(--font-display);text-decoration:none}.brandmark img{height:30px;width:auto}
 .hero{padding:88px 0 96px}.hero-grid{display:grid;grid-template-columns:1fr 1.15fr;gap:56px;align-items:center}
 .shot{margin:0;border-radius:18px;overflow:hidden;box-shadow:0 40px 80px -40px rgba(0,0,0,.45),0 0 0 1px var(--rule)}
-.logos{padding:44px 0}.logos ul{list-style:none;display:flex;flex-wrap:wrap;justify-content:center;gap:28px 48px;margin:18px 0 0;padding:0;font:700 18px var(--font-display);color:var(--muted)}.logos img{height:28px;width:auto;max-width:140px;object-fit:contain;filter:grayscale(1);opacity:.75}
+.logos{padding:44px 0}.logos ul{list-style:none;display:flex;flex-wrap:wrap;justify-content:center;gap:28px 48px;margin:18px 0 0;padding:0;font:700 18px var(--font-display);color:var(--muted)}.logos img,.logos .lg-ic{height:30px;width:auto;max-width:140px;object-fit:contain;filter:grayscale(1);opacity:.75}.logos .lg-ic.icm{width:30px;-webkit-mask-size:contain!important;mask-size:contain!important}
 .grid{display:grid;gap:24px;margin-top:40px}.g2{grid-template-columns:repeat(2,1fr)}.g3{grid-template-columns:repeat(3,1fr)}.g4{grid-template-columns:repeat(4,1fr)}.g1{grid-template-columns:1fr}
 .card{background:var(--card);border:1px solid var(--rule);border-radius:20px;padding:28px}
 .card p{color:var(--muted);margin:0}

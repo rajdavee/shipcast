@@ -101,3 +101,23 @@ ${extraCss}
 
 export const logo = (ctx: RenderCtx, cls = 'logo') =>
   ctx.brand.logo ? `<img class="${cls}" src="${img(ctx.brand.logo, ctx)}" alt="">` : `<span class="${cls} wordmark">${esc(ctx.brand.name)}</span>`;
+
+/**
+ * Single-colour icons (Lucide, Simple Icons) arrive baked in near-black, which
+ * vanishes on dark themes. Draw those as a CSS mask so they take the
+ * template's colour; full-colour logos stay as images.
+ */
+export function iconTag(uri: string | null | undefined, cls: string, color = 'var(--icon, var(--brand-primary))', alt = ''): string {
+  if (!uri) return '';
+  let mono = false;
+  if (uri.startsWith('data:image/svg+xml')) {
+    const comma = uri.indexOf(',');
+    const raw = uri.slice(comma + 1);
+    const svg = uri.slice(0, comma).includes('base64') ? Buffer.from(raw, 'base64').toString('utf8') : decodeURIComponent(raw);
+    const colours = new Set((svg.match(/#[0-9a-f]{3,8}\b/gi) ?? []).map((c) => c.toLowerCase()));
+    // One flat colour (ours or the brand's own near-black) reads as a glyph: let the template colour it.
+    mono = colours.size <= 1 && !/<(linearGradient|radialGradient|image)\b/i.test(svg);
+  }
+  if (!mono) return `<img class="${cls}" src="${uri}" alt="${esc(alt)}">`;
+  return `<span class="${cls} icm" role="img" aria-label="${esc(alt)}" style="display:inline-block;-webkit-mask:url('${uri}') center/62% no-repeat;mask:url('${uri}') center/62% no-repeat;background-color:${color}"></span>`;
+}

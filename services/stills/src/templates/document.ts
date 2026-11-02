@@ -1,4 +1,4 @@
-import { esc, img, list, logo, rich, type Layout, type RenderCtx } from './common.ts';
+import { esc, iconTag, img, list, logo, rich, type Layout, type RenderCtx } from './common.ts';
 import { brandCss, fontLinks } from '@shipcast/engine';
 
 /**
@@ -98,7 +98,7 @@ export function chartSvg(chart: { type?: string; data?: { label: string; value: 
 
 const icon = (name: unknown, ctx: RenderCtx) => {
   const uri = ctx.icons?.[String(name ?? '')];
-  return uri ? `<img class="ic" src="${uri}" alt="">` : `<span class="ic mono">${esc(String(name ?? '•').slice(0, 1).toUpperCase())}</span>`;
+  return uri ? iconTag(uri, 'ic') : `<span class="ic mono">${esc(String(name ?? '•').slice(0, 1).toUpperCase())}</span>`;
 };
 
 export const DOC_LAYOUTS: Layout[] = [
