@@ -199,3 +199,19 @@ test('stills renders a landing page: page, snippets, copy deck, previews, no sid
   assert.match(fs.readFileSync(join(out, 'landing', 'index.html'), 'utf8'), /<details><summary>Is there a free plan\?/);
   assert.ok(existsSync(join(out, 'landing', 'sections', '02-features.html')) && existsSync(join(out, 'landing.zip')) && existsSync(join(out, 'landing-mobile.png')));
 });
+
+test('stills renders print pieces with bleed and crop marks at print resolution', { skip: !hasChrome && 'no Chrome' }, async () => {
+  const out = join(home, 'print');
+  const job = await run('print', {
+    brand: { name: 'Acme', colors: { background: '#ffffff', primary: '#3355ff' } },
+    outDir: out,
+    pieces: [{ name: 'Flyer', size: 'a5-flyer', theme: 'light', layout: 'event', fields: { title: 'Meet us', date: '12 Nov', place: 'Berlin', cta: 'Book', url: 'acme.test' } }],
+  });
+  assert.equal(job.status, 'done', job.error);
+  assert.deepEqual(job.output.problems, []);
+  const p = job.output.pieces[0];
+  assert.equal(p.dpi, 300);
+  assert.ok(existsSync(p.pdf) && existsSync(p.png));
+  const html = (await import('node:fs')).readFileSync(p.pdf.replace(/\.pdf$/, '.html'), 'utf8');
+  assert.match(html, /trim 148 × 210 mm · bleed 3 mm/);
+});

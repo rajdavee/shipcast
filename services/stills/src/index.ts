@@ -5,6 +5,7 @@ import { assertInHome, browser, writePptx, type PptxSlide, createService, FIT_SC
 import { CAROUSEL_LAYOUTS, carouselIconNames, renderCarouselSlide, THEMES } from './templates/carousel.ts';
 import type { RenderCtx } from './templates/common.ts';
 import { CARD_LAYOUTS, renderCard, renderThumbnail, THUMBNAIL_LAYOUTS } from './templates/graphics.ts';
+import { PRINT_SIZES, printGeometry, printScale, renderPrint, type PrintSpec } from './templates/print.ts';
 import { landingIconNames, renderLanding, type LandingSpec } from './templates/landing.ts';
 import { checkEmail, renderEmail, type EmailSetSpec } from './templates/email.ts';
 import { AD_SIZES, DEFAULT_AD_SIZES, renderAd, type AdSpec } from './templates/ads.ts';
@@ -167,10 +168,43 @@ export function createStillsService() {
         carousel: { themes: Object.fromEntries(Object.entries(THEMES).map(([k, v]) => [k, v.label])), layouts: CAROUSEL_LAYOUTS.map(({ html, ...l }) => l) },
         thumbnail: { layouts: THUMBNAIL_LAYOUTS.map(({ html, ...l }) => l) },
         card: { layouts: CARD_LAYOUTS.map(({ html, ...l }) => l) },
+        print: { sizes: Object.fromEntries(Object.entries(PRINT_SIZES).map(([k, v]) => [k, v.label])) },
         ads: { sizes: Object.fromEntries(Object.entries(AD_SIZES).map(([k, v]) => [k, `${v.w}×${v.h} ${v.label}`])), defaultSizes: DEFAULT_AD_SIZES, themes: ['brand', 'light', 'dark'] },
         slides: { themes: Object.fromEntries(Object.entries(SLIDE_THEMES).map(([k, v]) => [k, v.label])), layouts: SLIDE_LAYOUTS.map(({ html, ...l }) => l) },
         document: { themes: Object.fromEntries(Object.entries(DOC_THEMES).map(([k, v]) => [k, v.label])), sizes: Object.fromEntries(Object.entries(PAGE_SIZES).map(([k, v]) => [k, v.label])), layouts: DOC_LAYOUTS.map(({ html, ...l }) => l) },
       }),
+
+      /** Print pieces → press-ready PDF (bleed + crop marks) and a high-resolution PNG each. */
+      print: async (input: { pieces: (PrintSpec & { name: string })[]; brandDir?: string; brand?: Partial<BrandKit>; outDir: string }, ctx) => {
+        const outDir = assertInHome(input.outDir, 'outDir');
+        const { brand, assetsDir } = await brandFrom(input);
+        if (!Array.isArray(input.pieces) || !input.pieces.length) throw new Error('pieces are required');
+        await mkdir(join(outDir, 'print'), { recursive: true });
+        const results = [];
+        const problems: string[] = [];
+        for (const [i, pc] of input.pieces.entries()) {
+          ctx.progress(i / input.pieces.length, pc.name);
+          const g = printGeometry(pc);
+          const base = join(outDir, 'print', String(pc.name || `piece-${i + 1}`).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''));
+          await writeFile(`${base}.html`, renderPrint(pc, { brand, width: g.pageW, height: g.pageH, assetsDir }));
+          const scale = printScale(pc);
+          const open = () => browser().open(pathToFileURL(`${base}.html`).href, { width: Math.ceil(g.pageW), height: Math.ceil(g.pageH), scale, settleMs: 300 });
+          const pg = await open().catch(async () => (await browser().restart(), open()));
+          try {
+            await pg.eval('document.fonts.ready.then(() => true)');
+            const over = await pg.eval<number>(`(() => { const s = document.querySelector('.safe'); return s ? Math.max(0, s.scrollHeight - s.clientHeight, s.scrollWidth - s.clientWidth) : 0; })()`);
+            const broken = await pg.eval<number>('[...document.images].filter((i) => !i.complete || !i.naturalWidth).length');
+            if (over > 2) problems.push(`${pc.name}: content overflows the safe area by ${Math.round(over)}px — shorten the copy or drop an element.`);
+            if (broken) problems.push(`${pc.name}: ${broken} image(s) didn't load.`);
+            await writeFile(`${base}.pdf`, await pg.pdf());
+            await writeFile(`${base}.png`, await pg.screenshot('png'));
+          } finally {
+            await pg.close();
+          }
+          results.push({ name: pc.name, size: pc.size, pdf: `${base}.pdf`, png: `${base}.png`, dpi: Math.round(scale * 96), trimMm: [g.mmW, g.mmH] });
+        }
+        return { pieces: results, problems };
+      },
 
       /** Landing-page sections → a standalone responsive page, per-section snippets, a copy deck and previews. */
       landing: async (input: LandingSpec & { brandDir?: string; brand?: Partial<BrandKit>; outDir: string }, ctx) => {

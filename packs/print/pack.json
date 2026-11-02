@@ -1,0 +1,20 @@
+{
+  "id": "print",
+  "name": "Print",
+  "tagline": "Posters, flyers, roll-up and booth banners — press-ready PDFs with bleed and crop marks, plus high-resolution PNGs.",
+  "category": "design",
+  "order": 12,
+  "estimate": "3–6 min",
+  "accent": "#b23a48",
+  "spec": "print",
+  "options": [
+    { "key": "pieces", "label": "Pieces", "type": "select", "choices": ["event-kit", "poster", "flyer", "rollup", "booth-banner"], "default": "event-kit" },
+    { "key": "event", "label": "Event details (optional)", "type": "text", "default": "", "placeholder": "e.g. SaaStr Europa, 12 Nov, Booth 14" },
+    { "key": "theme", "label": "Theme", "type": "select", "choices": ["auto", "brand", "light", "dark"], "default": "auto" }
+  ],
+  "outputs": ["print/*.pdf", "print/*.png", "print.json", "*.md"],
+  "skills": [],
+  "tools": ["chrome"],
+  "roles": ["design-taste", "copy"],
+  "timeoutMinutes": 25
+}

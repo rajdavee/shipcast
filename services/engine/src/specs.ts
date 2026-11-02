@@ -13,9 +13,9 @@ import { KNOWN_ICONS } from './icons.ts';
  * actionable feedback.
  */
 
-export type SpecKind = 'deck' | 'graphics' | 'storyboard' | 'infographic' | 'document' | 'slides' | 'ads' | 'email' | 'landing';
+export type SpecKind = 'deck' | 'graphics' | 'storyboard' | 'infographic' | 'document' | 'slides' | 'ads' | 'email' | 'landing' | 'print';
 
-export const SPEC_FILE: Record<SpecKind, string> = { deck: 'deck.json', graphics: 'graphics.json', storyboard: 'storyboard.json', infographic: 'infographic.json', document: 'document.json', slides: 'slides.json', ads: 'ads.json', email: 'email.json', landing: 'landing.json' };
+export const SPEC_FILE: Record<SpecKind, string> = { deck: 'deck.json', graphics: 'graphics.json', storyboard: 'storyboard.json', infographic: 'infographic.json', document: 'document.json', slides: 'slides.json', ads: 'ads.json', email: 'email.json', landing: 'landing.json', print: 'print.json' };
 
 type FieldDoc = { id: string; type: string; label: string; optional?: boolean; max?: number; help?: string; choices?: string[] };
 const fieldLine = (f: FieldDoc) =>
@@ -76,6 +76,21 @@ export async function catalogMarkdown(kind: SpecKind): Promise<string> {
       '',
       '## Layouts',
       ...c.document.layouts.map((l: any) => `### \`${l.id}\` — ${l.label}\n${l.use}\n${l.fields.map(fieldLine).join('\n')}`),
+    ].join('\n');
+  }
+  if (kind === 'print') {
+    return [
+      '# Print catalog',
+      '',
+      'Spec: `{ "pieces": [ { "name": "file name", "size": "<id>", "theme": "brand|light|dark", "layout": "headline|event|product|stat", "fields": {…} } ] }` — each piece becomes a press-ready PDF (3 mm bleed, crop marks) and a high-resolution PNG.',
+      `Sizes: ${Object.entries(c.print.sizes).map(([k, v]) => `\`${k}\` ${v}`).join(' · ')}`,
+      '',
+      '## Layouts and fields',
+      '- `headline` — `kicker?`, `title` (≤ 8 words, `*accent*`), `sub?`, `image?`, `cta?`, `url?` — posters and flyers.',
+      '- `event` — `kicker?`, `title`, `sub?`, `date`, `place`, `booth?`, `points?` (≤ 4), `image?`, `cta?`, `url?` — trade-show signage, meetups, webinars.',
+      '- `product` — `kicker?`, `title`, `sub?`, `image` (real screenshot or photo), `points` (≤ 4), `cta?`, `url?` — roll-ups and table cards.',
+      '- `stat` — `stat` (one verified number), `title`, `sub?`, `source`, `cta?`, `url?`.',
+      'Print is read from metres away: a roll-up needs ≤ 6 words in the title and ≤ 4 short points; a flyer can carry a sub and 4 points. Always end with a URL people can type.',
     ].join('\n');
   }
   if (kind === 'landing') {
@@ -229,6 +244,10 @@ export async function renderSpec(kind: SpecKind, cwd: string, briefDir: string, 
     if (kind === 'document') {
       const r = await callService('stills', 'document', { ...spec, brandDir: briefDir, outDir: out, name: 'document' });
       return { ok: !r.problems.length, feedback: r.problems, summary: `${r.pages.length}-page PDF` };
+    }
+    if (kind === 'print') {
+      const r = await callService('stills', 'print', { ...spec, brandDir: briefDir, outDir: out });
+      return { ok: !r.problems.length, feedback: r.problems, summary: `${r.pieces.length} print piece${r.pieces.length === 1 ? '' : 's'} · PDF with bleed + PNG` };
     }
     if (kind === 'landing') {
       const r = await callService('stills', 'landing', { ...spec, brandDir: briefDir, outDir: out });

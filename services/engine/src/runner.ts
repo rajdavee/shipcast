@@ -446,7 +446,7 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
     else if (pack?.pipeline === 'shorts') await phase('Cutting Shorts from your video');
     else if (pack?.pipeline === 'hub') await phase('Packaging the campaign');
     else if (pack?.pipeline) await phase('Transcribing and captioning');
-    else if (!renderOnly) await phase(specKind === 'storyboard' ? 'Writing the script' : specKind === 'infographic' ? 'Researching the framework' : specKind === 'deck' ? 'Writing the slides' : specKind === 'graphics' ? 'Designing the graphics' : specKind === 'document' ? 'Writing the document' : specKind === 'slides' ? 'Writing the deck' : specKind === 'ads' ? 'Writing the hooks' : specKind === 'email' ? 'Writing the emails' : specKind === 'landing' ? 'Writing the page' : pack?.id === 'copy-kit' ? 'Writing the posts' : 'Making it');
+    else if (!renderOnly) await phase(specKind === 'storyboard' ? 'Writing the script' : specKind === 'infographic' ? 'Researching the framework' : specKind === 'deck' ? 'Writing the slides' : specKind === 'graphics' ? 'Designing the graphics' : specKind === 'document' ? 'Writing the document' : specKind === 'slides' ? 'Writing the deck' : specKind === 'ads' ? 'Writing the hooks' : specKind === 'email' ? 'Writing the emails' : specKind === 'landing' ? 'Writing the page' : specKind === 'print' ? 'Designing for print' : pack?.id === 'copy-kit' ? 'Writing the posts' : 'Making it');
     if (pack?.pipeline === 'captions') {
       // No Claude: transcribe the upload, style the captions, render, master, check.
       const uploads = join(dir, 'uploads');
