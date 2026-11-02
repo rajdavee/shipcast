@@ -141,6 +141,9 @@ export interface Settings {
   /** Claude model alias or id; empty = your Claude Code default. */
   model: string;
   /** Tools the headless Claude run may use without asking. */
+  /** Generation spend caps in USD (gen service): per project and per calendar month. */
+  genCapPerProject: number;
+  genCapPerMonth: number;
   allowedTools: string[];
   /** Max wall-clock minutes per step before it is stopped. */
   stepTimeoutMinutes: number;

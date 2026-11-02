@@ -223,6 +223,8 @@ router.put('/api/settings', async (req) => {
   if (body.subagents === 'pack' || body.subagents === 'never') patch.subagents = body.subagents;
   if (typeof body.directorReview === 'boolean') patch.directorReview = body.directorReview;
   if (Number.isFinite(body.stepTimeoutMinutes)) patch.stepTimeoutMinutes = Math.min(240, Math.max(5, Number(body.stepTimeoutMinutes)));
+  if (Number.isFinite(body.genCapPerProject)) patch.genCapPerProject = Math.min(1000, Math.max(0, Number(body.genCapPerProject)));
+  if (Number.isFinite(body.genCapPerMonth)) patch.genCapPerMonth = Math.min(10000, Math.max(0, Number(body.genCapPerMonth)));
   return writeSettings(patch);
 });
 

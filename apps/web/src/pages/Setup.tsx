@@ -369,6 +369,33 @@ function EnginesSection() {
           );
         })}
       </div>
+      <GenBudget />
     </section>
+  );
+}
+
+/** Spending caps for generated images and video (the gen service refuses anything over them). */
+function GenBudget() {
+  const [s, setS] = useState<Settings | null>(null);
+  useEffect(() => void api.settings().then(setS), []);
+  if (!s) return null;
+  const save = async (patch: Partial<Settings>) => {
+    setS(await api.saveSettings(patch));
+    toast('Saved');
+  };
+  return (
+    <div className="rows" style={{ marginTop: 14 }}>
+      <div className="srow">
+        <i className="dot ok" />
+        <div>
+          <h3>Generation budget</h3>
+          <p>Generated images and video are paid per use on your own fal.ai or Replicate account. Shipcast plans the cost first and won't go over these caps.</p>
+        </div>
+        <div className="row-actions">
+          <label className="field" style={{ width: 120 }}><span>Per project ($)</span><input className="input" type="number" min={0} step={1} defaultValue={s.genCapPerProject ?? 5} onBlur={(e) => save({ genCapPerProject: Number(e.target.value) })} /></label>
+          <label className="field" style={{ width: 120 }}><span>Per month ($)</span><input className="input" type="number" min={0} step={5} defaultValue={s.genCapPerMonth ?? 25} onBlur={(e) => save({ genCapPerMonth: Number(e.target.value) })} /></label>
+        </div>
+      </div>
+    </div>
   );
 }

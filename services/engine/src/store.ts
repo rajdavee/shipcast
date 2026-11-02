@@ -7,6 +7,8 @@ import type { Campaign, CampaignEvent, Settings, Step } from './types.ts';
 
 export const DEFAULT_SETTINGS: Settings = {
   model: '',
+  genCapPerProject: 5,
+  genCapPerMonth: 25,
   allowedTools: ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'WebFetch', 'WebSearch', 'Skill', 'TodoWrite'],
   stepTimeoutMinutes: 60,
   subagents: 'pack',

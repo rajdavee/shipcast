@@ -21,7 +21,8 @@
     "services/render",
     "services/stills",
     "services/media",
-    "services/qa"
+    "services/qa",
+    "services/gen"
   ],
   "bin": {
     "shipcast": "bin/shipcast.ts"
@@ -39,7 +40,8 @@
     "service:stills": "node services/stills/src/main.ts",
     "service:media": "node services/media/src/main.ts",
     "service:qa": "node services/qa/src/main.ts",
-    "api": "node services/api/src/main.ts"
+    "api": "node services/api/src/main.ts",
+    "service:gen": "node services/gen/src/main.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

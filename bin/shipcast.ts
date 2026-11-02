@@ -19,9 +19,10 @@ const SERVICES: Record<string, { entry: string; port?: number }> = {
   stills: { entry: 'services/stills/src/main.ts', port: SERVICE_PORTS.stills },
   media: { entry: 'services/media/src/main.ts', port: SERVICE_PORTS.media },
   qa: { entry: 'services/qa/src/main.ts', port: SERVICE_PORTS.qa },
+  gen: { entry: 'services/gen/src/main.ts', port: SERVICE_PORTS.gen },
 };
 
-const COLORS: Record<string, string> = { api: '36', worker: '35', render: '33', stills: '32', media: '34', qa: '31' };
+const COLORS: Record<string, string> = { api: '36', worker: '35', render: '33', stills: '32', media: '34', qa: '31', gen: '95' };
 
 function portFree(port: number): Promise<boolean> {
   return new Promise((resolve) => {

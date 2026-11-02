@@ -5,7 +5,7 @@
 //   node media.mjs stock video "rain on a tram window at night" --seconds 6 --orientation landscape --out work/assets
 //   node media.mjs stock image "misty pine forest at dawn" --orientation landscape --out work/assets [--provider pixabay|unsplash|pexels]
 //   node media.mjs gen image "<cinematographer prompt>" --aspect 16:9 --out work/assets [--model fal-ai/flux/schnell]
-//   node media.mjs gen video "<prompt>" --seconds 5 --aspect 16:9 [--image start.png] --out work/assets [--model …]
+//   node media.mjs gen video "<prompt>" --seconds 5 --aspect 16:9 [--image start.png] [--end-image last.png] [--audio voice.wav] --out work/assets [--model …] [--tier draft|standard|premium] [--placeholder]
 //   node media.mjs sfx "magic sparkle whoosh" --seconds 4 --out work/assets
 //
 // Keys come from Shipcast's Setup page (stored in $SHIPCAST_HOME/secrets.json); nothing is
@@ -243,8 +243,44 @@ const firstUrl = (o) => {
   return o.video?.url || o.images?.[0]?.url || o.image?.url || o.url || null;
 };
 
+/**
+ * Prefer the Shipcast gen service: one place for model routing, budgets, the
+ * safety guard, caching and disclosure. Falls back to calling fal/Replicate
+ * directly when the service isn't running.
+ */
+async function genViaService(kind, prompt) {
+  const base = process.env.SHIPCAST_GEN_URL || 'http://127.0.0.1:4324';
+  const up = await fetch(`${base}/health`, { signal: AbortSignal.timeout(1500) }).then((r) => r.ok).catch(() => false);
+  if (!up) return false;
+  const campaign = resolve('.').match(/campaigns\/([^/]+)/)?.[1];
+  const capability = kind === 'image' ? (flags.image ? 'edit' : 't2i') : flags.audio ? 's2v' : flags.image ? 'i2v' : 't2v';
+  const input = {
+    capability,
+    prompt,
+    aspect: String(flags.aspect || '16:9'),
+    ...(flags.seconds ? { seconds: Number(flags.seconds) } : {}),
+    ...(flags.image ? (capability === 'edit' ? { images: String(flags.image).split(',').map((f) => resolve(f)) } : { image: resolve(String(flags.image)) }) : {}),
+    ...(flags['end-image'] ? { endImage: resolve(String(flags['end-image'])) } : {}),
+    ...(flags.audio ? { audio: resolve(String(flags.audio)) } : {}),
+    ...(flags.model ? { model: String(flags.model) } : {}),
+    ...(flags.tier ? { tier: String(flags.tier) } : {}),
+    ...(flags.placeholder ? { provider: 'fake' } : {}),
+    budgetKey: campaign ?? 'adhoc',
+    out: join(out, `gen-${kind}-${slug(prompt)}-${Date.now().toString(36)}`),
+  };
+  const r = await fetch(`${base}/run`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'generate', input }) });
+  const j = await r.json().catch(() => ({}));
+  if (j.status !== 'done') die(j.error || `generation failed (${r.status})`, /cap|budget/i.test(j.error || '') ? 5 : 1);
+  const o = j.output;
+  const c = `Generated with ${o.model}${o.cached ? ' (cached)' : ''} — ${(o.disclosure || ['AI-generated']).join(', ')}`;
+  await credit(c);
+  emit({ file: o.file, credit: c, model: o.model, usd: o.usd, cached: o.cached, prompt: o.prompt, disclosure: o.disclosure });
+  return true;
+}
+
 async function gen(kind, prompt) {
   guard(prompt);
+  if (await genViaService(kind, prompt)) return;
   if (!key('fal') && !key('replicate')) die('No generative engine connected. Add a fal.ai or Replicate key in Shipcast Setup → Media engines, or use motion graphics, the cartoon kit or stock instead.', 2);
   const aspect = String(flags.aspect || '16:9');
   const useFal = !!key('fal') && flags.provider !== 'replicate';
