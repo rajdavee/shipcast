@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { looksLikeContent } from '../content.ts';
 import { api, detectSource, type Campaign, type SourceType, type Status } from '../api.ts';
 import { go, useLoad } from '../hooks.ts';
 import { DEFAULT_FORMATS, FORMATS } from '../formats.ts';
@@ -33,13 +34,6 @@ function savePicks(ids: string[]) {
 
 /** A miniature post for the text-only format, so every tile shows a real artefact. */
 /** Heuristic: does a written brief describe a video/content to make rather than a product to market? */
-function looksLikeContent(t: string): boolean {
-  if (t.trim().length < 80) return false;
-  const cues = (t.match(/\b(scene\s*\d|scenes?\b|shot|anime|cartoon|animation|animated|character|episode|story|storyline|trailer|music video|lyric|documentary|cinematic|narrat|voice acting|sound design|seconds\)|aspect ratio|16:9|9:16|recipe|tutorial|montage|vlog|short film|plot)/gi) || []).length;
-  const product = (t.match(/\b(our (app|product|platform|tool|saas)|sign ?up|pricing|customers|users can|startup|api|dashboard|feature list|launching)\b/gi) || []).length;
-  return cues >= 3 && cues > product * 2;
-}
-
 const AnythingMock = () => (
   <div className="anything-mock" aria-hidden="true">
     <i className="orb" />

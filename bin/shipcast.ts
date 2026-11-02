@@ -53,8 +53,28 @@ async function supervise(names: string[]) {
     if (n !== 'api') env[`SHIPCAST_${n.toUpperCase()}_URL`] = `http://127.0.0.1:${port}`;
   }
   const children = new Map<string, ChildProcess>();
+  // One restart in flight per service: the exit handler and the watchdog both
+  // restart, and without this each crash added another chain (277 renders once).
+  const pending = new Map<string, NodeJS.Timeout>();
   let stopping = false;
-  const launch = (n: string, attempt = 0) => {
+  const later = (n: string, attempt: number, why: string) => {
+    if (stopping || pending.has(n)) return;
+    const wait = Math.min(30_000, 500 * 2 ** attempt);
+    process.stdout.write(`\x1b[${COLORS[n]}m${n.padEnd(6)}\x1b[0m │ ${why}; restarting in ${(wait / 1000).toFixed(1)}s\n`);
+    pending.set(n, setTimeout(() => {
+      pending.delete(n);
+      void launch(n, attempt);
+    }, wait));
+  };
+  const starting = new Set<string>();
+  const launch = async (n: string, attempt = 0) => {
+    if (stopping || children.has(n) || starting.has(n)) return;
+    starting.add(n);
+    // Something else (often a leftover copy) holds the port: wait for it instead of spawning a copy that dies at once.
+    const taken = !!ports[n] && !(await portFree(ports[n]));
+    starting.delete(n);
+    if (taken) return later(n, Math.min(attempt + 1, 6), `port ${ports[n]} is taken by another process`);
+    if (stopping || children.has(n)) return;
     const c = spawn(process.execPath, [join(ROOT, SERVICES[n].entry)], {
       env: { ...process.env, ...env, ...(ports[n] ? { PORT: String(ports[n]) } : {}) },
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -65,16 +85,12 @@ async function supervise(names: string[]) {
     pipe(c.stderr!);
     const started = Date.now();
     c.on('exit', (code) => {
-      children.delete(n);
-      if (stopping) return;
-      const next = Date.now() - started > 30_000 ? 0 : attempt + 1;
-      const wait = Math.min(30_000, 500 * 2 ** next);
-      process.stdout.write(`${tag}exited (${code}); restarting in ${(wait / 1000).toFixed(1)}s\n`);
-      setTimeout(() => launch(n, next), wait);
+      if (children.get(n) === c) children.delete(n);
+      later(n, Date.now() - started > 30_000 ? 0 : attempt + 1, `exited (${code})`);
     });
     children.set(n, c);
   };
-  for (const n of names) launch(n);
+  for (const n of names) void launch(n);
 
   // Watchdog: exit events can be missed (signals to process groups, wedged
   // pipes). Every 5 s make sure each child is alive and its port answers.
@@ -82,6 +98,7 @@ async function supervise(names: string[]) {
   setInterval(async () => {
     if (stopping) return;
     for (const n of names) {
+      if (pending.has(n) || starting.has(n)) continue;
       const c = children.get(n);
       const alive = !!c?.pid && c.exitCode === null && (() => { try { process.kill(c.pid!, 0); return true; } catch { return false; } })();
       let healthy = alive;
@@ -99,13 +116,14 @@ async function supervise(names: string[]) {
           c.kill('SIGKILL');
         }
         children.delete(n);
-        launch(n);
+        void launch(n);
       }
     }
   }, 5000).unref();
   if (names.includes('api')) console.log(`\n  ▲ Shipcast studio  →  http://localhost:${ports.api}\n`);
   const shutdown = () => {
     stopping = true;
+    for (const t of pending.values()) clearTimeout(t);
     for (const c of children.values()) c.kill('SIGTERM');
     setTimeout(() => process.exit(0), 4000).unref();
     if (!children.size) process.exit(0);
