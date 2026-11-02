@@ -329,7 +329,9 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
       if (pack.app && pack.id !== 'app-run' && !step.renderOnly) {
         // After a sleep, reboot or stop the app may be gone: bring it back before Claude needs it.
         const info = await appInfo(campaign);
-        if (info && !info.app.external && !(await appUp(info.app.url))) {
+        const canStart = (Array.isArray(info?.app.start) ? info!.app.start.length : info?.app.start ? 1 : 0) > 0;
+        // Without recorded start commands, work from the screens already captured instead of rebuilding the stack.
+        if (info && canStart && !info.app.external && !(await appUp(info.app.url))) {
           await log({ step: step.id, type: 'log', text: `The app isn't answering at ${info.app.url} — restarting it` });
           const r = await startApp(campaign);
           await log({ step: step.id, type: 'log', text: r.up ? 'App is back up' : `Couldn't restart the app (${r.log.slice(-1)[0] ?? ''}); Claude will try` });

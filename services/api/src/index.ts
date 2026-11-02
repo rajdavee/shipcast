@@ -102,6 +102,8 @@ async function packOptions(packId: string, given: Record<string, unknown> = {}):
   const pack = await getPack(packId);
   if (!pack) throw new HttpError(400, `unknown pack ${packId}`);
   const opts = defaultOptions(pack);
+  // Per-piece creative direction (title, angle, brief) rides along with the options.
+  for (const k of ['_title', '_angle', '_brief']) if (typeof given[k] === 'string' && given[k]) opts[k] = String(given[k]).slice(0, 2000);
   for (const o of pack.options) {
     const v = given[o.key];
     if (v === undefined || v === null) continue;
