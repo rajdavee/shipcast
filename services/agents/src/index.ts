@@ -1,4 +1,4 @@
-import { blockedReason, createService, foregroundBusy, learnOnce, logRun, pickDue, readJobs, readSettings, updateJob, type AgentJob, type AgentKind } from '@shipcast/engine';
+import { blockedReason, createService, foregroundBusy, learnOnce, logRun, refreshTrends, pickDue, readJobs, readSettings, updateJob, type AgentJob, type AgentKind } from '@shipcast/engine';
 
 /**
  * The agents service: wakes every 20 seconds, starts at most one background
@@ -35,6 +35,12 @@ registerAgent('learn', async (ctx) => {
   if (r.kept.length) parts.push(`${r.kept.length} kept`);
   if (r.retired.length) parts.push(`${r.retired.length} retired`);
   return { summary: parts.join(' · '), claudeRuns: r.claudeRuns };
+});
+
+registerAgent('trends', async (ctx) => {
+  const r = await refreshTrends({ now: ctx.now, shouldYield: ctx.shouldYield });
+  const src = Object.entries(r.sources).filter(([, n]) => n).map(([k, n]) => `${k} ${n}`).join(', ');
+  return { summary: r.claudeRuns ? `${r.fresh} trends found · ${r.live} live · from ${src || 'web search'}` : 'Paused for your campaign', claudeRuns: r.claudeRuns };
 });
 
 export interface TickDeps {

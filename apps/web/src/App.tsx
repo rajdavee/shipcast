@@ -8,6 +8,7 @@ import { Setup } from './pages/Setup.tsx';
 import { Skills } from './pages/Skills.tsx';
 import { Voice } from './pages/Voice.tsx';
 import { Learning } from './pages/Learning.tsx';
+import { Trending } from './pages/Trending.tsx';
 
 export function App() {
   const route = useRoute();
@@ -30,6 +31,7 @@ export function App() {
           <a href="#/new" aria-current={page === 'new' || !page ? 'page' : undefined}>New</a>
           <a href="#/library" aria-current={page === 'library' ? 'page' : undefined}>Projects</a>
           <a href="#/voice" aria-current={page === 'voice' ? 'page' : undefined}>Brand voice</a>
+          <a href="#/trending" aria-current={page === 'trending' ? 'page' : undefined}>Trending</a>
           <a href="#/learning" aria-current={page === 'learning' ? 'page' : undefined}>Learning</a>
           <a href="#/skills" aria-current={page === 'skills' ? 'page' : undefined}>Skills</a>
         </nav>
@@ -52,6 +54,8 @@ export function App() {
         <Library campaigns={campaigns.data} />
       ) : route[0] === 'voice' ? (
         <Voice />
+      ) : route[0] === 'trending' ? (
+        <Trending />
       ) : route[0] === 'learning' ? (
         <Learning />
       ) : route[0] === 'skills' ? (

@@ -11,6 +11,8 @@ import {
   blockedReason,
   CATEGORIES,
   collectIncidents,
+  rankCards,
+  readTrends,
   readLessons,
   setLessonStatus,
   claudeRunsToday,
@@ -265,6 +267,14 @@ router.put('/api/agents/:id', async (req, _r, p) => {
     throw new HttpError(404, (e as Error).message);
   }
 });
+// ── trend radar: cards the trends agent keeps fresh ────────────────────
+router.get('/api/trends', async (req) => {
+  const all = new URL(req.url ?? '/', 'http://x').searchParams.get('archived') === '1';
+  const feed = await readTrends();
+  return { refreshedAt: feed.refreshedAt ?? null, sources: feed.sources ?? {}, cards: rankCards(feed.cards.filter((c) => all || !c.archived)) };
+});
+router.post('/api/trends/refresh', async () => updateJob('trends', { runNow: true }));
+
 // ── learning loop: lessons per format, with the incidents behind them ──
 router.get('/api/lessons', async () => {
   const lessons = await readLessons();

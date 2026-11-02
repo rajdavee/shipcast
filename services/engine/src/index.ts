@@ -37,3 +37,4 @@ export * from './variants.ts';
 export * from './exports.ts';
 export * from './agents.ts';
 export * from './learn.ts';
+export * from './trends.ts';

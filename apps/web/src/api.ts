@@ -126,6 +126,25 @@ export interface AgentJob {
   running?: boolean;
   waiting: string;
 }
+export interface TrendCard {
+  key: string;
+  kind: 'format' | 'hook' | 'topic' | 'tactic' | 'platform-change';
+  platform: string;
+  title: string;
+  what: string;
+  evidence: { url: string; metric?: string; date?: string }[];
+  strength: 'rising' | 'steady' | 'fading';
+  recipe: { pack: string; angle: string; hookPattern: string; structure: string[] };
+  firstSeen: string;
+  lastSeen: string;
+  seen: number;
+  archived?: boolean;
+}
+export interface TrendFeed {
+  refreshedAt: string | null;
+  sources: Record<string, number>;
+  cards: TrendCard[];
+}
 export interface Lesson {
   id: string;
   pack: string;
@@ -247,6 +266,8 @@ export const api = {
   setAgent: (id: string, patch: { enabled?: boolean; every?: number }) => call<AgentJob[]>('PUT', `/api/agents/${id}`, patch),
   runAgent: (id: string) => call<AgentJob[]>('POST', `/api/agents/${id}/run`),
   lessons: () => call<LessonsState>('GET', '/api/lessons'),
+  trends: () => call<TrendFeed>('GET', '/api/trends'),
+  refreshTrends: () => call<unknown>('POST', '/api/trends/refresh'),
   setLesson: (id: string, status: 'off' | 'trial') => call<unknown>('PUT', `/api/lessons/${id}`, { status }),
   campaigns: () => call<Campaign[]>('GET', '/api/campaigns'),
   campaign: (id: string) => call<Campaign>('GET', `/api/campaigns/${id}`),

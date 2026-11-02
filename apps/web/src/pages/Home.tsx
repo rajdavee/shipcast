@@ -8,6 +8,7 @@ import { Brainstorm } from '../components/Brainstorm.tsx';
 
 const KIND: Record<SourceType, string> = { url: 'Website', github: 'GitHub repo', local: 'Folder on this computer', text: 'Description' };
 const PICK_KEY = 'shipcast.formats';
+export const PREFILL_KEY = 'shipcast.prefill';
 const BRAIN_KEY = 'shipcast.brainstorm';
 const readBool = (k: string, d: boolean) => {
   try {
@@ -76,6 +77,20 @@ export function Home({ status, services, campaigns }: { status: Status | null; s
   const [toneId, setToneId] = useState('');
   const [noteOpen, setNoteOpen] = useState(false);
   const [notes, setNotes] = useState('');
+  // "Make one like this" on the Trending page hands over a format and a recipe.
+  useEffect(() => {
+    let pre: { format?: string; notes?: string } | null = null;
+    try {
+      pre = JSON.parse(sessionStorage.getItem(PREFILL_KEY) ?? 'null');
+      sessionStorage.removeItem(PREFILL_KEY);
+    } catch {}
+    if (!pre) return;
+    if (pre.format) setPicks([pre.format]);
+    if (pre.notes) {
+      setNotes(pre.notes);
+      setNoteOpen(true);
+    }
+  }, []);
   const [shortLen, setShortLen] = useState<'15s' | '30s' | '60s'>('30s');
   const [longLen, setLongLen] = useState<'3 min' | '5 min' | '8 min' | '10 min'>('5 min');
   const [busy, setBusy] = useState(false);
