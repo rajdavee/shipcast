@@ -32,6 +32,14 @@ function savePicks(ids: string[]) {
 }
 
 /** A miniature post for the text-only format, so every tile shows a real artefact. */
+/** Heuristic: does a written brief describe a video/content to make rather than a product to market? */
+function looksLikeContent(t: string): boolean {
+  if (t.trim().length < 80) return false;
+  const cues = (t.match(/\b(scene\s*\d|scenes?\b|shot|anime|cartoon|animation|animated|character|episode|story|storyline|trailer|music video|lyric|documentary|cinematic|narrat|voice acting|sound design|seconds\)|aspect ratio|16:9|9:16|recipe|tutorial|montage|vlog|short film|plot)/gi) || []).length;
+  const product = (t.match(/\b(our (app|product|platform|tool|saas)|sign ?up|pricing|customers|users can|startup|api|dashboard|feature list|launching)\b/gi) || []).length;
+  return cues >= 3 && cues > product * 2;
+}
+
 const AnythingMock = () => (
   <div className="anything-mock" aria-hidden="true">
     <i className="orb" />
@@ -67,6 +75,21 @@ export function Home({ status, services, campaigns }: { status: Status | null; s
   const packs = useLoad(() => api.packs());
 
   const source = detectSource(text);
+  // A written brief for a video to make (a story, a trailer, a music video…) rather than a product.
+  const contentMode = source?.type === 'text' && looksLikeContent(text);
+  const [contentDismissed, setContentDismissed] = useState(false);
+  const [beforeContent, setBeforeContent] = useState<string[] | null>(null);
+  useEffect(() => {
+    if (contentMode && !contentDismissed && !beforeContent) {
+      setBeforeContent(picks);
+      setPicks(['custom-video']);
+    }
+    if (!contentMode && beforeContent) {
+      setPicks(beforeContent);
+      setBeforeContent(null);
+      setContentDismissed(false);
+    }
+  }, [contentMode]);
   const available = new Set((packs.data ?? []).map((p) => p.id));
   const formats = FORMATS.filter((f) => !packs.data || available.has(f.id));
   const chosen = picks.filter((id) => formats.some((f) => f.id === id));
@@ -130,7 +153,7 @@ export function Home({ status, services, campaigns }: { status: Status | null; s
 
   function make() {
     if (!canGo || !source) return;
-    if (brainOn) setBrain(true);
+    if (brainOn && !(contentMode && beforeContent)) setBrain(true);
     else create(notes);
   }
 
@@ -211,10 +234,17 @@ export function Home({ status, services, campaigns }: { status: Status | null; s
         </section>
       )}
 
-      <label className="brain-toggle">
+      {contentMode && beforeContent && (
+        <div className="content-note">
+          <b>This reads like a video to make, not a product.</b> Shipcast will treat it as a creative brief and make it with <b>Anything</b> — the director picks the engines (characters, motion, footage, generated shots) for each beat.
+          <button className="linkish" onClick={() => { setPicks(beforeContent); setBeforeContent(null); setContentDismissed(true); }}>Treat it as a product instead</button>
+        </div>
+      )}
+
+      {!(contentMode && beforeContent) && <label className="brain-toggle">
         <input type="checkbox" checked={brainOn} onChange={(e) => { setBrainOn(e.target.checked); try { localStorage.setItem(BRAIN_KEY, e.target.checked ? '1' : '0'); } catch {} }} />
         Brainstorm with me first — a few quick questions and three directions to pick from
-      </label>
+      </label>}
 
       {brain && source && <Brainstorm source={source} formats={chosen} notes={notes} length={hasLong ? longLen : hasShort ? shortLen : undefined} onDone={create} onCancel={() => setBrain(false)} onFormats={(ids) => { setPicks(ids); savePicks(ids); }} />}
 
