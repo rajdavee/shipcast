@@ -160,6 +160,29 @@ Copy is checked against platform limits (LinkedIn's "see more" fold, X's 280,
 YouTube's 60-character titles) and a list of AI clichés. Problems go back to
 Claude with the fix hint; you see what passed.
 
+## Anything — any kind of video
+
+Not every video is a product launch. Paste a brief for anything — a story, a
+documentary, a music or lyric video, a tutorial, a trailer, a motivational
+reel — and Shipcast reads it as content, writes a production brief (genre,
+beats with timings, look, sound, original characters, sources for facts) and a
+director picks the engine for each shot: original rigged cartoon characters and
+illustrated worlds, motion graphics and kinetic type, charts and maps, live
+captures, your uploads — plus real footage (Pexels), generated shots (fal.ai or
+Replicate) and CC0 sound effects (Freesound) when you connect your own keys.
+
+<p align="center">
+  <a href="docs/assets/anything-documentary.mp4"><img src="docs/assets/anything-documentary.jpg" alt="A 40-second honeybee documentary made from one paragraph: meadow, hive, waggle-dance diagram, moisture gauge, a teaspoon of honey" width="900" /></a><br />
+  <sub>▶ <a href="docs/assets/anything-documentary.mp4">Documentary (40 s)</a> from one paragraph — facts researched and cited, illustrated, narrated, scored.</sub>
+</p>
+<p align="center">
+  <img src="docs/assets/anything-motivational.jpg" alt="A vertical kinetic-type motivational reel" width="900" /><br />
+  <sub>A 9:16 kinetic-type reel from one line of text.</sub>
+</p>
+
+Original characters only (a famous character becomes an original one in the
+same spirit), no real people's likeness, no sexual or explicit content.
+
 ## A real run: Umami, from repo to campaign
 
 We pointed Shipcast at [`umami-software/umami`](https://github.com/umami-software/umami)

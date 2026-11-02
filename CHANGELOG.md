@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.1.0 — 2026-11-02
+
+Anything: make any kind of video, not just launch content.
+
+- **Product or content?** The research step decides. Content gets a production brief — genre, format, beats with timings, look, sound, original characters, cited sources for factual pieces — and every format follows it (no product claims or CTA unless asked).
+- **Director** skill with playbooks for stories and cartoons, trailers, documentaries, news, music and lyric videos, tutorials and recipes, motivational pieces, montages and data stories, choosing the engine per shot.
+- **Media engines** (`media.mjs`): Pexels stock video and photos, generative images and video through fal.ai or Replicate, CC0 sound effects from Freesound — all with your own keys from Setup, credits kept, explicit prompts refused.
+- **Cartoon kit**: nine original rigged characters (kid, robot, cat, dog, fox, dragon, blob, elder, bird) with emotions and actions, fourteen illustrated parallax worlds, twelve effects and camera moves — seek-safe for HyperFrames.
+- **Anything** format: follows the brief's own length and shape; Home recognises a video brief and switches to it.
+- Skills page no longer goes blank.
+
 ## 1.0.0 — 2026-11-02
 
 Ready to leave running: long campaigns look after themselves, your app and your disk.
