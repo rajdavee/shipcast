@@ -2,6 +2,7 @@ import type { Pack, Step } from './api.ts';
 
 /** The formats people pick on Home, in the order they appear. Preview images live in /public/formats. */
 export const FORMATS: { id: string; title: string; line: string; img?: string; ratio: number }[] = [
+  { id: 'custom-video', title: 'Anything', line: 'Describe any video — Claude builds it from scratch', ratio: 16 / 9 },
   { id: 'infographic', title: 'Infographic post', line: 'Animated framework post with real logos', img: '/formats/infographic.jpg', ratio: 4 / 5 },
   { id: 'carousel', title: 'Carousel', line: 'Swipe slides for LinkedIn and Instagram', img: '/formats/carousel.jpg', ratio: 4 / 5 },
   { id: 'reel', title: 'Reel', line: 'Vertical video with captions', img: '/formats/reel.jpg', ratio: 9 / 16 },

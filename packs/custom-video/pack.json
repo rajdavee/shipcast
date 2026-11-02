@@ -1,0 +1,20 @@
+{
+  "id": "custom-video",
+  "name": "Anything",
+  "tagline": "Describe any video — a cinematic battle, an abstract title sequence, a music visual, a story — and Claude builds it from scratch with motion graphics, particles, light and camera moves.",
+  "category": "motion",
+  "order": 2,
+  "estimate": "15–40 min",
+  "accent": "#f97316",
+  "subagents": true,
+  "options": [
+    { "key": "aspect", "label": "Shape", "type": "select", "choices": ["1920x1080", "1080x1920", "1080x1080", "1080x1350"], "default": "1920x1080" },
+    { "key": "length", "label": "Length", "type": "select", "choices": ["15 s", "30 s", "45 s", "60 s", "90 s"], "default": "30 s" },
+    { "key": "music", "label": "Music", "type": "select", "choices": ["yes", "no"], "default": "yes" },
+    { "key": "voice", "label": "Voiceover", "type": "select", "choices": ["no", "yes"], "default": "no" }
+  ],
+  "outputs": ["*.mp4", "*.webm", "*.jpg", "*.md"],
+  "skills": [{ "name": "motion-graphics", "source": "heygen-com/hyperframes" }],
+  "tools": ["ffmpeg", "chrome"],
+  "roles": ["gsap", "motion-doctrine", "transitions", "motion-review"]
+}

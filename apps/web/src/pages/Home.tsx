@@ -32,6 +32,13 @@ function savePicks(ids: string[]) {
 }
 
 /** A miniature post for the text-only format, so every tile shows a real artefact. */
+const AnythingMock = () => (
+  <div className="anything-mock" aria-hidden="true">
+    <i className="orb" />
+    <span>“A lone hero, a glowing aura, one final strike…”</span>
+  </div>
+);
+
 const PostMock = () => (
   <div className="post-mock" aria-hidden="true">
     <div className="pm-head"><i /><span><b /><small /></span></div>
@@ -257,7 +264,7 @@ export function Home({ status, services, campaigns }: { status: Status | null; s
               <button key={f.id} className="tile" aria-pressed={on} onClick={() => toggle(f.id)}>
                 <span className="tape" aria-hidden="true" />
                 <span className="tile-art">
-                  {f.img ? <img src={f.img} alt="" style={{ aspectRatio: String(f.ratio) }} loading="lazy" /> : <PostMock />}
+                  {f.id === 'custom-video' ? <AnythingMock /> : f.img ? <img src={f.img} alt="" style={{ aspectRatio: String(f.ratio) }} loading="lazy" /> : <PostMock />}
                 </span>
                 <span className="tile-text">
                   <b>{f.title}</b>
