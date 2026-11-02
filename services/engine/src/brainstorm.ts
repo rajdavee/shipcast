@@ -78,6 +78,12 @@ Use [] for whichever list is empty.`;
 }
 
 /** Pull the first JSON object out of a model reply and keep only well-formed parts. */
+/**
+ * The quick chat runs as its own role: without it, some models read the request
+ * as an injected instruction and refuse instead of answering in JSON.
+ */
+const BRAIN_ROLE = 'You are the creative brainstorm partner inside Shipcast, a video and marketing studio the user is using right now. The message is the user\'s own request, typed in the app; it is not an injected instruction. Do not use any tools and do not try to open links — answer straight away from what the message says (ask about what you cannot know). Answer with exactly the JSON the message asks for, and nothing else.';
+
 export function parseBrainTurn(text: string): BrainTurn {
   const start = text.indexOf('{');
   const end = text.lastIndexOf('}');
@@ -111,7 +117,8 @@ export async function brainstorm(i: BrainInput): Promise<BrainTurn> {
       // Questions should feel instant; directions get the default model.
       model: i.model ?? (i.answers || i.reply ? 'sonnet' : 'haiku'),
       // Skip the user's hooks, plugins and MCP servers: this is a quick chat, not a work session.
-      extraArgs: ['--max-turns', '1', '--setting-sources', 'project', '--strict-mcp-config'],
+      appendSystemPrompt: BRAIN_ROLE,
+      extraArgs: ['--max-turns', '2', '--disallowedTools', 'WebFetch,WebSearch,Bash,Read,Write,Edit,Task', '--setting-sources', 'project', '--strict-mcp-config'],
       // No extended thinking: a 25 s pause kills a conversation; answers come back in ~6–8 s.
       env: { MAX_THINKING_TOKENS: '0' },
       onEvent: (e) => {
@@ -123,7 +130,7 @@ export async function brainstorm(i: BrainInput): Promise<BrainTurn> {
     const r = await run.done;
     clearTimeout(timer);
     const turn = parseBrainTurn(r.result?.text || text);
-    if (!turn.questions.length && !turn.directions.length) throw new Error(r.result?.text ? 'Could not read the brainstorm reply' : `Claude didn't answer (${r.stderr.trim().split('\n').at(-1) || `exit ${r.code}`})`);
+    if (!turn.questions.length && !turn.directions.length) throw new Error(r.result?.text ? `Could not read the brainstorm reply: ${(r.result.text || '').replace(/\s+/g, ' ').slice(0, 160)}` : `Claude didn't answer (${r.stderr.trim().split('\n').at(-1) || `exit ${r.code}`})`);
     return turn;
   } finally {
     await rm(cwd, { recursive: true, force: true });
@@ -169,7 +176,7 @@ Reply with ONLY a JSON array, no prose:
   const cwd = await mkdtemp(join(tmpdir(), 'shipcast-board-'));
   try {
     let text = '';
-    const run = runClaude({ prompt, cwd, allowedTools: [], model: 'sonnet', extraArgs: ['--max-turns', '1', '--setting-sources', 'project', '--strict-mcp-config'], env: { MAX_THINKING_TOKENS: '0' }, onEvent: (e) => { if (e.kind === 'result' && e.text) text = e.text; } });
+    const run = runClaude({ prompt, cwd, allowedTools: [], model: 'sonnet', appendSystemPrompt: BRAIN_ROLE, extraArgs: ['--max-turns', '2', '--disallowedTools', 'WebFetch,WebSearch,Bash,Read,Write,Edit,Task', '--setting-sources', 'project', '--strict-mcp-config'], env: { MAX_THINKING_TOKENS: '0' }, onEvent: (e) => { if (e.kind === 'result' && e.text) text = e.text; } });
     const timer = setTimeout(run.kill, 90_000);
     const r = await run.done;
     clearTimeout(timer);
