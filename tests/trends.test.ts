@@ -8,24 +8,24 @@ process.env.SHIPCAST_HOME = mkdtempSync(join(tmpdir(), 'trends-'));
 const { parseTrendsRss, fromReddit, fromHN, cleanCard, mergeCards, rankCards, refreshTrends, readTrends, trendsPrompt } = await import('@shipcast/engine');
 
 const RSS = `<?xml version="1.0"?><rss><channel><item><title>ai agents</title><ht:approx_traffic>50,000+</ht:approx_traffic><pubDate>Mon, 2 Nov 2026 08:00:00 -0800</pubDate></item><item><title><![CDATA[world series]]></title><ht:approx_traffic>2M+</ht:approx_traffic></item></channel></rss>`;
-const REDDIT = { data: { children: [{ data: { title: 'Carousels doubled our reach', permalink: '/r/marketing/comments/abc/x/', ups: 412, num_comments: 88, created_utc: 1793600000 } }, { data: { title: 'nsfw', permalink: '/x', ups: 9, over_18: true } }] } };
+const REDDIT = `<feed><entry><title>Carousels doubled our reach</title><link href="https://www.reddit.com/r/marketing/comments/abc/x/" /><updated>2026-11-01T10:00:00+00:00</updated></entry><entry><title>offsite</title><link href="https://evil.example/x" /></entry></feed>`;
 const HN = { hits: [{ title: 'Show HN: launch kit', objectID: '42', points: 230, created_at: '2026-11-01T10:00:00Z' }] };
 
 const fakeFetch = (async (url: string) => {
-  const body = url.includes('trends.google') ? RSS : url.includes('reddit') ? JSON.stringify(REDDIT) : url.includes('algolia') ? JSON.stringify(HN) : '{}';
+  const body = url.includes('trends.google') ? RSS : url.includes('reddit') ? REDDIT : url.includes('algolia') ? JSON.stringify(HN) : '{}';
   return new Response(body, { status: 200 });
 }) as typeof fetch;
 
-test('sources parse into signals with links and numbers; NSFW posts are dropped', async () => {
+test('sources parse into signals with links and numbers; off-site links are dropped', async () => {
   const g = parseTrendsRss(RSS, 'US');
   assert.equal(g.length, 2);
   assert.equal(g[0].metric, 50000);
   assert.equal(g[1].title, 'world series');
   assert.match(g[0].url, /^https:\/\/trends\.google\.com\/trends\/explore\?q=ai%20agents&geo=US$/);
-  const r = await fromReddit(fakeFetch, ['marketing']);
+  const r = await fromReddit(fakeFetch, ['marketing'], 0);
   assert.equal(r.length, 1);
   assert.equal(r[0].url, 'https://www.reddit.com/r/marketing/comments/abc/x/');
-  assert.equal(r[0].metric, 412);
+  assert.equal(r[0].metricLabel, '#1 this week');
   const h = await fromHN(fakeFetch, new Date('2026-11-03'), ['launch']);
   assert.equal(h[0].url, 'https://news.ycombinator.com/item?id=42');
 });

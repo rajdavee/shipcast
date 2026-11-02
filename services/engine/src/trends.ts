@@ -63,16 +63,27 @@ export async function fromHN(f: Fetch = fetch, now = new Date(), queries = HN_QU
   return out;
 }
 
-export async function fromReddit(f: Fetch = fetch, subs = REDDIT_SUBS): Promise<Signal[]> {
+/** Reddit's public Atom feed of a community's top posts this week (its JSON API needs OAuth now). Rank stands in for votes. */
+export function parseRedditAtom(xml: string, sub: string): Signal[] {
   const out: Signal[] = [];
-  for (const sub of subs) {
-    const r = await f(`https://www.reddit.com/r/${sub}/top.json?t=week&limit=15`, { headers: UA, signal: AbortSignal.timeout(20_000) }).catch(() => null);
-    if (!r?.ok) continue;
-    const j = (await r.json().catch(() => ({}))) as { data?: { children?: { data: any }[] } };
-    for (const { data: p } of j.data?.children ?? []) {
-      if (p.over_18 || p.stickied) continue;
-      out.push({ source: 'reddit', title: String(p.title ?? ''), url: `https://www.reddit.com${p.permalink}`, metric: Number(p.ups) || 0, metricLabel: `upvotes, ${Number(p.num_comments) || 0} comments`, at: new Date((Number(p.created_utc) || 0) * 1000).toISOString().slice(0, 10), where: `r/${sub}` });
-    }
+  const entries = xml.match(/<entry[\s>][\s\S]*?<\/entry>/g) ?? [];
+  entries.forEach((e, i) => {
+    const title = (e.match(/<title>([\s\S]*?)<\/title>/)?.[1] ?? '').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'").trim();
+    const url = e.match(/<link href="([^"]+)"/)?.[1] ?? '';
+    if (!title || !/^https:\/\/www\.reddit\.com\/r\//.test(url)) return;
+    out.push({ source: 'reddit', title, url, metric: entries.length - i, metricLabel: `#${i + 1} this week`, at: (e.match(/<(?:published|updated)>([^<]+)</)?.[1] ?? '').slice(0, 10), where: `r/${sub}` });
+  });
+  return out;
+}
+
+export async function fromReddit(f: Fetch = fetch, subs = REDDIT_SUBS, gapMs = 2000): Promise<Signal[]> {
+  const out: Signal[] = [];
+  for (const [i, sub] of subs.entries()) {
+    // Reddit rate-limits anonymous feeds hard: space requests out and stop at the first "slow down".
+    if (i && gapMs) await new Promise((r) => setTimeout(r, gapMs));
+    const r = await f(`https://www.reddit.com/r/${sub}/top/.rss?t=week&limit=15`, { headers: UA, signal: AbortSignal.timeout(20_000) }).catch(() => null);
+    if (r?.status === 429) break;
+    if (r?.ok) out.push(...parseRedditAtom(await r.text(), sub));
   }
   return out;
 }
@@ -119,7 +130,7 @@ export async function fromYouTube(f: Fetch = fetch, now = new Date(), queries = 
 
 /** Everything from every source, de-duplicated, strongest first per source. */
 export async function collectSignals(f: Fetch = fetch, now = new Date()): Promise<{ signals: Signal[]; sources: Record<string, number> }> {
-  const [hn, reddit, gt, yt] = await Promise.all([fromHN(f, now), fromReddit(f), fromGoogleTrends(f), fromYouTube(f, now)]);
+  const [hn, reddit, gt, yt] = await Promise.all([fromHN(f, now), fromReddit(f, REDDIT_SUBS, f === fetch ? 2000 : 0), fromGoogleTrends(f), fromYouTube(f, now)]);
   const seen = new Set<string>();
   const signals = [...hn, ...reddit, ...gt, ...yt].filter((s) => s.title && !seen.has(s.url) && (seen.add(s.url), true));
   signals.sort((a, b) => a.source.localeCompare(b.source) || b.metric - a.metric);
