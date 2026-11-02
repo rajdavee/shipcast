@@ -35,3 +35,4 @@ export * from './tone-learn.ts';
 export * from './pptx.ts';
 export * from './variants.ts';
 export * from './exports.ts';
+export * from './agents.ts';

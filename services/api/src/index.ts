@@ -8,6 +8,11 @@ import { homedir } from 'node:os';
 import { pipeline } from 'node:stream/promises';
 import {
   appendEvent,
+  blockedReason,
+  claudeRunsToday,
+  readJobs,
+  readRuns,
+  updateJob,
   campaignDir,
   claudeAuth,
   createCampaign,
@@ -226,7 +231,42 @@ router.put('/api/settings', async (req) => {
   if (Number.isFinite(body.stepTimeoutMinutes)) patch.stepTimeoutMinutes = Math.min(240, Math.max(5, Number(body.stepTimeoutMinutes)));
   if (Number.isFinite(body.genCapPerProject)) patch.genCapPerProject = Math.min(1000, Math.max(0, Number(body.genCapPerProject)));
   if (Number.isFinite(body.genCapPerMonth)) patch.genCapPerMonth = Math.min(10000, Math.max(0, Number(body.genCapPerMonth)));
+  if (typeof body.agentsPaused === 'boolean') patch.agentsPaused = body.agentsPaused;
+  for (const k of ['agentsQuietStart', 'agentsQuietEnd'] as const) if (typeof body[k] === 'string' && /^\d{1,2}:\d{2}$/.test(body[k])) patch[k] = body[k];
+  if (Number.isFinite(body.agentsMaxClaudeRunsPerDay)) patch.agentsMaxClaudeRunsPerDay = Math.min(50, Math.max(0, Math.round(Number(body.agentsMaxClaudeRunsPerDay))));
   return writeSettings(patch);
+});
+
+// ── background agents: list, switch on/off, change cadence, run now ─────
+router.get('/api/agents', async () => {
+  const s = await readSettings();
+  const jobs = await readJobs();
+  return {
+    paused: s.agentsPaused,
+    quiet: { start: s.agentsQuietStart, end: s.agentsQuietEnd },
+    cap: s.agentsMaxClaudeRunsPerDay,
+    usedToday: await claudeRunsToday(),
+    jobs: await Promise.all(jobs.map(async (j) => ({ ...j, waiting: j.running ? '' : await blockedReason({ ...j, runNow: false }, s) }))),
+    runs: (await readRuns()).slice(-30).reverse(),
+  };
+});
+router.put('/api/agents/:id', async (req, _r, p) => {
+  const body = await readJson(req);
+  const patch: { enabled?: boolean; every?: number } = {};
+  if (typeof body.enabled === 'boolean') patch.enabled = body.enabled;
+  if (Number.isFinite(body.every)) patch.every = Number(body.every);
+  try {
+    return await updateJob(p.id, patch);
+  } catch (e) {
+    throw new HttpError(404, (e as Error).message);
+  }
+});
+router.post('/api/agents/:id/run', async (_q, _r, p) => {
+  try {
+    return await updateJob(p.id, { runNow: true });
+  } catch (e) {
+    throw new HttpError(404, (e as Error).message);
+  }
 });
 
 // ── voice (optional: your own ElevenLabs key; Kokoro is the free default) ─

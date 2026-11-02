@@ -17,6 +17,10 @@ export const DEFAULT_SETTINGS: Settings = {
   voiceProvider: 'kokoro',
   elevenVoice: '',
   elevenModel: 'eleven_multilingual_v2',
+  agentsPaused: false,
+  agentsQuietStart: '23:00',
+  agentsQuietEnd: '07:00',
+  agentsMaxClaudeRunsPerDay: 6,
 };
 
 export function newId(prefix = ''): string {

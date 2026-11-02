@@ -22,7 +22,8 @@
     "services/stills",
     "services/media",
     "services/qa",
-    "services/gen"
+    "services/gen",
+    "services/agents"
   ],
   "bin": {
     "shipcast": "bin/shipcast.ts"

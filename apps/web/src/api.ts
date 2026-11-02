@@ -107,6 +107,32 @@ export interface Settings {
   directorReview: boolean;
   genCapPerProject?: number;
   genCapPerMonth?: number;
+  agentsPaused?: boolean;
+  agentsQuietStart?: string;
+  agentsQuietEnd?: string;
+  agentsMaxClaudeRunsPerDay?: number;
+}
+
+export interface AgentJob {
+  id: string;
+  title: string;
+  about: string;
+  every: number;
+  enabled: boolean;
+  nextRun: string;
+  lastRun?: string;
+  lastResult?: { ok: boolean; summary: string; ms: number };
+  runNow?: boolean;
+  running?: boolean;
+  waiting: string;
+}
+export interface AgentsState {
+  paused: boolean;
+  quiet: { start: string; end: string };
+  cap: number;
+  usedToday: number;
+  jobs: AgentJob[];
+  runs: { job: string; at: string; ok: boolean; summary: string; ms: number }[];
 }
 
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -201,6 +227,9 @@ export const api = {
   scoreCopy: (b: { text: string; toneId: string; channel?: string }) => call<BrandScore>('POST', '/api/tones/score', b),
   rewriteCopy: (b: { text: string; toneId: string; channel?: string }) => call<{ text: string; score: BrandScore }>('POST', '/api/tones/rewrite', b),
   saveSettings: (s: Partial<Settings>) => call<Settings>('PUT', '/api/settings', s),
+  agents: () => call<AgentsState>('GET', '/api/agents'),
+  setAgent: (id: string, patch: { enabled?: boolean; every?: number }) => call<AgentJob[]>('PUT', `/api/agents/${id}`, patch),
+  runAgent: (id: string) => call<AgentJob[]>('POST', `/api/agents/${id}/run`),
   campaigns: () => call<Campaign[]>('GET', '/api/campaigns'),
   campaign: (id: string) => call<Campaign>('GET', `/api/campaigns/${id}`),
   createCampaign: (body: unknown) => call<Campaign>('POST', '/api/campaigns', body),

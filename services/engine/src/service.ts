@@ -244,7 +244,7 @@ export function createService(opts: ServiceOptions) {
 
 // ── client ───────────────────────────────────────────────────────────────
 
-export const SERVICE_PORTS = { render: 4320, stills: 4321, media: 4322, qa: 4323, gen: 4324 } as const;
+export const SERVICE_PORTS = { render: 4320, stills: 4321, media: 4322, qa: 4323, gen: 4324, agents: 4325 } as const;
 export type ServiceName = keyof typeof SERVICE_PORTS;
 
 export function serviceUrl(name: ServiceName): string {

@@ -191,3 +191,20 @@ test('drawing board turns a direction into sketchable beats', async () => {
   assert.equal(r.status, 200);
   assert.deepEqual(r.body.beats.map((b: any) => b.scene), ['kinetic', 'product', 'outro']);
 });
+
+test('background agents: list, switch off, change cadence, run now, settings', async () => {
+  const list = await api('/api/agents');
+  assert.equal(list.status, 200);
+  assert.deepEqual(list.body.jobs.map((j: any) => j.id), ['learn', 'trends', 'golden']);
+  assert.equal(list.body.cap, 6);
+  const off = await api('/api/agents/trends', { method: 'PUT', json: { enabled: false, every: 5 } });
+  const t = off.body.find((j: any) => j.id === 'trends');
+  assert.equal(t.enabled, false);
+  assert.equal(t.every, 30, 'cadence is clamped to at least 30 minutes');
+  assert.equal((await api('/api/agents/learn/run', { method: 'POST' })).body.find((j: any) => j.id === 'learn').runNow, true);
+  assert.equal((await api('/api/agents/nope/run', { method: 'POST' })).status, 404);
+  const s = await api('/api/settings', { method: 'PUT', json: { agentsPaused: true, agentsQuietStart: '22:30', agentsMaxClaudeRunsPerDay: 3 } });
+  assert.equal(s.body.agentsPaused, true);
+  assert.equal(s.body.agentsQuietStart, '22:30');
+  assert.equal((await api('/api/agents')).body.jobs[0].waiting, 'Background agents are paused.');
+});

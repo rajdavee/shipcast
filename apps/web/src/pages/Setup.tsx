@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api, type LoginState, type Settings, type Status, type StockProvider } from '../api.ts';
+import { api, type AgentsState, type LoginState, type Settings, type Status, type StockProvider } from '../api.ts';
 import { toast, useLoad } from '../hooks.ts';
 
 const NAMES: Record<string, string> = { render: 'Video renderer', stills: 'Image & PDF renderer', media: 'Voice, captions & music', qa: 'Quality checks' };
@@ -108,6 +108,7 @@ export function Setup({ status, onChange }: { status: Status | null; onChange: (
 
       <BrollSection />
       <EnginesSection />
+      <AgentsSection />
 
       <section className="setup-section">
         <h2>On this computer</h2>
@@ -397,5 +398,77 @@ function GenBudget() {
         </div>
       </div>
     </div>
+  );
+}
+
+const when = (iso?: string) => {
+  if (!iso) return 'never';
+  const d = (Date.parse(iso) - Date.now()) / 60_000;
+  const a = Math.abs(d);
+  const t = a < 1 ? 'now' : a < 60 ? `${Math.round(a)} min` : a < 48 * 60 ? `${Math.round(a / 60)} h` : `${Math.round(a / 1440)} days`;
+  return t === 'now' ? 'now' : d > 0 ? `in ${t}` : `${t} ago`;
+};
+const EVERY = [
+  [360, 'every 6 hours'],
+  [720, 'every 12 hours'],
+  [1440, 'daily'],
+  [10080, 'weekly'],
+] as const;
+
+function AgentsSection() {
+  const [s, setS] = useState<AgentsState | null>(null);
+  const load = () => api.agents().then(setS).catch(() => {});
+  useEffect(() => {
+    void load();
+    const t = setInterval(load, 10_000);
+    return () => clearInterval(t);
+  }, []);
+  if (!s) return null;
+  const save = async (patch: Partial<Settings>) => {
+    await api.saveSettings(patch);
+    await load();
+    toast('Saved');
+  };
+  return (
+    <section className="setup-section">
+      <h2>Background agents</h2>
+      <p>While you're not using Shipcast, these learn from past runs and watch what's working in marketing. They wait until your own campaigns finish, stay out of quiet hours and use at most {s.cap} Claude runs a day ({s.usedToday} used today).</p>
+      <div className="rows">
+        {s.jobs.map((j) => (
+          <div className="srow" key={j.id}>
+            <i className={`dot ${j.running ? 'live' : j.enabled ? (j.lastResult && !j.lastResult.ok ? 'bad' : 'ok') : ''}`} />
+            <div>
+              <h3>{j.title}</h3>
+              <p>{j.about}</p>
+              <p className="muted" style={{ fontSize: 13 }}>
+                {j.running ? 'Running now…' : j.enabled ? `Next ${when(j.nextRun)}${j.waiting ? ` · ${j.waiting}` : ''}` : 'Off'}
+                {j.lastRun ? ` · last ${when(j.lastRun)}: ${j.lastResult?.summary ?? ''}` : ''}
+              </p>
+            </div>
+            <div className="row-actions">
+              <select className="input" value={j.every} onChange={async (e) => { await api.setAgent(j.id, { every: Number(e.target.value) }); await load(); }} aria-label={`${j.title} schedule`}>
+                {EVERY.map(([m, l]) => <option key={m} value={m}>{l}</option>)}
+                {!EVERY.some(([m]) => m === j.every) && <option value={j.every}>every {j.every} min</option>}
+              </select>
+              <button className="btn ghost" disabled={j.running || j.runNow} onClick={async () => { await api.runAgent(j.id); await load(); toast('Queued — it starts when nothing else is running'); }}>{j.runNow ? 'Queued' : 'Run now'}</button>
+              <label className="switch"><input type="checkbox" checked={j.enabled} onChange={async (e) => { await api.setAgent(j.id, { enabled: e.target.checked }); await load(); }} /> On</label>
+            </div>
+          </div>
+        ))}
+        <div className="srow">
+          <i className={`dot ${s.paused ? 'bad' : 'ok'}`} />
+          <div>
+            <h3>{s.paused ? 'Paused' : 'Schedule'}</h3>
+            <p>Quiet hours keep them off while you sleep or present. "Run now" ignores quiet hours.</p>
+          </div>
+          <div className="row-actions">
+            <label className="field" style={{ width: 96 }}><span>Quiet from</span><input className="input" type="time" defaultValue={s.quiet.start} onBlur={(e) => save({ agentsQuietStart: e.target.value })} /></label>
+            <label className="field" style={{ width: 96 }}><span>until</span><input className="input" type="time" defaultValue={s.quiet.end} onBlur={(e) => save({ agentsQuietEnd: e.target.value })} /></label>
+            <label className="field" style={{ width: 96 }}><span>Runs / day</span><input className="input" type="number" min={0} max={50} defaultValue={s.cap} onBlur={(e) => save({ agentsMaxClaudeRunsPerDay: Number(e.target.value) })} /></label>
+            <button className="btn ghost" onClick={() => save({ agentsPaused: !s.paused })}>{s.paused ? 'Resume' : 'Pause all'}</button>
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }

@@ -159,4 +159,9 @@ export interface Settings {
   elevenVoice: string;
   /** ElevenLabs model id. */
   elevenModel: string;
+  /** Background agents (learning, trends): global pause, quiet hours (HH:MM local) and a daily cap on their Claude runs. */
+  agentsPaused: boolean;
+  agentsQuietStart: string;
+  agentsQuietEnd: string;
+  agentsMaxClaudeRunsPerDay: number;
 }
