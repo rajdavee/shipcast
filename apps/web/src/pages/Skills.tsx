@@ -26,6 +26,7 @@ export function Skills() {
   const [busy, setBusy] = useState<string | null>(null);
   const [data, setData] = useState<SkillsView | null>(null);
   const view = data ?? v.data;
+  const [url, setUrl] = useState('');
 
   const act = async (id: string, fn: () => Promise<SkillsView>, msg: string): Promise<void> => {
     setBusy(id);
@@ -41,7 +42,6 @@ export function Skills() {
   };
 
   if (!view) return <main className="page"><p className="muted">Loading…</p></main>;
-  const [url, setUrl] = useState('');
   const byArea = AREAS.map(([a, label]) => ({ a, label, items: view.packages.filter((p) => p.area === a) })).filter((g) => g.items.length);
 
   return (
