@@ -12,7 +12,9 @@ import { checkEmail, renderEmail, type EmailSetSpec } from './templates/email.ts
 import { AD_SIZES, DEFAULT_AD_SIZES, renderAd, type AdSpec } from './templates/ads.ts';
 import { HIDE_TEXT_CSS, MEASURE_TEXT_SCRIPT, renderSlide, SLIDE_LAYOUTS, SLIDE_THEMES, slideIconNames, type SlidePage } from './templates/slides.ts';
 import { DOC_AUDIT_SCRIPT, DOC_LAYOUTS, DOC_THEMES, docIconNames, PAGE_SIZES, renderDocument, type DocPage } from './templates/document.ts';
+import { snapCropFile } from './crop.ts';
 
+export { snapCrop } from './crop.ts';
 export { CAROUSEL_LAYOUTS, THEMES, CARD_LAYOUTS, THUMBNAIL_LAYOUTS, DOC_LAYOUTS, DOC_THEMES, PAGE_SIZES, SLIDE_LAYOUTS, SLIDE_THEMES };
 
 export interface SlidesSpec {
@@ -68,9 +70,11 @@ async function materializeCrops<T>(spec: T, assetsDir: string | undefined, outDi
       if (!m) return v;
       if (seen.has(v)) return seen.get(v);
       const src = m[1].startsWith('/') ? m[1] : join(assetsDir ?? outDir, m[1]);
-      const [x, y, w, h] = m.slice(2).map(Number).map((n) => Math.min(1, Math.max(0, n)));
+      const asked = m.slice(2).map(Number).map((n) => Math.min(1, Math.max(0, n)));
       const out = join(dir, `${createHash('sha1').update(v).digest('hex').slice(0, 12)}.png`);
       await mkdir(dir, { recursive: true });
+      // Nudge the edges out to clear space so a card isn't clipped a few pixels short of its border.
+      const { x, y, w, h } = await snapCropFile(src, { x: asked[0], y: asked[1], w: asked[2], h: asked[3] }, `${out}.gray`);
       const r = await run('ffmpeg', ['-y', '-v', 'error', '-i', src, '-vf', `crop=iw*${Math.max(0.02, w)}:ih*${Math.max(0.02, h)}:iw*${x}:ih*${y},scale='min(iw*2,2400)':-2:flags=lanczos`, out]);
       const res = r.code === 0 ? out : m[1];
       seen.set(v, res);
