@@ -1,0 +1,18 @@
+{
+  "id": "platform-export",
+  "name": "Platform export",
+  "tagline": "A finished piece re-cut for each place you'll post it — shape, length, file size and caption limits — with an upload checklist. No Claude turn.",
+  "category": "video",
+  "order": 91,
+  "hidden": true,
+  "estimate": "1–4 min",
+  "accent": "#0891b2",
+  "pipeline": "export",
+  "options": [
+    { "key": "source", "label": "Piece", "type": "text", "default": "" },
+    { "key": "platforms", "label": "Platforms (comma-separated)", "type": "text", "default": "tiktok,reels,shorts,linkedin,x" }
+  ],
+  "outputs": ["*/*.mp4", "*/*.png", "*/*.jpg", "*/caption.txt", "*/CHECKLIST.md", "EXPORTS.md"],
+  "skills": [],
+  "tools": ["ffmpeg"]
+}

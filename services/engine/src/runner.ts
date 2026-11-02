@@ -22,6 +22,7 @@ import { ensureForRoles, hubPluginDir, rolesPrompt } from './skillhub.ts';
 import { readCampaignEnv, scrubSecrets } from './campaignenv.ts';
 import type { Campaign, Pack, Step } from './types.ts';
 import { prepareVariants, renderVariants } from './variants.ts';
+import { exportForPlatforms, PLATFORMS } from './exports.ts';
 import { DEFAULT_TONE, getTone, normalizeTone, outputText, PACK_CHANNEL, scoreText, toneBrief, type ToneProfile } from './tone.ts';
 
 export const WORKER_ID = `${hostname()}:${process.pid}`;
@@ -451,6 +452,7 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
     if (step.kind === 'brief') await phase('Researching your product');
     else if (pack?.pipeline === 'shorts') await phase('Cutting Shorts from your video');
     else if (pack?.pipeline === 'hub') await phase('Packaging the campaign');
+    else if (pack?.pipeline === 'export') await phase('Re-cutting for each platform');
     else if (pack?.pipeline) await phase('Transcribing and captioning');
     else if (!renderOnly) await phase(specKind === 'storyboard' ? 'Writing the script' : specKind === 'infographic' ? 'Researching the framework' : specKind === 'deck' ? 'Writing the slides' : specKind === 'graphics' ? 'Designing the graphics' : specKind === 'document' ? 'Writing the document' : specKind === 'slides' ? 'Writing the deck' : specKind === 'ads' ? 'Writing the hooks' : specKind === 'email' ? 'Writing the emails' : specKind === 'landing' ? 'Writing the page' : specKind === 'print' ? 'Designing for print' : pack?.id === 'copy-kit' ? 'Writing the posts' : 'Making it');
     if (pack?.pipeline === 'captions') {
@@ -499,6 +501,24 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
             await rm(d, { recursive: true, force: true });
           }
           await log({ step: step.id, type: 'log', text: `Made ${shorts.length} Shorts from "${board.title ?? src.pack}"` });
+        } catch (e) {
+          ok = false;
+          why = (e as Error).message;
+        }
+      }
+    } else if (pack?.pipeline === 'export') {
+      // No Claude: re-cut one finished piece for each platform it will be posted on.
+      const src = campaign.steps.find((s) => s.id === step.options.source && s.status === 'done');
+      if (!src) {
+        ok = false;
+        why = 'Pick a finished piece to export.';
+      } else {
+        try {
+          const ids = String(step.options.platforms || 'tiktok,reels,shorts,linkedin,x').split(',').map((x) => x.trim()).filter((x) => PLATFORMS.some((p) => p.id === x));
+          const out = join(cwd, 'out');
+          const res = await exportForPlatforms(join(dir, 'deliverables', src.id, 'out'), out, ids, (t) => void phase(t));
+          await writeFile(join(out, 'EXPORTS.md'), ['# Platform exports', '', ...res.map((r) => `## ${PLATFORMS.find((p) => p.id === r.platform)?.label}\n${r.files.map((f) => `- ${f.slice(out.length + 1)}`).join('\n')}${r.warnings.length ? `\n${r.warnings.map((w) => `- ⚠️ ${w}`).join('\n')}` : ''}`)].join('\n\n') + '\n');
+          await log({ step: step.id, type: 'log', text: `Exported for ${res.map((r) => r.platform).join(', ')}` });
         } catch (e) {
           ok = false;
           why = (e as Error).message;

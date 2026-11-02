@@ -134,6 +134,9 @@ export function Lightbox({ campaign, step, pack, events, onClose, onChange, onPr
               {editable && step.status === 'done' && !['ad-set', 'landing', 'print', 'infographic', 'hook-variants'].includes(step.pack ?? '') && (
                 <button className="btn" title="The same piece with 4 different openings, rendered side by side for an A/B test" onClick={() => act(() => api.variants(campaign.id, step.id, 4), 'Writing 4 hook variants')}>Hook variants</button>
               )}
+              {step.status === 'done' && step.outputs.some((o) => /\.(mp4|png|jpe?g)$/.test(o)) && !['platform-export', 'hook-variants', 'campaign-hub'].includes(step.pack ?? '') && (
+                <button className="btn" title="Re-cut for TikTok, Reels, Shorts, LinkedIn and X with captions and an upload checklist" onClick={() => act(() => api.addStep(campaign.id, 'platform-export', { source: step.id, platforms: 'tiktok,reels,shorts,linkedin,x' }), 'Exporting for each platform')}>Export for platforms</button>
+              )}
             </div>
           )}
 
