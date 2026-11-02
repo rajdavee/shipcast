@@ -1,0 +1,19 @@
+{
+  "id": "product-hunt-kit",
+  "name": "Product Hunt Launch Kit",
+  "tagline": "4–6 gallery images (1270×760), a 240×240 thumbnail and the listing copy — name, 60-character tagline, description, maker's first comment and topics — checked against the form's limits.",
+  "category": "design",
+  "order": 10,
+  "estimate": "3–6 min",
+  "accent": "#da552f",
+  "spec": "graphics",
+  "options": [
+    { "key": "gallery", "label": "Gallery images", "type": "number", "default": "5", "min": 4, "max": 6 },
+    { "key": "theme", "label": "Theme", "type": "select", "choices": ["auto", "editorial", "swiss", "bold", "midnight"], "default": "auto" },
+    { "key": "launchDate", "label": "Launch date (optional)", "type": "text", "default": "", "placeholder": "e.g. Tuesday 12 May" }
+  ],
+  "outputs": ["gallery/*.png", "thumbnail.png", "launch-copy.md", "graphics.json", "*.md"],
+  "skills": [],
+  "tools": ["chrome"],
+  "roles": ["design-taste", "copy", "humanize"]
+}

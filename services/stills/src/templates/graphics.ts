@@ -358,6 +358,65 @@ ${logo(ctx)}<div><div style="font:900 220px/.7 var(--font-display);color:var(--a
 <div class="stage"><div class="dev${bleed ? ' bleed' : ''}"><i class="cam"></i><div class="scr"><img src="${img(f.image, ctx)}" alt=""></div></div></div></div>`;
     },
   },
+  {
+    id: 'gallery-shot',
+    label: 'Launch gallery: headline + product',
+    use: 'Launch-page gallery image (preset producthunt-gallery, 1270×760): one benefit headline over a big real screenshot that runs off the bottom. Use for the first image and most of the set.',
+    fields: [
+      { id: 'title', type: 'text', label: 'Headline (≤ 8 words)', max: 56, help: '*word* = accent' },
+      { id: 'sub', type: 'text', label: 'Supporting line', max: 90, optional: true },
+      { id: 'kicker', type: 'text', label: 'Kicker', max: 28, optional: true },
+      { id: 'image', type: 'image', label: 'Screenshot (crop with #crop=x,y,w,h)' },
+    ],
+    html: (f, ctx) => {
+      const pad = Math.round(ctx.width * 0.06);
+      const t = fit(f.title, [[24, 76], [40, 64], [56, 54]], 48);
+      return `<div class="c" style="flex-direction:column;padding:${pad}px ${pad}px 0;gap:22px;--k:26px">
+<div class="hd">${logo(ctx)}${f.kicker ? `<span class="kick">${rich(f.kicker)}</span>` : ''}</div>
+<h1 data-fit-lines="2" data-min-font="44" style="font-size:${t}px">${rich(f.title)}</h1>${f.sub ? `<p style="font-size:28px;line-height:1.3;margin-top:-6px">${rich(f.sub)}</p>` : ''}
+<div class="frame" style="flex:1;min-height:0;margin:8px 0 -30px"><div class="bar"><i></i><i></i><i></i></div><img src="${img(f.image, ctx)}"></div></div>`;
+    },
+  },
+  {
+    id: 'gallery-points',
+    label: 'Launch gallery: three reasons',
+    use: 'A gallery image with a headline and three numbered reasons ("Title — detail"). Use once, mid-set, for the "why it\'s different" beat.',
+    fields: [
+      { id: 'title', type: 'text', label: 'Headline', max: 56 },
+      { id: 'items', type: 'list', label: 'Reasons ("Title — detail", 3)', max: 3 },
+    ],
+    html: (f, ctx) => {
+      const pad = Math.round(ctx.width * 0.06);
+      const items = list(f.items).slice(0, 3);
+      return `<div class="c" style="flex-direction:column;padding:${pad}px;gap:44px;justify-content:center">
+<div class="hd">${logo(ctx)}</div>
+<h1 data-fit-lines="2" data-min-font="44" style="font-size:${fit(f.title, [[24, 72], [40, 62], [56, 54]], 48)}px">${rich(f.title)}</h1>
+<div style="display:grid;grid-template-columns:repeat(${Math.max(1, items.length)},1fr);gap:24px">${items
+        .map((it, i) => {
+          const [t, d] = it.split(/\s+[—–-]\s+/);
+          return `<div style="background:var(--card);border-radius:24px;padding:32px;box-shadow:0 0 0 1px color-mix(in srgb,var(--rule) 45%,transparent)"><b style="display:block;font:800 40px/1 var(--font-display);color:var(--accent);margin-bottom:18px">${String(i + 1).padStart(2, '0')}</b><h3 style="font:700 32px/1.15 var(--font-display);letter-spacing:-.02em">${rich(t)}</h3>${d ? `<p style="font-size:24px;line-height:1.35;margin-top:10px">${rich(d)}</p>` : ''}</div>`;
+        })
+        .join('')}</div></div>`;
+    },
+  },
+  {
+    id: 'launch-thumb',
+    label: 'Launch thumbnail (logo mark)',
+    use: 'The 240×240 product thumbnail (preset producthunt-thumb): the brand mark alone, big and centred. No words — it is shown at 80 px.',
+    fields: [
+      { id: 'mark', type: 'text', label: 'Monogram if there is no logo', max: 2, optional: true },
+      { id: 'bg', type: 'enum', label: 'Background', choices: ['light', 'dark', 'brand'], optional: true },
+    ],
+    html: (f, ctx) => {
+      const bg = { dark: '#0f1115', brand: 'var(--brand-primary)' }[f.bg as string] ?? '#ffffff';
+      const fg = f.bg === 'brand' ? 'var(--brand-on-primary)' : f.bg === 'dark' ? 'var(--accent-on-dark)' : 'var(--accent-on-light)';
+      const s = Math.min(ctx.width, ctx.height);
+      const mark = ctx.brand.logo
+        ? `<img src="${img(ctx.brand.logo, ctx)}" alt="" style="width:${Math.round(s * 0.66)}px;height:${Math.round(s * 0.66)}px;object-fit:contain">`
+        : `<span style="font:800 ${Math.round(s * 0.5)}px/1 var(--font-display);letter-spacing:-.05em;color:${fg}">${esc(String(f.mark ?? '').slice(0, 2) || initials(ctx.brand.name))}</span>`;
+      return `<div class="c" style="align-items:center;justify-content:center;background:${bg}">${mark}</div>`;
+    },
+  },
 ];
 
 export function renderThumbnail(layoutId: string, fields: Record<string, any>, ctx: RenderCtx): string {

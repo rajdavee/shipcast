@@ -175,7 +175,7 @@ export async function catalogMarkdown(kind: SpecKind): Promise<string> {
     '# Graphics catalog',
     '',
     'Each item: `{ "type": "thumbnail"|"card", "layout": "<id>", "theme"?: "editorial|swiss|bold|midnight", "preset": "<preset id>", "name": "file.png", "fields": {…} }`',
-    'Presets: `youtube-thumbnail` 1280×720 · `og-card` 1200×630 · `github-banner` 1280×640 · `x-image` 1600×900 · `instagram-post` 1080×1080 · `linkedin-image` 1080×1350 · `linkedin-landscape` 1200×627 · `story-image` 1080×1920 · `x-header` 1500×500 · `linkedin-banner` 1584×396 · `youtube-banner` 2560×1440 · `app-store-ios` 1290×2796 · `play-store` 1080×1920',
+    'Presets: `youtube-thumbnail` 1280×720 · `og-card` 1200×630 · `github-banner` 1280×640 · `x-image` 1600×900 · `instagram-post` 1080×1080 · `linkedin-image` 1080×1350 · `linkedin-landscape` 1200×627 · `story-image` 1080×1920 · `x-header` 1500×500 · `linkedin-banner` 1584×396 · `youtube-banner` 2560×1440 · `app-store-ios` 1290×2796 · `play-store` 1080×1920 · `producthunt-gallery` 1270×760 · `producthunt-thumb` 240×240',
     'File names may carry one folder (`ios/01-track.png`) to keep sets apart. Images that fail to load come back to you.',
     'App store screens (`app-screen`): the caption must stay on 2 lines at ≥ 6% of the canvas width — a caption that shrinks further comes back to you. The screenshot fills the phone\'s width and is cut at the bottom, so use a phone-shaped screenshot or crop a desktop one to a tall region about 1 wide by 2 high in pixels (for a 1440×900 capture: `#crop=x,0,0.29,1`). No real device art or store badges — the frame is generic.',
     'Quotes and people: `pull-quote`, `testimonial`, `quote-post` and `post-card` carry exact words from the brief or source only, attributed to the real person or post. With no real quote, write clearly placeholder words and set `"sample": "yes"` — the image is then labelled "Sample copy — not a real customer". Never invent a named customer, a rating or a platform logo.',
@@ -334,6 +334,29 @@ export const BANNED_PHRASES = [
   'excited to announce', 'excited to share', 'thrilled to', 'game-changer', 'game changer', 'revolutionize', 'revolutionary', 'unlock', 'supercharge',
   'seamless', 'streamline your workflow', "in today's fast-paced", 'leverage', 'elevate', 'delve', 'empower', 'cutting-edge', 'next-level', 'harness the power',
 ];
+
+/**
+ * Product Hunt launch copy (out/launch-copy.md, one `## ` section per field):
+ * the listing's own limits, checked before anyone pastes it into the form.
+ */
+export function checkLaunchCopy(md: string | null): string[] {
+  if (!md?.trim()) return ['out/launch-copy.md was not written.'];
+  const sections = md.split(/^##\s+/m).slice(1).map((p) => ({ head: p.split('\n')[0].trim().toLowerCase(), body: p.split('\n').slice(1).join('\n').trim() }));
+  const get = (k: string) => sections.find((x) => x.head.startsWith(k))?.body ?? '';
+  const out: string[] = [];
+  for (const [k, label] of [['name', 'Name'], ['tagline', 'Tagline'], ['description', 'Description'], ['maker', "Maker's first comment"], ['topics', 'Topics']]) if (!get(k)) out.push(`launch-copy.md: the "## ${label}" section is missing or empty.`);
+  const tagline = get('tagline').replace(/\s+/g, ' ');
+  if (tagline.length > 60) out.push(`launch-copy.md: the tagline is ${tagline.length} characters; Product Hunt allows 60.`);
+  const desc = get('description').replace(/\s+/g, ' ');
+  if (desc.length > 260) out.push(`launch-copy.md: the description is ${desc.length} characters; Product Hunt allows 260.`);
+  const topics = get('topics').split('\n').map((l) => l.replace(/^\s*(?:[-*]|\d+\.)\s*/, '').trim()).filter(Boolean);
+  if (topics.length && topics.length !== 3) out.push(`launch-copy.md: list exactly 3 topics (one per line), not ${topics.length}.`);
+  const comment = get('maker');
+  if (comment && comment.length < 300) out.push("launch-copy.md: the maker's first comment is too thin — say who you are, why you built it, what's in it today and what feedback you want (100–300 words).");
+  const all = [tagline, desc, comment].join(' ').toLowerCase();
+  for (const p of BANNED_PHRASES) if (all.includes(p)) out.push(`launch-copy.md: uses "${p}" — rewrite it in plain, specific words.`);
+  return out.slice(0, 12);
+}
 
 /** Platform limits for the copy kit; returns problems to send back to Claude. */
 export function checkCopy(copy: Record<string, { label: string; text: string }[]>): string[] {

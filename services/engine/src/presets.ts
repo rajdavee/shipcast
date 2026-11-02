@@ -64,6 +64,8 @@ export const PRESETS: PlatformPreset[] = [
   { id: 'youtube-thumbnail', label: 'YouTube thumbnail', kind: 'image', width: 1280, height: 720, maxBytes: 2 * MB, safe: { top: 36, right: 200, bottom: 90, left: 36 }, notes: 'Bottom-right holds the duration badge; must read at 160 px wide.' },
   { id: 'app-store-ios', label: 'App Store screenshot (iPhone 6.9″)', kind: 'image', width: 1290, height: 2796, safe: box(80), notes: 'PNG or JPEG, no transparency; 3–10 per locale, the first 3 show in search.' },
   { id: 'play-store', label: 'Google Play phone screenshot', kind: 'image', width: 1080, height: 1920, safe: box(64), notes: 'PNG or JPEG, no transparency, 9:16; at least 4 for promotion in recommendations.' },
+  { id: 'producthunt-gallery', label: 'Product Hunt gallery image', kind: 'image', width: 1270, height: 760, maxBytes: 3 * MB, safe: box(48), notes: 'The first image is the one shown in shares and the launch page header.' },
+  { id: 'producthunt-thumb', label: 'Product Hunt thumbnail', kind: 'image', width: 240, height: 240, maxBytes: 3 * MB, safe: box(16), notes: 'Shown at 80 px and smaller in lists.' },
   { id: 'og-card', label: 'Link preview (OG)', kind: 'image', width: 1200, height: 630, safe: { top: 65, right: 100, bottom: 65, left: 100 } },
   { id: 'x-image', label: 'X image (16:9)', kind: 'image', width: 1600, height: 900, maxBytes: 5 * MB, safe: box(60) },
   { id: 'story-image', label: 'Story card', kind: 'image', width: 1080, height: 1920, safe: { top: 270, right: 65, bottom: 380, left: 65 } },

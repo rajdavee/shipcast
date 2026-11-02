@@ -169,6 +169,24 @@ test('app store screens: captions over real screens in a phone frame for iOS and
   assert.ok(!/apple|iphone|android|google/i.test((await import('node:fs')).readFileSync(ios1.html, 'utf8').split('<body>')[1].replace(/src="[^"]*"/g, '')), 'no platform names drawn on the screen');
 });
 
+test('Product Hunt gallery and thumbnail render at 1270×760 and 240×240 without overflow', { skip: !hasChrome && 'no Chrome' }, async () => {
+  const out = join(home, 'ph');
+  const shot = join(process.cwd(), 'docs', 'assets', 'studio-new.png');
+  const logo = join(process.cwd(), 'docs', 'assets', 'mark.svg');
+  const items = [
+    { type: 'card', layout: 'gallery-shot', theme: 'midnight', preset: 'producthunt-gallery', name: 'gallery/01-launch.png', fields: { kicker: 'Open source', title: 'Paste a link. Get a *launch*.', sub: 'Videos, carousels, decks and posts from one URL.', image: `${shot}#crop=0.15,0.12,0.7,0.6` } },
+    { type: 'card', layout: 'gallery-points', theme: 'editorial', preset: 'producthunt-gallery', name: 'gallery/02-why.png', fields: { title: "Why it's *different*", items: ['No API keys — uses the login you have', 'Runs locally — files stay on your machine', 'Checks itself — overflow, safe zones, legibility'] } },
+    { type: 'card', layout: 'launch-thumb', theme: 'editorial', preset: 'producthunt-thumb', name: 'thumbnail.png', fields: { bg: 'light' } },
+  ];
+  const job = await run('graphics', { brand: { name: 'Shipcast', logo, colors: { background: '#0b0d12', primary: '#2b3bff' } }, outDir: out, items });
+  assert.equal(job.status, 'done', job.error);
+  for (const it of job.output.items) for (const k of ['overflow', 'offCanvas', 'unsafe', 'tinyShots', 'small', 'broken']) assert.deepEqual(it.audit[k], [], `${it.file} ${k}`);
+  const nomono = await run('graphics', { brand: { name: 'Shipcast', colors: { background: '#0b0d12', primary: '#2b3bff' } }, outDir: out, items: [{ ...items[2], name: 'mono.png', fields: { bg: 'brand' } }] });
+  assert.deepEqual(nomono.output.items[0].audit.offCanvas, []);
+  assert.match((await import('node:fs')).readFileSync(join(out, 'mono.html'), 'utf8'), />S<\/span>/, 'no logo → a monogram, never someone else\'s mark');
+  assert.ok(existsSync(join(out, 'gallery', '02-why.png')) && existsSync(join(out, 'thumbnail.png')));
+});
+
 test('stills audit catches text that overflows', { skip: !hasChrome && 'no Chrome' }, async () => {
   const f = join(home, 'bad.html');
   writeFileSync(f, '<html><body style="margin:0"><div style="width:200px;overflow:hidden;white-space:nowrap;font-size:40px">This headline is far too long for its box</div></body></html>');

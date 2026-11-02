@@ -67,7 +67,7 @@ test('marketing-material packs load, validate and point at a Shipcast skill that
   const { join } = await import('node:path');
   const { PLUGIN_DIR } = await import('@shipcast/engine');
   const packs = await loadPacks(true);
-  const want: Record<string, string> = { 'photo-carousel': 'deck', 'quote-cards': 'graphics', 'app-store-screens': 'graphics' };
+  const want: Record<string, string> = { 'photo-carousel': 'deck', 'quote-cards': 'graphics', 'app-store-screens': 'graphics', 'product-hunt-kit': 'graphics' };
   for (const [id, spec] of Object.entries(want)) {
     const p = packs.find((x) => x.id === id);
     assert.ok(p, `${id} is bundled`);

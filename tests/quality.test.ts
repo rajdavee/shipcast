@@ -28,6 +28,21 @@ test('presets are internally consistent', () => {
   }
 });
 
+test('Product Hunt launch copy is checked against the listing limits', async () => {
+  const { checkLaunchCopy } = await import('@shipcast/engine');
+  const comment = 'Hi, I am the maker. '.repeat(20);
+  const good = `## Name\nShipcast\n## Tagline\nPaste a link, get a whole launch campaign\n## Description\nA local-first studio that turns a site or repo into videos, carousels, decks and posts.\n## Maker's first comment\n${comment}\n## Topics\n- Marketing\n- Open Source\n- Developer Tools\n`;
+  assert.deepEqual(checkLaunchCopy(good), []);
+  const bad = checkLaunchCopy(`## Name\nShipcast\n## Tagline\n${'x'.repeat(61)}\n## Description\nWe are excited to announce ${'y'.repeat(260)}\n## Maker's first comment\nHi!\n## Topics\n- One\n- Two\n`).join(' | ');
+  assert.match(bad, /tagline is 61 characters/);
+  assert.match(bad, /description is \d+ characters/);
+  assert.match(bad, /exactly 3 topics/);
+  assert.match(bad, /too thin/);
+  assert.match(bad, /excited to announce/);
+  assert.deepEqual(checkLaunchCopy(null), ['out/launch-copy.md was not written.']);
+  assert.ok(checkLaunchCopy('## Name\nX\n').some((p) => /Tagline/.test(p)), 'missing sections are named');
+});
+
 test('music is deterministic, the requested length, and not silent', () => {
   const a = makeMusic({ mood: 'tech', seconds: 6, seed: 3 });
   const b = makeMusic({ mood: 'tech', seconds: 6, seed: 3 });

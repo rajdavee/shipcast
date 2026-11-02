@@ -344,6 +344,7 @@ export const PACK_CHANNEL: Record<string, Channel> = {
   'photo-carousel': 'tiktok',
   'quote-cards': 'linkedin',
   'app-store-screens': 'web',
+  'product-hunt-kit': 'web',
   'social-post': 'linkedin',
   reel: 'tiktok',
   'social-short': 'tiktok',
