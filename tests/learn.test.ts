@@ -59,6 +59,7 @@ test('candidates skip infra and covered categories; a single revision note is en
   const c = lessonCandidates([], incidents);
   assert.ok(c.some((g) => g.pack === 'carousel' && g.category === 'tiny-screenshot'));
   assert.ok(!c.some((g) => g.category === 'infra'));
+  assert.ok(!c.some((g) => g.category === 'hashtags' || g.category === 'voice-wording'), 'brand voice is per brand, not per format');
   const covered = lessonCandidates([{ id: 'x', pack: 'carousel', category: 'tiny-screenshot', rule: 'r', evidence: [], createdAt: '', status: 'trial', baseline: { rate: 1, runs: 4 } }], incidents);
   assert.ok(!covered.some((g) => g.pack === 'carousel' && g.category === 'tiny-screenshot'));
 });

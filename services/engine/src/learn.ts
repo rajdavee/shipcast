@@ -52,6 +52,9 @@ export const CATEGORIES: { id: string; label: string; test: RegExp }[] = [
   { id: 'realism', label: 'Looks templated or unreal', test: /templat|generic|stock|realism|real footage|people/i },
 ];
 
+/** Counted and shown, but never turned into format lessons. */
+export const NOT_LESSONS = new Set(['infra', 'other', 'voice-wording', 'hashtags']);
+
 export function classify(text: string): string {
   return CATEGORIES.find((c) => c.test.test(text))?.id ?? 'other';
 }
@@ -222,8 +225,9 @@ export function judgeLessons(ls: Lesson[], incidents: Incident[], runs: Record<s
 export function lessonCandidates(ls: Lesson[], incidents: Incident[], min = 3): { pack: string; category: string; incidents: Incident[] }[] {
   const groups = new Map<string, Incident[]>();
   for (const i of incidents) {
-    // "other" is too vague to turn into a rule; infra is a tool problem, not the writer's.
-    if (i.category === 'infra' || i.category === 'other' || i.pack === 'hook-variants' || i.pack === 'platform-export') continue;
+    // "other" is too vague to turn into a rule; infra is a tool problem, not the writer's; wording and
+    // hashtags belong to each brand's voice profile, so a format-wide lesson would leak one brand into the next.
+    if (NOT_LESSONS.has(i.category) || i.pack === 'hook-variants' || i.pack === 'platform-export') continue;
     const k = `${i.pack}\t${i.category}`;
     groups.set(k, [...(groups.get(k) ?? []), i]);
   }
