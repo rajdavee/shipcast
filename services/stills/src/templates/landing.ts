@@ -39,6 +39,7 @@ function section(s: LandingSection, img: (p: string) => string, icons: Record<st
     case 'features':
       return `<section class="features" id="features"><div class="wrap">${head(s.eyebrow, s.heading, s.sub)}<div class="grid g${Math.min(4, Math.max(2, list(s.items).length % 3 === 0 ? 3 : list(s.items).length >= 4 ? 4 : 2))}">${list(s.items).map((x) => { const [i, t, b] = split(x); return `<article class="card">${icon(i, icons)}<h3>${rich(t ?? '')}</h3><p>${rich(b ?? '')}</p></article>`; }).join('')}</div></div></section>`;
     case 'media':
+      if (!s.image) return section({ ...s, type: 'features', items: s.points ?? [], sub: s.body }, img, icons);
       return `<section class="media"><div class="wrap split ${s.side === 'left' ? 'flip' : ''}"><div>${head(s.eyebrow, s.heading, s.body)}${list(s.points).length ? `<ul class="checks">${list(s.points).map((x) => `<li>${rich(x)}</li>`).join('')}</ul>` : ''}</div><figure class="shot"><img src="${img(s.image)}" alt="${esc(s.alt ?? s.heading ?? '')}" loading="lazy"></figure></div></section>`;
     case 'how':
       return `<section class="how" id="how"><div class="wrap">${head(s.eyebrow, s.heading, s.sub)}<ol class="steps">${list(s.steps).map((x, n) => { const [t, b] = split(x); return `<li><span class="n">${n + 1}</span><h3>${rich(t)}</h3><p>${rich(b ?? '')}</p></li>`; }).join('')}</ol></div></section>`;

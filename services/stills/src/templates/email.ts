@@ -102,6 +102,8 @@ export interface RenderedEmail {
 }
 
 export function renderEmail(e: EmailSpec, set: EmailSetSpec, brand: BrandKit, resolveImage: (p: string) => string): RenderedEmail {
+  // Model-written specs can miss fields; render what's there and let the checks explain the rest.
+  e = { ...e, name: String(e.name ?? 'email'), subjects: Array.isArray(e.subjects) ? e.subjects.map(String) : [], preheader: String(e.preheader ?? ''), blocks: Array.isArray(e.blocks) ? e.blocks.filter((x) => x && typeof x === 'object') : [] };
   const c = colors(brand, set.theme ?? 'light');
   const font = `'${brand.fonts.body}', ${SAFE_SANS}`;
   const display = `'${brand.fonts.display}', ${SAFE_SANS}`;

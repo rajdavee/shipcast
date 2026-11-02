@@ -238,7 +238,7 @@ export function scoreText(text: string, p: ToneProfile, ch?: Channel): BrandScor
     if (m) issues.push({ rule: 'banned', severity: 'error', detail: `Banned: "${w}" (${m.length}×)`, match: w });
   }
   // Unfinished copy never ships: bracketed placeholders, TBDs, lorem ipsum, template tokens (standard merge tags are fine).
-  for (const m of text.matchAll(/\[(?:[^\]\n]{0,40}\b(?:url|link|insert|replace|fill|add|address|tbd|tbc|todo|confirm|name|date|company|placeholder|your|xx+)\b[^\]\n]{0,40})\]|\bTBD\b|\bTODO\b|lorem ipsum|\{\{(?!\s*(?:unsubscribe|first_?name|view_in_browser))[^}]{1,40}\}\}/gi)) issues.push({ rule: 'placeholder', severity: 'error', detail: `Unfinished placeholder: "${m[0]}" — fill it in from the brief or remove it`, match: m[0] });
+  for (const m of text.matchAll(/\[(?!(?:[^\]\n]*)\]\()(?:[^\]\n]{0,40}\b(?:url|link|insert|replace|fill|add|address|tbd|tbc|todo|confirm|name|date|company|placeholder|your|xx+)\b[^\]\n]{0,40})\]|\bTBD\b|\bTODO\b|lorem ipsum|\{\{(?!\s*(?:unsubscribe|first_?name|view_in_browser))[^}]{1,40}\}\}/gi)) issues.push({ rule: 'placeholder', severity: 'error', detail: `Unfinished placeholder: "${m[0]}" — fill it in from the brief or remove it`, match: m[0] });
   for (const [from, to] of Object.entries(p.lexicon.preferred)) {
     if (wordRe(from).test(text)) issues.push({ rule: 'preferred', severity: 'warn', detail: `Say "${to}" instead of "${from}"`, match: from, fix: to });
   }
@@ -318,7 +318,13 @@ export async function saveTone(raw: unknown): Promise<ToneProfile> {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
   const existing = typeof r.id === 'string' ? await getTone(r.id) : null;
   const p = normalizeTone(r, existing ?? DEFAULT_TONE);
-  if (!existing && (!r.id || r.id === 'default') && p.name !== DEFAULT_TONE.name) p.id = slugify(p.name);
+  if (!existing && (!r.id || r.id === 'default') && p.name !== DEFAULT_TONE.name) {
+    // A new voice never takes over an existing one (or the built-in default).
+    const base = slugify(p.name) === 'default' ? 'default-voice' : slugify(p.name);
+    let id = base;
+    for (let n = 2; existsSync(join(toneDir(), `${id}.json`)) || id === 'default'; n++) id = `${base}-${n}`.slice(0, 48);
+    p.id = id;
+  }
   p.updatedAt = new Date().toISOString();
   await mkdir(toneDir(), { recursive: true });
   await writeFile(join(toneDir(), `${p.id}.json`), JSON.stringify(p, null, 2));

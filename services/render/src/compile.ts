@@ -289,7 +289,7 @@ export async function compileStoryboard(story: Storyboard, opts: { dir: string; 
       const own = String(f.video).startsWith('/') ? String(f.video) : join(opts.brandDir ?? '', String(f.video));
       if (own && existsSync(own)) {
         const sound = /^(yes|true|on)$/i.test(String(f.audio ?? ''));
-        clips.push(`<video id="clip-${e.id}" src="${asset(own)}" muted${sound ? '="false"' : ''} playsinline data-has-audio="${sound}" data-volume="${sound ? 1 : 0}" data-start="${e.start}" data-duration="${e.duration}" data-track-index="0" style="position:absolute;left:0;top:0;width:${width}px;height:${height}px;object-fit:cover"></video>`);
+        clips.push(`<video id="clip-${e.id}" src="${asset(own)}"${sound ? '' : ' muted'} playsinline data-has-audio="${sound}" data-volume="${sound ? 1 : 0}" data-start="${e.start}" data-duration="${e.duration}" data-track-index="0" style="position:absolute;left:0;top:0;width:${width}px;height:${height}px;object-fit:cover"></video>`);
         if (existsSync(`${own}.json`)) {
           try {
             const meta = JSON.parse(readFileSync(`${own}.json`, 'utf8'));

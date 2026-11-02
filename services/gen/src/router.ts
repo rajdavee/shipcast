@@ -80,16 +80,40 @@ export async function spent(key?: string): Promise<{ month: number; key: number 
   return { month: l.months[month()] ?? 0, key: key ? l.keys[key] ?? 0 : 0 };
 }
 
-/** Refuse before spending if this request would break a cap. */
-export async function checkBudget(key: string, usd: number, caps: { perKey: number; perMonth: number }): Promise<void> {
-  if (usd <= 0) return;
-  const s = await spent(key);
-  if (s.key + usd > caps.perKey) throw new Error(`This would take the project's generation spend to $${(s.key + usd).toFixed(2)}, over its $${caps.perKey.toFixed(2)} cap. Raise it in Setup → Generation, or use a draft tier.`);
-  if (s.month + usd > caps.perMonth) throw new Error(`This would take this month's generation spend to $${(s.month + usd).toFixed(2)}, over the $${caps.perMonth.toFixed(2)} monthly cap (Setup → Generation).`);
+// One writer at a time: concurrent jobs would otherwise read the same ledger and lose each other's spend.
+let chain: Promise<unknown> = Promise.resolve();
+const serial = <T>(fn: () => Promise<T>): Promise<T> => {
+  const next = chain.then(fn, fn);
+  chain = next.catch(() => {});
+  return next;
+};
+/** Spend that passed the cap check but hasn't been recorded yet (jobs in flight). */
+const reserved = new Map<string, number>();
+const reservedFor = (key: string) => [...reserved.entries()].filter(([k]) => k.startsWith(`${key}::`)).reduce((a, [, v]) => a + v, 0);
+const reservedAll = () => [...reserved.values()].reduce((a, v) => a + v, 0);
+
+/** Refuse before spending if this request would break a cap; on success the amount is held until released. */
+export function checkBudget(key: string, usd: number, caps: { perKey: number; perMonth: number }): Promise<() => void> {
+  return serial(async () => {
+    const hold = `${key}::${Math.random().toString(36).slice(2)}`;
+    const release = () => void reserved.delete(hold);
+    if (usd <= 0) return release;
+    const s = await spent(key);
+    const k = s.key + reservedFor(key);
+    const m = s.month + reservedAll();
+    if (k + usd > caps.perKey) throw new Error(`This would take the project's generation spend to $${(k + usd).toFixed(2)}, over its $${caps.perKey.toFixed(2)} cap. Raise it in Setup → Generation, or use a draft tier.`);
+    if (m + usd > caps.perMonth) throw new Error(`This would take this month's generation spend to $${(m + usd).toFixed(2)}, over the $${caps.perMonth.toFixed(2)} monthly cap (Setup → Generation).`);
+    reserved.set(hold, usd);
+    return release;
+  });
 }
 
-export async function record(key: string, model: string, usd: number): Promise<void> {
-  if (usd <= 0) return;
+export function record(key: string, model: string, usd: number): Promise<void> {
+  if (usd <= 0) return Promise.resolve();
+  return serial(() => recordNow(key, model, usd));
+}
+
+async function recordNow(key: string, model: string, usd: number): Promise<void> {
   const l = await readLedger();
   l.months[month()] = +((l.months[month()] ?? 0) + usd).toFixed(4);
   l.keys[key] = +((l.keys[key] ?? 0) + usd).toFixed(4);

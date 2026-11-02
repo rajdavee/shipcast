@@ -1,6 +1,6 @@
 import { createServer, type Server } from 'node:http';
 import { existsSync, createWriteStream, realpathSync } from 'node:fs';
-import { readFile, writeFile as writeFileP } from 'node:fs/promises';
+import { readdir, readFile, writeFile as writeFileP } from 'node:fs/promises';
 import { mkdir } from 'node:fs/promises';
 import { join, resolve, sep, basename } from 'node:path';
 import { spawn } from 'node:child_process';
@@ -746,21 +746,43 @@ router.put('/api/campaigns/:id/steps/:step/spec', async (req, _r, p) => {
 // ── takes: alternative generated shots; pick one and the piece re-renders without Claude ──
 interface Take { id: string; label: string; kind: string; files: string[]; posters: string[]; chosen: number }
 const takesFile = (id: string, step: string) => join(campaignDir(id), 'deliverables', step, 'out', 'takes.json');
+const takesDir = (id: string, step: string) => join(campaignDir(id), 'deliverables', step, 'out', 'takes');
+/** All takes for a step: one file per shot under out/takes/ (plus a legacy takes.json). */
+async function readTakes(id: string, step: string): Promise<{ all: Take[]; save: (t: Take) => Promise<void> }> {
+  const all: Take[] = [];
+  const where = new Map<string, string>();
+  try {
+    for (const t of JSON.parse(await readFile(takesFile(id, step), 'utf8')) as Take[]) {
+      all.push(t);
+      where.set(t.id, takesFile(id, step));
+    }
+  } catch {}
+  for (const f of await readdir(takesDir(id, step)).catch(() => [] as string[])) {
+    if (!f.endsWith('.json')) continue;
+    try {
+      const t = JSON.parse(await readFile(join(takesDir(id, step), f), 'utf8')) as Take;
+      all.push(t);
+      where.set(t.id, join(takesDir(id, step), f));
+    } catch {}
+  }
+  const save = async (t: Take) => {
+    const file = where.get(t.id)!;
+    if (file === takesFile(id, step)) await writeFileP(file, JSON.stringify(all.filter((x) => where.get(x.id) === file), null, 2));
+    else await writeFileP(file, JSON.stringify(t, null, 2));
+  };
+  return { all, save };
+}
 const rel = (id: string, f: string) => (f.startsWith(campaignDir(id)) ? f.slice(campaignDir(id).length + 1) : f);
 router.get('/api/campaigns/:id/steps/:step/takes', async (_q, _r, p) => {
   await mustCampaign(p.id);
-  try {
-    const all = JSON.parse(await readFile(takesFile(p.id, p.step), 'utf8')) as Take[];
-    return all.map((t) => ({ ...t, files: t.files.map((f) => rel(p.id, f)), posters: t.posters.map((f) => rel(p.id, f)) }));
-  } catch {
-    return [];
-  }
+  const { all } = await readTakes(p.id, p.step);
+  return all.map((t) => ({ ...t, files: t.files.map((f) => rel(p.id, f)), posters: t.posters.map((f) => rel(p.id, f)) }));
 });
 router.post('/api/campaigns/:id/steps/:step/takes', async (req, _r, p) => {
   const b = await readJson(req);
   const { file, step } = await specPath(p.id, p.step);
   if (step.status === 'running' || step.status === 'queued') throw new HttpError(409, 'wait for the current run to finish');
-  const all = JSON.parse(await readFile(takesFile(p.id, p.step), 'utf8').catch(() => '[]')) as Take[];
+  const { all, save } = await readTakes(p.id, p.step);
   const t = all.find((x) => x.id === b.id);
   const k = Number(b.choose);
   if (!t || !Number.isInteger(k) || k < 0 || k >= t.files.length) throw new HttpError(400, 'unknown take');
@@ -779,7 +801,7 @@ router.post('/api/campaigns/:id/steps/:step/takes', async (req, _r, p) => {
   if (!hit) throw new HttpError(409, 'that take is no longer used in the piece — edit it in the spec instead');
   await writeFileP(file, spec);
   t.chosen = k;
-  await writeFileP(takesFile(p.id, p.step), JSON.stringify(all, null, 2));
+  await save(t);
   const c = await mutateStep(p.id, p.step, (s) => {
     s.status = 'queued';
     s.renderOnly = true;

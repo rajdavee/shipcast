@@ -89,6 +89,8 @@ const XML_DECL = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
 // ---------------------------------------------------------------------------
 
 export async function writePptx(deck: PptxDeck, outFile: string): Promise<void> {
+  // Notes may arrive as arrays or numbers from a model-written spec; PowerPoint wants text.
+  deck = { ...deck, slides: deck.slides.map((sl) => ({ ...sl, notes: sl.notes == null ? undefined : Array.isArray(sl.notes) ? (sl.notes as unknown[]).map(String).join('\n') : String(sl.notes) })) };
   if (!deck.slides.length) throw new Error('pptx: deck has no slides');
   const width = deck.width ?? 13.333;
   const height = deck.height ?? 7.5;

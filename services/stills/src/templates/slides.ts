@@ -250,8 +250,9 @@ export function renderSlide(s: SlidePage, theme: string, ctx: RenderCtx): string
  * the page; returns plain data.
  */
 export const MEASURE_TEXT_SCRIPT = `(() => {
-  const hex = (c) => { const m = c.match(/\\d+(\\.\\d+)?/g); if (!m) return '000000'; return m.slice(0, 3).map((x) => Math.round(+x).toString(16).padStart(2, '0')).join(''); };
-  const alpha = (c) => { const m = c.match(/rgba?\\(([^)]+)\\)/); if (!m) return 1; const p = m[1].split(','); return p.length > 3 ? +p[3] : 1; };
+  // color-mix() resolves to color(srgb r g b / a) with 0–1 channels; rgb() uses 0–255.
+  const hex = (c) => { const m = c.match(/\\d*\\.?\\d+/g); if (!m) return '000000'; const unit = c.startsWith('color(') ? 255 : 1; return m.slice(0, 3).map((x) => Math.max(0, Math.min(255, Math.round(+x * unit))).toString(16).padStart(2, '0')).join(''); };
+  const alpha = (c) => { const s = c.match(/\\/\\s*([\\d.]+)\\s*\\)/); if (s) return +s[1]; const m = c.match(/rgba?\\(([^)]+)\\)/); if (!m) return 1; const p = m[1].split(','); return p.length > 3 ? +p[3] : 1; };
   const out = [];
   document.querySelectorAll('.t').forEach((el) => {
     const r = el.getBoundingClientRect();

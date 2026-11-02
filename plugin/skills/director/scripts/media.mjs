@@ -280,12 +280,10 @@ async function genViaService(kind, prompt) {
   }
   if (takes.length > 1) {
     // Record the alternatives so the person can swap takes on the campaign page without another Claude run.
-    const reg = resolve('out', 'takes.json');
-    let all = [];
-    try { all = JSON.parse(await readFile(reg, 'utf8')); } catch {}
-    all.push({ id: `${slug(prompt)}-${Date.now().toString(36)}`, label: String(flags.label || prompt).slice(0, 80), kind, files: takes.map((t) => t.file), posters: takes.map((t) => t.poster ?? t.file), chosen: 0 });
-    await mkdir(resolve('out'), { recursive: true });
-    await writeFile(reg, JSON.stringify(all, null, 2));
+    // One file per shot: parallel gen calls can't overwrite each other's takes (the API merges them).
+    const id = `${slug(prompt)}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    await mkdir(resolve('out', 'takes'), { recursive: true });
+    await writeFile(resolve('out', 'takes', `${id}.json`), JSON.stringify({ id, label: String(flags.label || prompt).slice(0, 80), kind, files: takes.map((t) => t.file), posters: takes.map((t) => t.poster ?? t.file), chosen: 0 }, null, 2));
   }
   return true;
 }

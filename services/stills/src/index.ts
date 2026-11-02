@@ -139,6 +139,7 @@ async function captureOnce(html: string, file: string, width: number, height: nu
 /** Combine PNG pages into one PDF, each page exactly the slide size. */
 /** A labelled grid of mixed-size images (ads, page sets), drawn by Chrome so any sizes fit. */
 async function contactSheet(images: { file: string; label: string }[], out: string, cell = 300): Promise<string> {
+  if (!images.length) return out;
   const cols = Math.min(5, images.length);
   const rows = Math.ceil(images.length / cols);
   const W = cols * (cell + 20) + 20;
@@ -215,6 +216,7 @@ export function createStillsService() {
         const { brand, assetsDir } = await brandFrom(input);
         input = await materializeCrops(input, assetsDir, outDir);
         if (!Array.isArray(input.pieces) || !input.pieces.length) throw new Error('pieces are required');
+        await rm(join(outDir, 'print'), { recursive: true, force: true });
         await mkdir(join(outDir, 'print'), { recursive: true });
         const results = [];
         const problems: string[] = [];
@@ -250,7 +252,7 @@ export function createStillsService() {
         if (!Array.isArray(input.sections) || !input.sections.length) throw new Error('sections are required');
         const names = landingIconNames(input);
         const icons = names.length ? await resolveIcons(names) : {};
-        const r = renderLanding(input, brand, (p) => (p.startsWith('/') ? p : join(assetsDir ?? outDir, p)), icons);
+        const r = renderLanding(input, brand, (p) => assertInHome(p.startsWith('/') ? p : join(assetsDir ?? outDir, p), 'image'), icons);
         const dir = join(outDir, 'landing');
         await mkdir(join(dir, 'images'), { recursive: true });
         await mkdir(join(dir, 'sections'), { recursive: true });
@@ -278,6 +280,7 @@ export function createStillsService() {
             await pg.close();
           }
         }
+        await rm(join(outDir, 'landing.zip'), { force: true });
         await run('zip', ['-qr', join(outDir, 'landing.zip'), '.'], { cwd: dir });
         return { index, previews, zip: join(outDir, 'landing.zip'), sections: r.sections.map((x) => x.type), problems };
       },
@@ -289,7 +292,8 @@ export function createStillsService() {
         input = await materializeCrops(input, assetsDir, outDir);
         if (!Array.isArray(input.emails) || !input.emails.length) throw new Error('emails are required');
         const slug = (x: string) => String(x).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'email';
-        const resolve = (p: string) => (p.startsWith('/') ? p : join(assetsDir ?? outDir, p));
+        // Images are copied into the upload zip: only files inside the Shipcast home qualify.
+        const resolve = (p: string) => assertInHome(p.startsWith('/') ? p : join(assetsDir ?? outDir, p), 'image');
         const results = [];
         const problems: string[] = [];
         const md: string[] = ['# Emails', ''];
@@ -316,6 +320,7 @@ export function createStillsService() {
               await pg.close();
             }
           }
+          await rm(join(outDir, `${slug(e.name)}.zip`), { force: true });
           await run('zip', ['-qr', join(outDir, `${slug(e.name)}.zip`), '.'], { cwd: dir });
           problems.push(...checkEmail(e, r, input));
           md.push(`## ${e.name}`, '', '**Subject lines**', ...e.subjects.map((x, n) => `${n + 1}. ${x}`), '', `**Preview text:** ${e.preheader}`, '', `HTML: emails/${slug(e.name)}/${slug(e.name)}.html · plain text: emails/${slug(e.name)}/${slug(e.name)}.txt · upload zip: ${slug(e.name)}.zip`, '');
@@ -332,13 +337,16 @@ export function createStillsService() {
         const { brand, assetsDir } = await brandFrom(input);
         input = await materializeCrops(input, assetsDir, outDir);
         if (!Array.isArray(input.variants) || !input.variants.length) throw new Error('variants are required');
-        const sizes = (input.sizes?.length ? input.sizes : DEFAULT_AD_SIZES).filter((x) => AD_SIZES[x]);
+        const asked = (input.sizes ?? []).filter((x) => AD_SIZES[x]);
+        // Unknown size ids fall back to the defaults rather than an empty (and crashing) set.
+        const sizes = asked.length ? asked : DEFAULT_AD_SIZES;
+        await rm(join(outDir, 'ads'), { recursive: true, force: true });
         const slug = (x: string) => String(x).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30) || 'v';
         const items = [];
         const csv = [['variant', 'size', 'platform', 'width', 'height', 'file', 'headline', 'primary_text', 'description', 'cta', 'url'].join(',')];
         const q = (x: unknown) => `"${String(x ?? '').replace(/"/g, '""')}"`;
         let n = 0;
-        for (const v of input.variants.slice(0, 10)) {
+        for (const v of input.variants.slice(0, 10).filter((x) => x && typeof x === 'object').map((x) => ({ ...x, name: String(x.name ?? 'variant'), headline: String(x.headline ?? '') }))) {
           const vdir = join(outDir, 'ads', slug(v.name));
           for (const sz of sizes) {
             ctx.progress(n++ / (input.variants.length * sizes.length), `${v.name} · ${sz}`);
@@ -346,7 +354,7 @@ export function createStillsService() {
             const file = join(vdir, `${slug(v.name)}-${sz}.png`);
             const r = await capture(renderAd(input, v, sz, { brand, width: s.w, height: s.h, assetsDir }), file, s.w, s.h, s.safe ?? { top: 0, right: 0, bottom: 0, left: 0 });
             items.push({ ...r, variant: v.name, size: sz });
-            csv.push([q(v.name), sz, s.platform, s.w, s.h, q(file.slice(outDir.length + 1)), q(v.headline.replace(/[*=]/g, '')), q(v.primary), q(v.description), q(input.cta), q(input.url)].join(','));
+            csv.push([q(v.name), sz, s.platform, s.w, s.h, q(file.slice(outDir.length + 1)), q(String(v.headline ?? '').replace(/[*=]/g, '')), q(v.primary), q(v.description), q(input.cta), q(input.url)].join(','));
           }
           await contactSheet(items.filter((x) => x.variant === v.name).map((x) => ({ file: x.file, label: `${AD_SIZES[x.size].w}×${AD_SIZES[x.size].h}` })), join(outDir, `${slug(v.name)}.sheet.png`));
         }
@@ -369,6 +377,8 @@ export function createStillsService() {
         const names = slideIconNames(input.slides);
         const icons = names.length ? await resolveIcons(names) : {};
         const base = String(input.name ?? 'presentation').replace(/[^\w-]/g, '_');
+        // A shorter deck must not leave last run's slides behind (exports read the whole folder).
+        await rm(join(outDir, 'slides'), { recursive: true, force: true });
         await mkdir(join(outDir, 'slides'), { recursive: true });
         await mkdir(join(outDir, 'work', 'pptx'), { recursive: true });
         const results = [];
@@ -424,6 +434,7 @@ export function createStillsService() {
         const icons = names.length ? await resolveIcons(names) : {};
         const html = renderDocument(input, { brand, width: sz.width, height: sz.height, assetsDir, icons });
         const base = String(input.name ?? 'document').replace(/[^\w-]/g, '_');
+        await rm(join(outDir, 'pages'), { recursive: true, force: true });
         await mkdir(join(outDir, 'pages'), { recursive: true });
         const htmlFile = join(outDir, `${base}.html`);
         await writeFile(htmlFile, html);

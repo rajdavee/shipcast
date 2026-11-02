@@ -111,3 +111,26 @@ test('"the best way to" is phrasing, not a claim', async () => {
   const { scoreText, DEFAULT_TONE } = await import('@shipcast/engine');
   assert.equal(scoreText('The best way to see it is a short walkthrough with a matter of your own.', DEFAULT_TONE).issues.filter((i) => i.rule === 'claim').length, 0);
 });
+
+test('new voices never overwrite existing ones or the default', async () => {
+  const { saveTone, getTone } = await import('@shipcast/engine');
+  const a = await saveTone({ name: 'Acme' });
+  const b = await saveTone({ name: 'ACME!' });
+  assert.notEqual(a.id, b.id);
+  assert.equal((await getTone(a.id))?.name, 'Acme');
+  const d = await saveTone({ name: 'Default' });
+  assert.notEqual(d.id, 'default');
+});
+
+test('markdown link text is not a placeholder', async () => {
+  const { scoreText, DEFAULT_TONE } = await import('@shipcast/engine');
+  assert.equal(scoreText('Install it from [Add to Slack](https://acme.test/slack) and you are set for the week.', DEFAULT_TONE).issues.filter((i) => i.rule === 'placeholder').length, 0);
+});
+
+test('brand font names cannot carry markup into rendered pages', async () => {
+  const { normalizeBrand, brandCss } = await import('@shipcast/engine');
+  const b = normalizeBrand({ fonts: { display: 'Inter', body: 'Inter" onload="x', fallback: 'x}</style><iframe src=file:///etc/hosts>' } } as any);
+  assert.equal(b.fonts.body, 'Inter');
+  assert.equal(b.fonts.fallback, 'system-ui');
+  assert.ok(!brandCss(b).includes('<'));
+});

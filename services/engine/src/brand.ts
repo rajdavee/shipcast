@@ -86,11 +86,13 @@ export function normalizeBrand(raw: Partial<BrandKit> | null | undefined): Brand
   if (!colors.muted) colors.muted = luminance(colors.background) > 0.5 ? '#5b6170' : '#a3a9b6';
   if (!colors.secondary) colors.secondary = colors.primary;
   const f = (b.fonts ?? {}) as Partial<BrandKit['fonts']>;
+  // Font names end up inside CSS and style attributes: only plain family names get through.
+  const font = (v: unknown, d: string) => (typeof v === 'string' && /^[\w \-.]{1,60}$/.test(v.trim()) ? v.trim() : d);
   const fonts = {
-    display: (f.display || DEFAULT_BRAND.fonts.display).trim(),
-    body: (f.body || f.display || DEFAULT_BRAND.fonts.body).trim(),
-    mono: (f.mono || DEFAULT_BRAND.fonts.mono).trim(),
-    fallback: (f.fallback || 'system-ui').trim(),
+    display: font(f.display, DEFAULT_BRAND.fonts.display),
+    body: font(f.body, font(f.display, DEFAULT_BRAND.fonts.body)),
+    mono: font(f.mono, DEFAULT_BRAND.fonts.mono),
+    fallback: font(f.fallback, 'system-ui'),
   };
   return { ...DEFAULT_BRAND, ...b, name: b.name || DEFAULT_BRAND.name, colors, fonts } as BrandKit;
 }

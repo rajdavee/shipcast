@@ -78,3 +78,14 @@ test('takes: three alternatives of one shot with different seeds, video takes ge
   await record('c-takes', 'kling3-i2v', 4.9);
   await assert.rejects(generateTakes({ capability: 'i2v', prompt: 'x', seconds: 5, takes: 3, provider: 'fal', budgetKey: 'c-takes', out: join(home, 'c9', 'y') }), /cap/);
 });
+
+test('concurrent spend is never lost and in-flight jobs count against the cap', async () => {
+  const { spent } = await import('../services/gen/src/router.ts');
+  await Promise.all([record('race', 'm', 1), record('race', 'm', 1), record('race', 'm', 1)]);
+  assert.equal((await spent('race')).key, 3);
+  const caps = { perKey: 5, perMonth: 1000 };
+  const r1 = await checkBudget('race', 1.5, caps);
+  await assert.rejects(checkBudget('race', 1.5, caps), /cap/, 'the first job is still holding $1.50');
+  r1();
+  (await checkBudget('race', 1.5, caps))();
+});

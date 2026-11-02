@@ -42,6 +42,8 @@ export interface GenerateInput {
   nonCommercial?: boolean;
   /** Alternatives of the same shot (different seeds) to pick from; 1–3. */
   takes?: number;
+  /** Internal: the budget for this request was already held by the caller. */
+  preApproved?: boolean;
 }
 
 async function providers(force?: Provider): Promise<Provider[]> {
@@ -103,7 +105,8 @@ export async function generate(i: GenerateInput, progress: (f: number, m: string
     return { file: target, model: m.id, usd: 0, cached: true, prompt: plan.prompt, disclosure: verdict.disclose };
   }
   const budgetKey = i.budgetKey ?? 'adhoc';
-  await checkBudget(budgetKey, plan.usd, await caps());
+  const release = i.preApproved ? () => {} : await checkBudget(budgetKey, plan.usd, await caps());
+  try {
   const a = await adapter(m.provider, join(dirname(target), '.gen-work'));
   progress(0.1, `uploading inputs for ${m.label}`);
   const up = async (f?: string) => (f ? a.upload(f) : undefined);
@@ -115,6 +118,9 @@ export async function generate(i: GenerateInput, progress: (f: number, m: string
   progress(0.9, 'downloading');
   await fetchTo(urls[0], target);
   await record(budgetKey, m.id, plan.usd);
+  } finally {
+    release();
+  }
   await mkdir(cacheDir(), { recursive: true });
   await copyFile(target, join(cacheDir(), `${key}${ext}`)).catch(() => {});
   await writeFile(`${target}.json`, JSON.stringify({ ...meta, usd: plan.usd, cached: false }, null, 2));
@@ -126,12 +132,16 @@ export async function generateTakes(i: GenerateInput, progress: (f: number, m: s
   const n = Math.min(3, Math.max(1, Math.round(i.takes ?? 1)));
   const plan = await planGeneration(i);
   // Budget the whole set up front so a cap never leaves you with one and a half takes.
-  await checkBudget(i.budgetKey ?? 'adhoc', plan.usd * n, await caps());
+  const release = await checkBudget(i.budgetKey ?? 'adhoc', plan.usd * n, await caps());
   const base = i.seed ?? 1000 + Math.floor(Math.random() * 9000);
   const out = [];
   for (let k = 0; k < n; k++) {
     progress(k / n, `take ${k + 1} of ${n}`);
-    const r = await generate({ ...i, takes: 1, seed: base + k * 7919, out: n === 1 ? i.out : `${i.out}-t${k + 1}` }, (f, m) => progress((k + f) / n, m));
+    // The set's budget is already held, so each take skips its own check.
+    const r = await generate({ ...i, takes: 1, preApproved: true, seed: base + k * 7919, out: n === 1 ? i.out : `${i.out}-t${k + 1}` }, (f, m) => progress((k + f) / n, m)).catch((e) => {
+      release();
+      throw e;
+    });
     let poster: string | undefined;
     if (r.file.endsWith('.mp4')) {
       poster = r.file.replace(/\.mp4$/, '.jpg');
@@ -139,6 +149,7 @@ export async function generateTakes(i: GenerateInput, progress: (f: number, m: s
     }
     out.push({ ...r, poster });
   }
+  release();
   return { takes: out, usd: out.reduce((a, t) => a + t.usd, 0) };
 }
 

@@ -135,6 +135,7 @@ test('stills renders slides to PNGs, a PDF and an editable PPTX with notes', { s
   assert.match(list, /notesSlide2\.xml/);
   const xml = execFileSync('unzip', ['-p', join(out, 'presentation.pptx'), 'ppt/slides/slide1.xml']).toString();
   assert.match(xml, /R&amp;D &lt;2026&gt;/, 'title is editable text');
+  assert.ok(!/srgbClr val="010101"/.test(execFileSync('unzip', ['-p', join(out, 'presentation.pptx'), 'ppt/slides/slide2.xml']).toString()), 'color-mix() text keeps its colour, not near-black');
 });
 
 test('stills renders an ad set: every variant × size, an upload sheet, nothing overflowing', { skip: !hasChrome && 'no Chrome' }, async () => {
