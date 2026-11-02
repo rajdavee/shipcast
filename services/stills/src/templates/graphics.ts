@@ -48,7 +48,8 @@ export const THUMBNAIL_LAYOUTS: Layout[] = [
       if (ctx.width / ctx.height < 1.4) {
         // Square and tall feeds: headline across the top, the shot bleeding off the bottom-right below it.
         const top = Math.round(ctx.height * 0.4);
-        const ringAt = f.focus && f.focus !== 'none' ? `<div class="ring" style="left:${Math.round(ctx.width * 0.42)}px;top:${top + 90}px;width:260px;height:260px"></div>${ARROW.replace('class="arrow"', `class="arrow" style="left:${Math.round(ctx.width * 0.22)}px;top:${top - 60}px"`)}` : '';
+        // No callout ring here: its position can't know where the detail sits in the screenshot, and a ring on empty space looks broken.
+        const ringAt = '';
         return `<div class="t"><div class="tag">${logo(ctx)}</div>
 <h1 class="hl" style="position:absolute;left:64px;top:170px;width:${ctx.width - 128}px;font-size:${fit(f.headline, [[10, 170], [16, 150], [22, 128], [28, 112]], 96)}px">${rich(f.headline)}</h1>
 <div class="shot" style="left:110px;top:${top}px;width:${ctx.width}px;height:${ctx.height - top + 80}px;transform:rotate(-4deg)"><img src="${img(f.image, ctx)}"></div>

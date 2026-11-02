@@ -73,7 +73,7 @@ const CSS = (w: number, h: number) => {
   const px = (n: number) => `${Math.max(9, Math.round(n * u * (w < 400 || h < 120 ? 1.35 : 1)))}px`;
   return `
 .ad{position:absolute;inset:0;background:var(--bg);color:var(--fg);display:grid;overflow:hidden;font-family:var(--font-body)}
-.ad .logo{height:${px(54)};width:auto;max-width:40%;object-fit:contain;align-self:flex-start;flex:none}
+.ad .logo{height:${Math.max(24, Math.round(54 * Math.min(w, h * 1.1) / 1080 * (w < 400 || h < 120 ? 1.35 : 1)))}px;width:auto;max-width:40%;object-fit:contain;align-self:flex-start;flex:none}
 .ad img.logo{background:#fff;border-radius:${px(10)};padding:${px(6)} ${px(10)}}
 .theme-light .ad img.logo{background:none;padding:0}
 .ad .wordmark{font:800 ${px(40)}/1 var(--font-display)}
