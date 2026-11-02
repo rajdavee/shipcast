@@ -13,7 +13,7 @@ import { existsSync } from 'node:fs';
 import { mkdtemp, readdir, rm, writeFile, copyFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
-import { campaignDir, readCampaign, runClaude, getPack } from '@shipcast/engine';
+import { campaignDir, readCampaign, runClaude, getPack, run } from '@shipcast/engine';
 
 const RUBRIC = {
   realism: 'Looks real and professionally made (photos, people, product shots, motion) — not AI-looking or templated',
@@ -42,10 +42,20 @@ async function previews(dir: string): Promise<string[]> {
   const pick = (re: RegExp) => files.filter((f) => re.test(basename(f)));
   const ordered = [
     ...pick(/\.sheet\.(jpg|png)$/),
+    ...pick(/^contact-sheet\.jpg$/),
     ...pick(/^(landing|.*)-desktop\.png$/),
     ...pick(/-mobile\.png$/),
-    ...pick(/^video\.jpg$/),
+    ...pick(/^(video|poster)\.jpg$/),
   ];
+  // A video with no preview image: make a frame sheet from the file itself.
+  if (!ordered.length) {
+    const vid = pick(/\.mp4$/)[0];
+    if (vid) {
+      const sheet = join(out, 'eval.sheet.jpg');
+      await run('ffmpeg', ['-y', '-v', 'error', '-i', vid, '-vf', 'fps=1/3,scale=480:-2,tile=4x3', '-frames:v', '1', sheet]);
+      if (existsSync(sheet)) ordered.push(sheet);
+    }
+  }
   if (!ordered.length) {
     for (const sub of ['slides', 'pages', 'print']) {
       const d = join(out, sub);
