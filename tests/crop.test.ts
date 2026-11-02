@@ -32,3 +32,9 @@ test('a crop that cuts through a line of text moves only to the nearest gap', ()
   const [, x1] = px(b, W);
   assert.ok(x1 > 180 && x1 <= 330, `right edge ${x1} should clear the text, not jump far`);
 });
+
+test('a crop wholly inside a panel is a deliberate zoom and stays put', () => {
+  const { g, W, H } = page();
+  const box = { x: 120 / W, y: 90 / H, w: 100 / W, h: 50 / H };
+  assert.deepEqual(snapCrop(g, W, H, box), box);
+});

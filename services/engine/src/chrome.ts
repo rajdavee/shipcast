@@ -236,7 +236,8 @@ export function browser(): Browser {
  * leaves the canvas or enters the platform safe-zone margins, and the
  * smallest rendered type size.
  */
-export function layoutAuditScript(safe: { top: number; right: number; bottom: number; left: number }, width: number, height: number): string {
+/** uiShare: smallest readable UI text as a share of canvas width — 2.2% for phone feeds, ~1.2% for screens. */
+export function layoutAuditScript(safe: { top: number; right: number; bottom: number; left: number }, width: number, height: number, uiShare = 0.022): string {
   return `(() => {
     const W = ${width}, H = ${height}, S = ${JSON.stringify(safe)};
     const out = { overflow: [], offCanvas: [], unsafe: [], minFont: 999, textCount: 0 };
@@ -255,8 +256,21 @@ export function layoutAuditScript(safe: { top: number; right: number; bottom: nu
       if (r.left < -1 || r.top < -1 || r.right > W + 1 || r.bottom > H + 1) out.offCanvas.push(label(el));
       else if (!el.closest('[data-safe-ignore]') && (r.left < S.left || r.top < S.top || r.right > W - S.right || r.bottom > H - S.bottom)) out.unsafe.push(label(el));
     }
-    // Screenshots shown far below their real size: readable UI needs a crop, not a shrink.
-    out.tinyShots = [...document.querySelectorAll('img')].filter((im) => !im.closest('.logo, .tag, .ic, .who, .lchip, .run') && !im.classList.contains('logo') && im.naturalWidth >= 1000 && im.getBoundingClientRect().width > 160 && im.getBoundingClientRect().width / im.naturalWidth < 0.3).map((im) => (im.getAttribute('src') || '').split('/').pop().slice(0, 60));
+    // Screenshots whose UI text lands too small to read. UI body text is ~13 CSS px; a crop's file name
+    // carries the CSS width of screen it covers (-ui620), otherwise 2x captures are assumed past 2400px.
+    const minUi = Math.round(W * ${uiShare});
+    out.tinyShots = [...document.querySelectorAll('img')].filter((im) => !im.closest('.logo, .tag, .ic, .who, .lchip, .run') && !im.classList.contains('logo') && im.getBoundingClientRect().width > 160).map((im) => {
+      const src = im.getAttribute('src') || '';
+      const tag = src.match(/-ui(\\d+)\\.(?:png|jpe?g|webp)/);
+      if (!tag && im.naturalWidth < 1000) return null;
+      const css = tag ? Number(tag[1]) : im.naturalWidth / (im.naturalWidth >= 2400 ? 2 : 1);
+      const shown = im.getBoundingClientRect().width;
+      const ui = 13 * shown / css;
+      if (ui >= minUi) return null;
+      const name = tag ? 'the cropped screenshot' : decodeURIComponent(src.split('/').pop() || '').slice(0, 60);
+      const keep = Math.max(5, Math.min(95, Math.round((100 * ui) / minUi)));
+      return name + ': its UI text lands at about ' + Math.round(ui) + 'px on the canvas (needs ' + minUi + 'px). Crop to roughly ' + keep + '% of the width it shows now (the button, chart or result that proves the point) with #crop=x,y,w,h.';
+    }).filter(Boolean);
     if (out.minFont === 999) out.minFont = 0;
     out.overflow = out.overflow.slice(0, 20); out.offCanvas = out.offCanvas.slice(0, 20); out.unsafe = out.unsafe.slice(0, 20);
     return out;
@@ -269,7 +283,7 @@ export interface LayoutAudit {
   unsafe: string[];
   minFont: number;
   textCount: number;
-  /** Large screenshots shown below ~30% of their real width (unreadable UI). */
+  /** Screenshots whose UI text lands below ~2.2% of the canvas width, each with the crop that would fix it. */
   tinyShots?: string[];
 }
 

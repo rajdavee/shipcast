@@ -229,7 +229,7 @@ export async function renderSpec(kind: SpecKind, cwd: string, briefDir: string, 
         ...s.audit.overflow.map((x: string) => `Slide ${i + 1}: text overflows its box (${x}). Shorten it.`),
         ...s.audit.offCanvas.map((x: string) => `Slide ${i + 1}: text runs off the canvas (${x}). Shorten it.`),
         ...(s.audit.minFont && s.audit.minFont < 24 ? [`Slide ${i + 1}: smallest text is ${s.audit.minFont}px — too small for mobile.`] : []),
-        ...(s.audit.tinyShots?.length ? [`Slide ${i + 1}: ${s.audit.tinyShots[0]} is a full screenshot shrunk past readability — crop it to the part that matters with #crop=x,y,w,h.`] : []),
+        ...(s.audit.tinyShots?.length ? [`Slide ${i + 1}: ${s.audit.tinyShots[0]}`] : []),
       ]);
       return { ok: !fb.length, feedback: fb, summary: `${r.slides.length} slides + PDF` };
     }
@@ -239,7 +239,7 @@ export async function renderSpec(kind: SpecKind, cwd: string, briefDir: string, 
         ...g.audit.overflow.map((x: string) => `${g.file.split('/').pop()}: text overflows (${x}).`),
         ...g.audit.offCanvas.map((x: string) => `${g.file.split('/').pop()}: text runs off the canvas (${x}).`),
         ...g.audit.unsafe.slice(0, 2).map((x: string) => `${g.file.split('/').pop()}: ${x} sits inside the ${g.preset} safe margin — platform UI may cover it.`),
-        ...(g.audit.tinyShots?.length ? [`${g.file.split('/').pop()}: the screenshot is shrunk past readability — crop it with #crop=x,y,w,h.`] : []),
+        ...(g.audit.tinyShots?.length && !/-(portrait|wide|story)\./.test(g.file) ? [`${g.file.split('/').pop().replace(/-feed(?=\.)/, '')} (every size): ${g.audit.tinyShots[0]}`] : []),
       ]);
       return { ok: !fb.length, feedback: fb, summary: `${r.items.length} graphics` };
     }
@@ -274,7 +274,7 @@ export async function renderSpec(kind: SpecKind, cwd: string, briefDir: string, 
         ...s.audit.overflow.map((x: string) => `Slide ${i + 1}: text overflows its box (${x}). Shorten it or split the slide.`),
         ...s.audit.offCanvas.map((x: string) => `Slide ${i + 1}: text runs off the slide (${x}). Shorten it.`),
         ...(s.audit.minFont && s.audit.minFont < 20 ? [`Slide ${i + 1}: smallest text is ${s.audit.minFont}px — too small to read from the back of a room.`] : []),
-        ...(s.audit.tinyShots?.length ? [`Slide ${i + 1}: ${s.audit.tinyShots[0]} is a full screenshot shrunk past readability — crop it to the part that matters with #crop=x,y,w,h.`] : []),
+        ...(s.audit.tinyShots?.length ? [`Slide ${i + 1}: ${s.audit.tinyShots[0]}`] : []),
       ]);
       return { ok: !fb.length, feedback: fb, summary: `${r.slides.length} slides · PDF + PPTX` };
     }

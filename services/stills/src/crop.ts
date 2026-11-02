@@ -41,7 +41,7 @@ function line(g: Uint8Array, W: number, vertical: boolean, at: number, a: number
 }
 
 /** Move one edge outward (dir ±1) onto plain page background; returns the new pixel position. */
-function snapEdge(g: Uint8Array, W: number, H: number, page: number, vertical: boolean, edge: number, dir: 1 | -1, a: number, b: number): number {
+function snapEdge(g: Uint8Array, W: number, H: number, page: number, vertical: boolean, edge: number, dir: 1 | -1, a: number, b: number, panelReach: number): number {
   const size = vertical ? W : H;
   // The middle of the span: crops usually carry a strip of page above and below a panel.
   const trim = Math.floor((b - a) * 0.15);
@@ -58,7 +58,7 @@ function snapEdge(g: Uint8Array, W: number, H: number, page: number, vertical: b
       if (l.std < UNIFORM && Math.abs(l.mean - here.mean) > 8) return edge;
     }
   // Cutting content: the nearest gap is close. Inside a plain panel: its border may be far.
-  const reach = Math.round(size * (here.std < UNIFORM ? 0.4 : 0.08));
+  const reach = Math.round(here.std < UNIFORM ? panelReach : size * 0.08);
   let found = -1;
   let gap = -1;
   for (let k = 1; k <= reach; k++) {
@@ -91,35 +91,52 @@ function pageGrey(g: Uint8Array): number {
 
 /** Snap a fractional crop box to clear space in a grey image (W×H, one byte per pixel). */
 export function snapCrop(g: Uint8Array, W: number, H: number, box: Box): Box {
-  let x0 = Math.round(box.x * W);
-  let x1 = Math.min(W - 1, Math.round((box.x + box.w) * W));
-  let y0 = Math.round(box.y * H);
-  let y1 = Math.min(H - 1, Math.round((box.y + box.h) * H));
-  if (x1 - x0 < 8 || y1 - y0 < 8) return box;
+  const ox0 = Math.round(box.x * W);
+  const ox1 = Math.min(W - 1, Math.round((box.x + box.w) * W));
+  const oy0 = Math.round(box.y * H);
+  const oy1 = Math.min(H - 1, Math.round((box.y + box.h) * H));
+  if (ox1 - ox0 < 8 || oy1 - oy0 < 8) return box;
   const page = pageGrey(g);
-  const nx1 = snapEdge(g, W, H, page, true, x1, 1, y0, y1);
-  const nx0 = snapEdge(g, W, H, page, true, x0, -1, y0, y1);
-  x0 = nx0;
-  x1 = nx1;
-  const ny1 = snapEdge(g, W, H, page, false, y1, 1, x0, x1);
-  const ny0 = snapEdge(g, W, H, page, false, y0, -1, x0, x1);
-  if (nx0 === Math.round(box.x * W) && nx1 === Math.min(W - 1, Math.round((box.x + box.w) * W)) && ny0 === y0 && ny1 === y1) return box;
-  y0 = ny0;
-  y1 = ny1;
+  // One axis: first nudge each edge a short way (a border a few pixels off, a gap in content). Then, if
+  // one side now sits in clear space, the panel is only partly in frame: let the other side reach its far
+  // border, up to doubling the crop. A crop wholly inside a panel is a deliberate zoom and stays.
+  const axis = (vertical: boolean, e0: number, e1: number, a: number, b: number): [number, number] => {
+    const size = vertical ? W : H;
+    const near = size * 0.03;
+    let n0 = snapEdge(g, W, H, page, vertical, e0, -1, a, b, near);
+    let n1 = snapEdge(g, W, H, page, vertical, e1, 1, a, b, near);
+    const clear = (p: number) => isClear(g, W, page, vertical, p, a, b);
+    const room = Math.min(size * 0.4, e1 - e0);
+    if (clear(n0) && !clear(n1)) n1 = snapEdge(g, W, H, page, vertical, n1, 1, a, b, room);
+    else if (clear(n1) && !clear(n0)) n0 = snapEdge(g, W, H, page, vertical, n0, -1, a, b, room);
+    return [n0, n1];
+  };
+  const [x0, x1] = axis(true, ox0, ox1, oy0, oy1);
+  const [y0, y1] = axis(false, oy0, oy1, x0, x1);
+  if (x0 === ox0 && x1 === ox1 && y0 === oy0 && y1 === oy1) return box;
   return { x: x0 / W, y: y0 / H, w: (x1 - x0 + 1) / W, h: (y1 - y0 + 1) / H };
 }
 
+/** Is this line plain page background (or the edge of the image)? */
+function isClear(g: Uint8Array, W: number, page: number, vertical: boolean, p: number, a: number, b: number): boolean {
+  const size = vertical ? W : g.length / W;
+  if (p <= 0 || p >= size - 1) return true;
+  const trim = Math.floor((b - a) * 0.15);
+  const l = line(g, W, vertical, p, a + trim, b - trim);
+  return l.std < UNIFORM && Math.abs(l.mean - page) <= 4;
+}
+
 /** Decode an image to grey at most 1200px wide and snap the crop; returns the box unchanged if decoding fails. */
-export async function snapCropFile(file: string, box: Box, scratch: string): Promise<Box> {
+export async function snapCropFile(file: string, box: Box, scratch: string): Promise<Box & { srcW?: number }> {
   const probe = await run('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'csv=p=0', file]);
   const [iw, ih] = probe.stdout.trim().split(',').map(Number);
   if (!iw || !ih) return box;
   const W = Math.min(1200, iw);
   const H = Math.max(1, Math.round((ih * W) / iw));
   const r = await run('ffmpeg', ['-y', '-v', 'error', '-i', file, '-vf', `scale=${W}:${H}:flags=area,format=gray`, '-f', 'rawvideo', scratch]);
-  if (r.code !== 0) return box;
+  if (r.code !== 0) return { ...box, srcW: iw };
   const buf = await readFile(scratch).catch(() => null);
   await rm(scratch, { force: true });
-  if (!buf || buf.length < W * H) return box;
-  return snapCrop(new Uint8Array(buf.buffer, buf.byteOffset, W * H), W, H, box);
+  if (!buf || buf.length < W * H) return { ...box, srcW: iw };
+  return { ...snapCrop(new Uint8Array(buf.buffer, buf.byteOffset, W * H), W, H, box), srcW: iw };
 }

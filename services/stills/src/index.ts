@@ -71,10 +71,12 @@ async function materializeCrops<T>(spec: T, assetsDir: string | undefined, outDi
       if (seen.has(v)) return seen.get(v);
       const src = m[1].startsWith('/') ? m[1] : join(assetsDir ?? outDir, m[1]);
       const asked = m.slice(2).map(Number).map((n) => Math.min(1, Math.max(0, n)));
-      const out = join(dir, `${createHash('sha1').update(v).digest('hex').slice(0, 12)}.png`);
+      const id = createHash('sha1').update(v).digest('hex').slice(0, 12);
       await mkdir(dir, { recursive: true });
       // Nudge the edges out to clear space so a card isn't clipped a few pixels short of its border.
-      const { x, y, w, h } = await snapCropFile(src, { x: asked[0], y: asked[1], w: asked[2], h: asked[3] }, `${out}.gray`);
+      const { x, y, w, h, srcW } = await snapCropFile(src, { x: asked[0], y: asked[1], w: asked[2], h: asked[3] }, join(dir, `${id}.gray`));
+      // The name carries how many CSS px of screen the crop covers, so the layout audit can judge UI text size.
+      const out = join(dir, srcW ? `${id}-ui${Math.round((srcW / (srcW >= 2400 ? 2 : 1)) * w)}.png` : `${id}.png`);
       const r = await run('ffmpeg', ['-y', '-v', 'error', '-i', src, '-vf', `crop=iw*${Math.max(0.02, w)}:ih*${Math.max(0.02, h)}:iw*${x}:ih*${y},scale='min(iw*2,2400)':-2:flags=lanczos`, out]);
       const res = r.code === 0 ? out : m[1];
       seen.set(v, res);
@@ -112,17 +114,17 @@ function size(preset?: string): { width: number; height: number; safe: { top: nu
 }
 
 /** Render an HTML document to PNG/JPG and audit it; one retry on a fresh browser if Chrome dies mid-capture. */
-async function capture(html: string, file: string, width: number, height: number, safe: { top: number; right: number; bottom: number; left: number }) {
+async function capture(html: string, file: string, width: number, height: number, safe: { top: number; right: number; bottom: number; left: number }, uiShare?: number) {
   try {
-    return await captureOnce(html, file, width, height, safe);
+    return await captureOnce(html, file, width, height, safe, uiShare);
   } catch (e) {
     if (!/DevTools|timed out|closed|Target/i.test(String((e as Error).message))) throw e;
     await browser().restart();
-    return captureOnce(html, file, width, height, safe);
+    return captureOnce(html, file, width, height, safe, uiShare);
   }
 }
 
-async function captureOnce(html: string, file: string, width: number, height: number, safe: { top: number; right: number; bottom: number; left: number }) {
+async function captureOnce(html: string, file: string, width: number, height: number, safe: { top: number; right: number; bottom: number; left: number }, uiShare?: number) {
   await mkdir(dirname(file), { recursive: true });
   const htmlFile = file.replace(/\.(png|jpe?g)$/, '.html');
   await writeFile(htmlFile, html);
@@ -131,7 +133,7 @@ async function captureOnce(html: string, file: string, width: number, height: nu
     await page.eval(FIT_SCRIPT);
     // Templates with their own fitting rules (ads) expose it on the page.
     await page.eval('document.fonts.ready.then(() => (window.__shipcastFit ? window.__shipcastFit() : 0))');
-    const audit = await page.eval<LayoutAudit>(layoutAuditScript(safe, width, height));
+    const audit = await page.eval<LayoutAudit>(layoutAuditScript(safe, width, height, uiShare));
     const jpg = /\.jpe?g$/.test(file);
     await writeFile(file, await page.screenshot(jpg ? 'jpeg' : 'png', 90));
     return { file, html: htmlFile, audit };
@@ -401,7 +403,7 @@ export function createStillsService() {
           const s = input.slides[i];
           const html = renderSlide(s, input.theme ?? 'brand', { brand, width: W, height: H, page: i + 1, pages: input.slides.length, assetsDir, icons });
           const file = join(outDir, 'slides', `slide-${String(i + 1).padStart(2, '0')}.png`);
-          const shot = await capture(html, file, W, H, { top: 40, right: 60, bottom: 40, left: 60 });
+          const shot = await capture(html, file, W, H, { top: 40, right: 60, bottom: 40, left: 60 }, 0.012);
           // Second pass on the same HTML: measure the text, then render the design without it.
           const tmp = join(outDir, 'work', 'pptx', `slide-${i + 1}.html`);
           await writeFile(tmp, html.replace('</style>', `${HIDE_TEXT_CSS}</style>`).replace('<body>', '<body data-measure="1">'));
