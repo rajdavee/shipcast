@@ -45,6 +45,15 @@ export const THUMBNAIL_LAYOUTS: Layout[] = [
       { id: 'focus', type: 'enum', label: 'Circle', choices: ['none', 'top-left', 'center', 'bottom-left'], optional: true },
     ],
     html: (f, ctx) => {
+      if (ctx.width / ctx.height < 1.4) {
+        // Square and tall feeds: headline across the top, the shot bleeding off the bottom-right below it.
+        const top = Math.round(ctx.height * 0.4);
+        const ringAt = f.focus && f.focus !== 'none' ? `<div class="ring" style="left:${Math.round(ctx.width * 0.42)}px;top:${top + 90}px;width:260px;height:260px"></div>${ARROW.replace('class="arrow"', `class="arrow" style="left:${Math.round(ctx.width * 0.22)}px;top:${top - 60}px"`)}` : '';
+        return `<div class="t"><div class="tag">${logo(ctx)}</div>
+<h1 class="hl" style="position:absolute;left:64px;top:170px;width:${ctx.width - 128}px;font-size:${fit(f.headline, [[10, 170], [16, 150], [22, 128], [28, 112]], 96)}px">${rich(f.headline)}</h1>
+<div class="shot" style="left:110px;top:${top}px;width:${ctx.width}px;height:${ctx.height - top + 80}px;transform:rotate(-4deg)"><img src="${img(f.image, ctx)}"></div>
+${ringAt}</div>`;
+      }
       const ring = { 'top-left': 'left:690px;top:150px', center: 'left:860px;top:250px', 'bottom-left': 'left:690px;top:390px' }[f.focus as string];
       return `<div class="t"><div class="tag">${logo(ctx)}</div>
 <h1 class="hl" style="position:absolute;left:64px;top:170px;width:600px;font-size:${fit(f.headline, [[10, 150], [16, 128], [22, 110], [28, 96]], 84)}px">${rich(f.headline)}</h1>
