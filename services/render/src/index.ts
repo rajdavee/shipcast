@@ -2,7 +2,7 @@ import { copyFile, mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { existsSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
-import { assertInHome, callService, contactSheet, createService, home, PRESETS, presetForSize, run, SERVICE_PORTS, npxRun, engineEnv, chatterboxReady, findBroll, getSecret, readSettings } from '@shipcast/engine';
+import { assertInHome, callService, contactSheet, createService, frameDetail, home, PRESETS, presetForSize, run, SERVICE_PORTS, npxRun, engineEnv, chatterboxReady, findBroll, getSecret, readSettings } from '@shipcast/engine';
 import { SCENES } from './scenes.ts';
 import { CAPTION_STYLES } from './captions.ts';
 import { compileStoryboard, echoesVoice, validateStoryboard, type Storyboard } from './compile.ts';
@@ -84,7 +84,7 @@ async function compositionFindings(project: string) {
 }
 
 /** Shared tail of every render: lint → render → master → poster frame 0 → contact sheet → QA. */
-async function finishProject(o: { project: string; dir: string; name: string; quality: string; fps: number; preset?: string; posterAt: number; progress: (f: number, m?: string) => void }) {
+async function finishProject(o: { project: string; dir: string; name: string; quality: string; fps: number; preset?: string; posterAt: number; scenes?: { id: string; start: number; duration: number; kind: string }[]; progress: (f: number, m?: string) => void }) {
   const { project, dir, name } = o;
   o.progress(0.42, 'lint');
   const lint = await hf(['lint', '.', '--json'], project, 300_000);
@@ -108,17 +108,35 @@ async function finishProject(o: { project: string; dir: string; name: string; qu
   const withPoster = join(dir, `${name}.p.mp4`);
   const pr = await run('ffmpeg', ['-y', '-v', 'error', '-i', final, '-i', poster, '-filter_complex', "[1:v]scale=iw:ih[p];[0:v][p]overlay=enable='eq(n\\,0)'", '-c:v', 'libx264', '-profile:v', 'high', '-crf', '18', '-pix_fmt', 'yuv420p', '-c:a', 'copy', '-movflags', '+faststart', withPoster]);
   if (pr.code === 0) await run('mv', [withPoster, final]);
-  const sheet = await contactSheet(final, join(dir, `${name}.sheet.jpg`));
+  // Each scene at its settled moment — after its entrances (late in the scene), before the exit fade (~0.5 s):
+  // what a viewer sees, not a transition caught halfway.
+  const settled = (o.scenes ?? []).filter((s) => s.id !== 'captions').map((s) => ({ ...s, at: +(s.start + Math.max(s.duration * 0.55, s.duration - 0.8)).toFixed(2) }));
+  const sheet = await contactSheet(final, join(dir, `${name}.sheet.jpg`), { at: settled.map((s) => s.at) });
   o.progress(0.9, 'quality checks');
-  const [qa, layout] = await Promise.all([
+  const [qa, layout, empty] = await Promise.all([
     callService('qa', 'video', { file: final, preset: o.preset }).catch((e: Error) => ({ pass: false, issues: [{ rule: 'qa.unavailable', severity: 'warn', message: e.message }], facts: {} })),
     compositionFindings(project),
+    emptyScenes(final, settled),
   ]);
-  qa.issues.push(...layout);
+  qa.issues.push(...layout, ...empty);
   qa.pass = !qa.issues.some((i: any) => i.severity === 'error');
   return { file: final, poster, sheet, project, lint: lintJson?.summary ?? lintJson ?? undefined, qa };
 }
 
+
+/** Scenes that are nearly empty at their settled moment (a logo sting is meant to be sparse). */
+async function emptyScenes(file: string, scenes: { id: string; kind: string; at: number }[]) {
+  const out = [];
+  for (const [i, s] of scenes.entries()) {
+    if (/logo-sting|^block:/.test(s.kind)) continue;
+    const d = await frameDetail(file, s.at);
+    if (d !== null && d < EMPTY_DETAIL) out.push({ rule: 'picture.empty-scene', severity: 'error', at: s.at, message: `Scene ${i + 1} (${s.kind}) is nearly empty at ${s.at.toFixed(1)}s — the viewer sees a flat background.`, fix: 'Give it content that holds (headline, product shot, footage), or cut the scene.' });
+  }
+  return out;
+}
+
+/** Below this edge density a settled frame reads as blank (measured: content 2–14, lone logo ~1). */
+export const EMPTY_DETAIL = 0.6;
 
 const ts = (sec: number) => {
   const s = Math.floor(sec);
@@ -272,7 +290,7 @@ export function createRenderService() {
         const compiled = await compileStoryboard(storyboard as Storyboard, { dir: project, brandDir: brandDir ? assertInHome(brandDir, 'brandDir') : undefined, deps, progress: (f, m) => ctx.progress(f * 0.4, m) });
         const firstScene = compiled.scenes[0];
         const posterAt = firstScene ? firstScene.start + Math.min(firstScene.duration * 0.8, firstScene.duration - 0.1) : 1;
-        const out = await finishProject({ project, dir, name, quality, fps: compiled.preset.fps ?? 30, preset: compiled.preset.id, posterAt, progress: ctx.progress });
+        const out = await finishProject({ project, dir, name, quality, fps: compiled.preset.fps ?? 30, preset: compiled.preset.id, posterAt, scenes: compiled.scenes, progress: ctx.progress });
         if (compiled.credits.length) await writeFile(join(dir, 'credits.txt'), `Stock footage\n${compiled.credits.map((c) => `- ${c}`).join('\n')}\n`);
         return { ...out, duration: compiled.duration, scenes: compiled.scenes };
       },

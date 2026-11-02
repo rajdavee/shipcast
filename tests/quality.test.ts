@@ -150,3 +150,20 @@ test('the critic only asks for a fix on low, fixable criteria', async () => {
   assert.deepEqual(criticWeakest(v({ legibility: 2, layout: 1 })), { crit: 'layout', score: 1 });
   assert.match(criticSummary(v({ legibility: 2 })), /lowest legibility 2/);
 });
+
+test('contact sheets can sample each scene at its settled moment, and frame detail tells content from a flat frame', async () => {
+  const { contactSheet, frameDetail, run } = await import('@shipcast/engine');
+  const { mkdtempSync, existsSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const d = mkdtempSync(join(tmpdir(), 'sheet-'));
+  const v = join(d, 'v.mp4');
+  // 2 s flat blue, then 2 s of test pattern.
+  const r = await run('ffmpeg', ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'color=c=0x2233cc:s=320x240:d=2', '-f', 'lavfi', '-i', 'testsrc=s=320x240:d=2', '-filter_complex', '[0][1]concat=n=2:v=1', '-pix_fmt', 'yuv420p', v]);
+  if (r.code !== 0) return; // no ffmpeg here
+  const flat = await frameDetail(v, 1);
+  const busy = await frameDetail(v, 3);
+  assert.ok(flat !== null && busy !== null && flat < 0.6 && busy > 2, `flat ${flat}, busy ${busy}`);
+  const out = await contactSheet(v, join(d, 's.jpg'), { at: [1, 3] });
+  assert.ok(existsSync(out));
+});

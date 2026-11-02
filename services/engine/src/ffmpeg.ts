@@ -1,3 +1,5 @@
+import { mkdir, rm } from 'node:fs/promises';
+import { join } from 'node:path';
 import { run } from './exec.ts';
 
 export interface Probe {
@@ -62,8 +64,25 @@ export async function frozenSpans(file: string, minSeconds = 2): Promise<Span[]>
   return starts.map((s, i) => ({ start: s, end: ends[i] ?? s + minSeconds }));
 }
 
-/** A grid of evenly spaced frames, for human or model review. */
-export async function contactSheet(file: string, out: string, { cols = 4, rows = 3, width = 360 } = {}): Promise<string> {
+/**
+ * A grid of frames for human or model review: evenly spaced, or — given scene
+ * timings — each scene at its settled moment, so reviewers judge what viewers
+ * see rather than a transition caught halfway.
+ */
+export async function contactSheet(file: string, out: string, { cols = 4, rows = 3, width = 360, at }: { cols?: number; rows?: number; width?: number; at?: number[] } = {}): Promise<string> {
+  if (at?.length) {
+    const times = at.length > cols * rows ? Array.from({ length: cols * rows }, (_, i) => at[Math.round((i * (at.length - 1)) / (cols * rows - 1))]) : at;
+    const tmp = `${out}.frames`;
+    await mkdir(tmp, { recursive: true });
+    try {
+      for (const [i, t] of times.entries()) await run('ffmpeg', ['-y', '-v', 'error', '-ss', t.toFixed(2), '-i', file, '-frames:v', '1', '-vf', `scale=${width}:-2`, '-q:v', '3', join(tmp, `f${String(i).padStart(3, '0')}.jpg`)]);
+      const c = Math.min(cols, times.length);
+      const r = await run('ffmpeg', ['-y', '-v', 'error', '-framerate', '1', '-pattern_type', 'glob', '-i', join(tmp, 'f*.jpg'), '-vf', `tile=${c}x${Math.ceil(times.length / c)}:padding=6:margin=6:color=0x111111`, '-frames:v', '1', '-q:v', '3', out], { timeoutMs: 300_000 });
+      if (r.code === 0) return out;
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
+  }
   const p = await probe(file);
   const n = cols * rows;
   const every = Math.max(p.duration / n, 0.1);
@@ -92,4 +111,11 @@ export async function finishVideo(input: string, output: string, { lufs = -14, t
   const r = await run('ffmpeg', ['-y', '-v', 'error', '-i', input, ...videoArgs, ...audioArgs, '-movflags', '+faststart', output], { timeoutMs: 1_800_000 });
   if (r.code !== 0) throw new Error(`finish failed: ${r.stderr.slice(-400)}`);
   return { loudness: p.audio ? await measureLoudness(output) : null };
+}
+
+/** How much detail a frame has (mean of its edge map, 0–255): ~1 for a lone logo on a flat colour, 3+ for real content. */
+export async function frameDetail(file: string, at: number): Promise<number | null> {
+  const r = await run('ffmpeg', ['-v', 'error', '-ss', at.toFixed(2), '-i', file, '-frames:v', '1', '-vf', 'scale=360:-2,edgedetect=low=0.1:high=0.3,signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=-', '-f', 'null', '-']);
+  const m = r.stdout.match(/YAVG=([\d.]+)/);
+  return m ? Number(m[1]) : null;
 }
