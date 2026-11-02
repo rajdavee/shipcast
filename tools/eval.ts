@@ -62,6 +62,14 @@ async function previews(dir: string): Promise<string[]> {
       if (existsSync(d)) ordered.push(...(await readdir(d)).filter((f) => /\.png$/.test(f)).sort().slice(0, 3).map((f) => join(d, f)));
     }
   }
+  // Sheets shrink everything; add two full-size pages/slides so legibility is judged at real size.
+  for (const sub of ['slides', 'pages', 'print']) {
+    const d = join(out, sub);
+    if (!existsSync(d)) continue;
+    const pngs = (await readdir(d)).filter((f) => f.endsWith('.png') && !f.includes('.full.')).sort();
+    ordered.splice(1, 0, ...[pngs[0], pngs[Math.min(pngs.length - 1, 2)]].filter(Boolean).map((f) => join(d, f)));
+    break;
+  }
   return [...new Set(ordered)].slice(0, 4);
 }
 

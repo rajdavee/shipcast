@@ -531,7 +531,7 @@ export function createStillsService() {
         await mkdir(dir, { recursive: true });
         const safeName = String(name).replace(/[^\w-]/g, '_');
         const out: Record<string, string> = {};
-        const views: Record<string, { width: number; height: number; scale?: number; mobile?: boolean }> = { desktop: { width: 1440, height: 900, scale: 1 }, mobile: { width: 390, height: 844, scale: 2, mobile: true } };
+        const views: Record<string, { width: number; height: number; scale?: number; mobile?: boolean }> = { desktop: { width: 1440, height: 900, scale: 2 }, mobile: { width: 390, height: 844, scale: 2, mobile: true } };
         for (const v of ['desktop', 'mobile'] as const) {
           if (!shots.includes(v) && !(v === 'desktop' && shots.includes('full'))) continue;
           const page = await browser().open(url, { ...views[v], settleMs: 600 });
