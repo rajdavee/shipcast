@@ -11,6 +11,7 @@ import {
   blockedReason,
   CATEGORIES,
   collectIncidents,
+  readEvals,
   rankCards,
   readTrends,
   readLessons,
@@ -275,6 +276,18 @@ router.get('/api/trends', async (req) => {
   return { refreshedAt: feed.refreshedAt ?? null, sources: feed.sources ?? {}, cards: rankCards(feed.cards.filter((c) => all || !c.archived)) };
 });
 router.post('/api/trends/refresh', async () => updateJob('trends', { runNow: true }));
+
+// ── quality over time: eval and nightly-check scores per format ─────────
+router.get('/api/quality', async () => {
+  const evals = await readEvals(new Date(Date.now() - 120 * 86_400_000));
+  const formats: Record<string, { at: string; avg: number; golden: boolean; low: string }[]> = {};
+  for (const e of evals)
+    for (const p of e.pieces) {
+      const low = Object.entries(p.scores ?? {}).sort((a, b) => Number(a[1]) - Number(b[1]))[0];
+      (formats[p.pack] ??= []).push({ at: e.at, avg: p.avg, golden: !!e.golden, low: low ? `${low[0]} ${low[1]}` : '' });
+    }
+  return { formats, runs: evals.length };
+});
 
 // ── learning loop: lessons per format, with the incidents behind them ──
 router.get('/api/lessons', async () => {

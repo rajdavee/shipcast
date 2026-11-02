@@ -12,7 +12,9 @@ export function Learning() {
   const data = useLoad(() => api.lessons(), [], 15000);
   const agents = useLoad(() => api.agents(), [], 10000);
   const [busy, setBusy] = useState(false);
+  const quality = useLoad(() => api.quality(), [], 30000);
   const job = agents.data?.jobs.find((j) => j.id === 'learn');
+  const golden = agents.data?.jobs.find((j) => j.id === 'golden');
   if (!data.data) return <main className="page narrow"><p className="muted">Loading…</p></main>;
   const { lessons, packs, categories } = data.data;
   const label = (c: string) => categories.find((x) => x.id === c)?.label ?? c;
@@ -55,6 +57,32 @@ export function Learning() {
           <a className="btn ghost" href="#/setup">Schedule</a>
           <button className="btn primary" disabled={busy || job?.running || job?.runNow} onClick={learnNow}>{job?.runNow ? 'Queued' : 'Learn now'}</button>
         </div>
+      </div>
+
+      <h2>Quality over time</h2>
+      <p className="muted" style={{ fontSize: 13 }}>
+        Scores out of 5 from the creative-director critic (eval runs and the nightly quality check{golden?.enabled ? '' : ' — off; switch it on in Setup → Background agents'}).
+      </p>
+      {quality.data && !Object.keys(quality.data.formats).length && <p className="muted">No scores yet.</p>}
+      <div className="rows" style={{ marginBottom: 22 }}>
+        {Object.entries(quality.data?.formats ?? {})
+          .sort((a, b) => a[0].localeCompare(b[0]))
+          .map(([p, xs]) => {
+            const last = xs.at(-1)!;
+            const prev = xs.at(-2);
+            const d = prev ? +(last.avg - prev.avg).toFixed(2) : 0;
+            return (
+              <div className="srow" key={p}>
+                <i className={`dot ${last.avg >= 4 ? 'ok' : last.avg < 3 ? 'bad' : ''}`} />
+                <div>
+                  <h3>{formatName(p)} · {last.avg.toFixed(2)}{prev ? <span className="muted" style={{ fontSize: 13 }}> {d > 0 ? `▲ ${d}` : d < 0 ? `▼ ${-d}` : '='}</span> : null}</h3>
+                  <p className="muted" style={{ fontSize: 13 }}>
+                    {xs.slice(-8).map((x) => x.avg.toFixed(1)).join(' → ')} · lowest last time: {last.low} · {new Date(last.at).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
       </div>
 
       <h2>Lessons</h2>

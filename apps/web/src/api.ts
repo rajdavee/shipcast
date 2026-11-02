@@ -268,6 +268,7 @@ export const api = {
   runAgent: (id: string) => call<AgentJob[]>('POST', `/api/agents/${id}/run`),
   lessons: () => call<LessonsState>('GET', '/api/lessons'),
   trends: () => call<TrendFeed>('GET', '/api/trends'),
+  quality: () => call<{ runs: number; formats: Record<string, { at: string; avg: number; golden: boolean; low: string }[]> }>('GET', '/api/quality'),
   refreshTrends: () => call<unknown>('POST', '/api/trends/refresh'),
   setLesson: (id: string, status: 'off' | 'trial') => call<unknown>('PUT', `/api/lessons/${id}`, { status }),
   campaigns: () => call<Campaign[]>('GET', '/api/campaigns'),

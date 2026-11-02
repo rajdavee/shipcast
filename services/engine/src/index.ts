@@ -39,3 +39,4 @@ export * from './agents.ts';
 export * from './learn.ts';
 export * from './trends.ts';
 export * from './critic.ts';
+export * from './golden.ts';

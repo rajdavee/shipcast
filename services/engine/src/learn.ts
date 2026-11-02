@@ -121,6 +121,8 @@ export async function collectIncidents(since = new Date(Date.now() - 30 * 86_400
 
 export interface EvalRecord {
   at: string;
+  /** From the nightly quality check (same project, rotating formats) rather than a one-off eval. */
+  golden?: boolean;
   pieces: { campaign: string; step: string; pack: string; scores: Record<string, number>; avg: number; fix?: string }[];
 }
 const evalsDir = () => join(home(), 'evals');

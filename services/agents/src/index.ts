@@ -1,4 +1,4 @@
-import { blockedReason, createService, foregroundBusy, learnOnce, logRun, refreshTrends, pickDue, readJobs, readSettings, updateJob, type AgentJob, type AgentKind } from '@shipcast/engine';
+import { blockedReason, createService, foregroundBusy, learnOnce, logRun, refreshTrends, runGolden, pickDue, readJobs, readSettings, updateJob, type AgentJob, type AgentKind } from '@shipcast/engine';
 
 /**
  * The agents service: wakes every 20 seconds, starts at most one background
@@ -17,6 +17,8 @@ export interface AgentContext {
 }
 export interface AgentOutcome {
   summary: string;
+  /** Check back sooner than the job's schedule (work it started is still going). */
+  nextInMinutes?: number;
   /** Claude runs this job used (counts toward the daily cap). */
   claudeRuns?: number;
 }
@@ -36,6 +38,8 @@ registerAgent('learn', async (ctx) => {
   if (r.retired.length) parts.push(`${r.retired.length} retired`);
   return { summary: parts.join(' · '), claudeRuns: r.claudeRuns };
 });
+
+registerAgent('golden', async () => runGolden());
 
 registerAgent('trends', async (ctx) => {
   const r = await refreshTrends({ now: ctx.now, shouldYield: ctx.shouldYield });
@@ -78,7 +82,7 @@ async function runJob(job: AgentJob, now: Date, handler: AgentHandler | undefine
     out = { summary: (e as Error).message.slice(0, 400), claudeRuns: 0 };
   }
   const ms = Date.now() - t0;
-  const next = new Date(now.getTime() + job.every * 60_000).toISOString();
+  const next = new Date(now.getTime() + (ok && out.nextInMinutes ? Math.max(5, out.nextInMinutes) : job.every) * 60_000).toISOString();
   await updateJob(job.id, { running: false, lastRun: now.toISOString(), nextRun: next, lastResult: { ok, summary: out.summary, ms } });
   await logRun({ job: job.id, at: now.toISOString(), ok, summary: out.summary, ms, claudeRuns: out.claudeRuns ?? 0 });
   log(`${job.title}: ${ok ? 'done' : 'failed'} — ${out.summary}`);
