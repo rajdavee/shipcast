@@ -1,4 +1,5 @@
 import { lessonsBrief } from './learn.ts';
+import { criticSummary, criticWeakest, judge, previews } from './critic.ts';
 import { cp, mkdir, writeFile, rm } from 'node:fs/promises';
 import { catalogMarkdown, checkCopy, renderSpec, SPEC_FILE, type SpecKind } from './specs.ts';
 import { readFile, readdir, rename, stat } from 'node:fs/promises';
@@ -578,6 +579,7 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
 
     // Spec formats: render through the services; hand problems back to the same session (≤ 2 fix rounds).
     let reviewed = false;
+    let criticked = false;
     if (ok && specKind && !canceled && !timedOut) {
       // Variety guard: a near-copy of a recent video gets one rewrite before it renders.
       if (specKind === 'storyboard' && !renderOnly && sessionId && !canceled && !timedOut) {
@@ -617,6 +619,22 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
               continue;
             }
             await log({ step: step.id, type: 'log', text: "Director's review: approved" });
+          }
+          // Critic: every other format gets one look at its real-size previews; the weakest fixable thing is fixed now.
+          if (specKind !== 'storyboard' && settings.criticReview !== false && !renderOnly && !criticked && sessionId && Date.now() < deadline - 4 * 60_000 && !canceled && !timedOut) {
+            criticked = true;
+            await phase('Final review');
+            const v = await judge(pack?.id ?? specKind, step.options._title ?? pack?.name ?? specKind, await previews(cwd)).catch(() => null);
+            if (v) {
+              await writeFile(join(cwd, 'out', 'critic.json'), JSON.stringify(v, null, 2)).catch(() => {});
+              const weak = criticWeakest(v);
+              await log({ step: step.id, type: 'log', text: `Critic: ${criticSummary(v)}${weak ? ` — fixing ${weak.crit}` : ''}` });
+              if (weak) {
+                await log({ step: step.id, type: 'log', text: `Critic review: ${weak.crit} scored ${weak.score}. ${v.fix}` });
+                const fix = await execClaude(`A reviewer scored your rendered ${SPEC_FILE[specKind]} (previews in out/, e.g. ${(await previews(cwd)).map((f) => f.split('/out/')[1]).filter(Boolean).join(', ')}). Lowest: ${weak.crit} ${weak.score}/5.\n\nTheir notes: ${v.notes}\nThe change they'd make: ${v.fix}\n\nMake that change in out/${SPEC_FILE[specKind]} if it's possible within the spec (copy, layout choice, crops, order, sizes); keep everything that works. Add one line to out/NOTES.md. Don't render anything yourself. If it can't be fixed in the spec, reply NO CHANGE.`, sessionId);
+                if (fix.result?.ok && !/NO CHANGE/.test(fix.result.text ?? '')) continue;
+              }
+            }
           }
           break;
         }

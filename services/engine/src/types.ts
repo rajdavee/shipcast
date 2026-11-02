@@ -151,6 +151,8 @@ export interface Settings {
   subagents: 'pack' | 'never';
   /** After a video passes QA, Claude reviews the frames like a creative director (one revision round). */
   directorReview: boolean;
+  /** After any non-video piece renders cleanly, a vision critic scores it and the weakest fixable thing gets one revision. */
+  criticReview: boolean;
   /** Extra args appended to every claude invocation. */
   extraArgs: string[];
   /** Voiceover engine: local Kokoro (free) or your own ElevenLabs account. */

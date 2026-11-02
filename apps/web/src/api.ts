@@ -105,6 +105,7 @@ export interface Settings {
   stepTimeoutMinutes: number;
   subagents: 'pack' | 'never';
   directorReview: boolean;
+  criticReview?: boolean;
   genCapPerProject?: number;
   genCapPerMonth?: number;
   agentsPaused?: boolean;

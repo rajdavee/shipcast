@@ -141,3 +141,12 @@ test('captions step aside when the scene already shows what the voice says', () 
   assert.equal(echoesVoice({ headline: 'Eight tools.' }, w('You need eight different tools to launch one product properly')), false);
   assert.equal(echoesVoice({ image: 'shots/x.png', zoom: 1.3 }, w('Paste one link into Shipcast today')), false);
 });
+
+test('the critic only asks for a fix on low, fixable criteria', async () => {
+  const { criticWeakest, criticSummary } = await import('@shipcast/engine');
+  const v = (s: Record<string, number>) => ({ scores: { realism: 3, fidelity: 4, brand: 4, hook: 4, layout: 4, legibility: 4, artefacts: 4, ...s } as any, notes: '', fix: '' });
+  assert.equal(criticWeakest(v({})), null);
+  assert.equal(criticWeakest(v({ realism: 1 })), null, 'realism needs generated imagery, not a rewrite');
+  assert.deepEqual(criticWeakest(v({ legibility: 2, layout: 1 })), { crit: 'layout', score: 1 });
+  assert.match(criticSummary(v({ legibility: 2 })), /lowest legibility 2/);
+});

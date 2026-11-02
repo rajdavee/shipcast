@@ -173,6 +173,17 @@ export function Setup({ status, onChange }: { status: Status | null; onChange: (
             <div className="srow">
               <span />
               <div>
+                <h3>Final review for everything else</h3>
+                <p>A critic scores each carousel, deck, document, ad, email and page at full size, and the weakest thing gets fixed before you see it.</p>
+              </div>
+              <div className="seg">
+                <button aria-pressed={settings.criticReview !== false} onClick={() => save({ criticReview: true })}>On</button>
+                <button aria-pressed={settings.criticReview === false} onClick={() => save({ criticReview: false })}>Off</button>
+              </div>
+            </div>
+            <div className="srow">
+              <span />
+              <div>
                 <h3>Helper agents for experimental formats</h3>
                 <p>Some experimental formats build frames in parallel. Off saves usage.</p>
               </div>

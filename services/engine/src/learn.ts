@@ -109,6 +109,7 @@ export async function collectIncidents(since = new Date(Date.now() - 30 * 86_400
       let m: RegExpMatchArray | null;
       if ((m = text.match(/^Quality check found \d+ issue\(s\): (.*)$/s))) for (const part of m[1].split(' · ')) add('qa', part);
       else if ((m = text.match(/^Revision queued: (.*)$/s))) add('revision', m[1]);
+      else if ((m = text.match(/^Critic review: (.*)$/s))) add('eval', m[1]);
       else if (/^Director's review: revising/.test(text)) add('director', (lastText.get(e.step) ?? '').replace(/\bCHANGED\b\.?/g, '').trim() || "Director's review sent the storyboard back for changes.");
       else if ((m = text.match(/^Brand score \d+% — (.*)$/s))) for (const part of m[1].split(' · ')) add('brand', part);
     }

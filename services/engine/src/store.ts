@@ -13,6 +13,7 @@ export const DEFAULT_SETTINGS: Settings = {
   stepTimeoutMinutes: 60,
   subagents: 'pack',
   directorReview: true,
+  criticReview: true,
   extraArgs: [],
   voiceProvider: 'kokoro',
   elevenVoice: '',
