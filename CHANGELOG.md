@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — sprint v6: Shipcast that gets better on its own
+
+- **Background agents** — a new `agents` service runs scheduled jobs that wait for your own campaigns, stay out of quiet hours and share a daily cap of Claude runs; Setup → Background agents to switch them on or off, change how often they run, run now or pause.
+- **Learning loop** — quality checks, the creative director's notes, brand-voice slips, eval scores and your revision notes become categorised incidents; repeat problems turn into short per-format lessons that go into that format's prompt, each on trial and kept only if its problem gets rarer. New **Learning** page.
+- **Trend radar** — Hacker News, Reddit's marketing communities, Google Trends and YouTube, plus one web-search pass on your subscription, become evidence-backed trend cards that are merged over time. New **Trending** page with *Make one like this*.
+- **Quality in the loop** — a critic scores every non-video piece at full size after its first clean render and the weakest fixable thing is fixed in the same session; video review sheets show each scene settled instead of mid-transition; nearly empty scenes go back as fixes; legibility is measured as UI text size on the canvas; crops that clip a card widen to show all of it.
+- **Nightly quality check** — an opt-in project that re-makes two formats per run in rotation and scores them; *Quality over time* on the Learning page.
+- **New formats** — TikTok/Instagram photo carousels, quote and testimonial cards, app store screenshot sets, Product Hunt launch kit.
+
 ## Unreleased — sprint v5: every marketing material
 
 - **Brand voice** — learn a voice from your own copy or links; sliders, lexicon, claims and per-channel rules; every asset scored and fixed against it; *Check any copy* with one-click rewrite.

@@ -172,6 +172,16 @@ Copy is checked against platform limits (LinkedIn's "see more" fold, X's 280,
 YouTube's 60-character titles) and a list of AI clichés. Problems go back to
 Claude with the fix hint; you see what passed.
 
+## Gets better on its own
+
+Shipcast runs a few background agents while you're not using it (Setup → Background agents). They wait until your own campaigns finish, stay out of quiet hours and use a small daily share of your Claude runs.
+
+- **Learning** — reads its own quality checks, the creative director's notes, brand-voice slips, eval scores and the changes you ask for, and turns problems that keep coming back into short lessons for that format ("Carousel: keep every text element ≥ 28 px"). Each lesson is on trial and is kept only if the problem gets rarer. See and switch them off on the **Learning** page.
+- **Trending** — watches Hacker News, Reddit's marketing communities, Google Trends and YouTube, then checks what marketers report is working this month. Every card has its sources and a *Make one like this* button that opens a new campaign with the format and a recipe filled in.
+- **Nightly quality check** (opt-in) — re-makes two sample pieces per night from your latest product and scores them, so a drop in quality shows up the next morning.
+
+While it makes each piece, a critic looks at the result at real size and the weakest fixable thing is fixed before you see it.
+
 ## Brand voice
 
 Every format writes in one voice. Paste a few paragraphs you're proud of (or
