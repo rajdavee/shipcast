@@ -1,9 +1,11 @@
 # Sprint v5 — marketing on steroids
 
-Goal: results a marketing team would pay for. Photoreal people using the
-product, UGC-style ads, talking presenters, lifestyle shots — mixed and
-matched from open and hosted models — plus the controls marketers expect:
-a brand voice, hook variants, platform-ready exports and a weekly trend brief.
+Goal: every material a marketing team ships, at a quality they would pay
+for — decks, PDFs, carousels, posts, ads, emails, landing sections, print,
+infographics, images and videos — all in one brand voice, with hook variants,
+platform-ready exports and a weekly trend brief. Photoreal people and products
+(UGC ads, presenters, lifestyle shots) come from mixed-and-matched open and
+hosted models.
 
 ## What the research says (summary)
 
@@ -48,59 +50,102 @@ web search. Not to build on: Reddit (public API closing), pytrends (dead), X
 (paid per read), TikTok Creative Center (no API). Competitor ads come in as
 links or screenshots the user pastes.
 
+## Materials marketers use (and what Shipcast makes after this sprint)
+
+| Material | Today | This sprint |
+|---|---|---|
+| Social carousels (LinkedIn PDF, IG) | ✅ carousel pack | tone + brand score, hook variants |
+| Social posts (all sizes) | ✅ social-post pack | variants, platform copy, AI label |
+| **Pitch / sales deck, webinar slides** | — | **presentation pack** → PDF + editable PPTX + speaker notes |
+| **One-pager, sales sheet, case study, datasheet** | — | **document pack** → print-ready PDF (A4 / Letter) |
+| **Ebook / whitepaper / lead magnet / report** | — | document pack, long mode: cover, TOC, chapters, charts, CTA pages |
+| **Static ads** (Meta, LinkedIn, Google Display, X) | — | **ad-set pack**: every IAB/social size × 3–10 hook variants |
+| **Email / newsletter** | — | **email pack**: responsive HTML (tested table layout) + plain text + subject/preview variants |
+| **Landing-page sections** | — | **landing pack**: hero, features, proof, pricing, FAQ, CTA → HTML/CSS + previews |
+| **Posters, banners, roll-ups, event signage** | — | **print pack**: print sizes with bleed and crop marks, CMYK-safe colours |
+| Infographics (static + animated) | ✅ | tone, data sourcing |
+| Thumbnails, cards, OG images | ✅ | — |
+| Launch copy, calendar, campaign hub | ✅ | per-channel voice, trend-aware calendar |
+| Videos: tours, reels, films, explainers, YouTube | ✅ | realistic B-roll, UGC presenter, hook cuts |
+| **Realistic images** (lifestyle, product in hand, people) | — | `gen` service: hero images for every material above |
+
 ## Backlog (ranked by impact ÷ effort)
 
-### A. Realistic people and products
+### A. Shared brain (every material)
 
-1. **`services/gen` (:4324)** — one generation service with adapters
-   (`fal`, `replicate`, `comfyui`, `mflux`), a model registry (capability,
-   inputs, limits, licence + `commercialOK`, hardware, price, quality, prompt
-   style), a router (fit × quality ÷ cost under a budget cap, explicit model
-   wins), content-hash cache, cost estimate before submit, spend cap per
-   campaign. `media.mjs gen` becomes a thin client of it.
-2. **Shot compiler** — 5-slot shot schema + camera/lens/light presets +
-   per-model templates and word budgets. The director writes shots, not prompts.
-3. **Hero-frame → motion** — generate the still first (with the real product
-   cut-out and brand colours), approve, then image→video with the frame pinned.
-4. **Cast & product kits** — reference packs per synthetic actor and per
-   product (BiRefNet cut-out); optional LoRA training; reused across shots and
-   campaigns.
-5. **UGC / presenter pack** — script → voice (Kokoro / ElevenLabs) → portrait
-   → InfiniteTalk (or Wan-S2V) talking clip, intercut with product screens and
-   B-roll; captions; "AI actor" disclosure built in.
-6. **Finishing** — SeedVR2 / Real-ESRGAN upscale, GFPGAN face pass,
-   IC-Light relight for product shots, all optional per shot.
-7. **Storyboard approval with takes** — contact sheet of hero frames, 2–3
-   takes per shot, price per shot and total; approve, swap or regenerate one.
-
-### B. Marketer controls
-
-8. **Tone & Voice profile** — sliders (formal↔casual, serious↔playful,
+1. **Tone & Voice profile** — sliders (formal↔casual, serious↔playful,
    reserved↔bold, technical↔simple, humour), personality words, reading
    level, person, do/don't, lexicon (preferred + banned), emoji / hashtag /
    CTA policy, claims rules, locale, per-channel overrides. Learned from
    sample texts or URLs. Lives with the brand kit; every pack reads it.
-9. **Brand score** — after each asset: banned terms, claims without a
-   source, reading level, slider drift → % and "fix it" rewrite (QA service).
-10. **Hook variants** — 5–10 hooks per asset (pain POV, open loop,
-    before/after, stat, contrarian), rendered as cut variants of one master.
-11. **Platform-native export** — TikTok / Reels / Shorts / LinkedIn / X
-    presets: ratio, length, safe zones (2026), caption placement above
-    auto-captions, per-platform copy, hashtags, AI-label flag.
-12. **Weekly trend brief** — HN + YouTube search + Claude web search for the
-    product's niche → trending formats, hooks and topics mapped to ready-to-make
-    briefs. Competitor teardown from pasted ad links or screenshots.
-13. **Compliance & disclosure** — C2PA / XMP "AI-generated" metadata,
-    on-screen label for synthetic humans, claims check, consent record for any
-    real face or cloned voice (otherwise refused).
+2. **Brand score** — after each asset: banned terms, claims without a
+   source, reading level, slider drift → % and a "fix it" rewrite (QA service).
+3. **Hook variants** — 5–10 hooks per asset (pain POV, open loop,
+   before/after, stat, contrarian) for posts, ads, emails and video cuts.
+4. **Platform-native export** — TikTok / Reels / Shorts / LinkedIn / X /
+   Meta ads / Google Display presets: sizes, safe zones (2026), lengths,
+   caption placement, per-platform copy, hashtags, AI-label flag.
 
-### C. Carried over
+### B. New materials
 
-14. Stock: real download tests for the "Anything" pack; footage cut to the
-    beat.
-15. ElevenLabs: voice per brand profile; credit counter in Setup.
-16. Supervisor: no duplicate restarts, waits out taken ports — done.
-17. Content prompts pick "Anything" more reliably — done.
+5. **Document pack** (stills `document` kind) — page system for A4 / Letter:
+   cover, section, two-column body, pull quote, stat row, chart, table,
+   testimonial, CTA/back page; one-pager, sales sheet, case study, datasheet,
+   ebook / whitepaper (TOC, page numbers, running heads). PDF with real text.
+6. **Presentation pack** (stills `slides` kind) — 16:9 master with title,
+   agenda, problem, solution, product shot, metric, comparison, timeline,
+   team, quote, pricing, CTA layouts; PDF + PPTX (editable text boxes, images,
+   speaker notes) written by our own OOXML writer.
+7. **Ad-set pack** — one concept → every size (1080², 1080×1350, 1080×1920,
+   1200×628, 300×250, 728×90, 160×600, 320×50, 970×250) × hook variants;
+   text-ratio and safe-zone checks; naming that matches ad managers.
+8. **Email pack** — table-based responsive HTML that survives Gmail/Outlook,
+   dark-mode safe, inline CSS, alt text; plain-text twin; 5 subject + preview
+   variants; launch, newsletter, nurture sequence (3–5 mails).
+9. **Landing pack** — semantic HTML/CSS sections in the brand kit (hero,
+   logos, features, how-it-works, testimonials, pricing, FAQ, CTA), responsive,
+   plus desktop/mobile previews; copy follows the voice profile.
+10. **Print pack** — poster (A3/A2/18×24"), roll-up (850×2000 mm), banner,
+    flyer; 3 mm bleed, crop marks, 300 dpi images, print PDF.
+
+### C. Realistic people and products
+
+11. **`services/gen` (:4324)** — one generation service with adapters
+    (`fal`, `replicate`, `comfyui`, `mflux`, `fake`), a model registry
+    (capability, inputs, limits, licence + `commercialOK`, hardware, price,
+    quality, prompt style), a router (fit × quality ÷ cost under a budget
+    cap; an explicit model wins), content-hash cache, cost estimate before
+    submit, spend cap per campaign. `media.mjs gen` becomes a thin client.
+12. **Shot compiler** — 5-slot shot schema + camera/lens/light presets +
+    per-model templates and word budgets. Packs write shots, not prompts.
+13. **Hero-frame → motion** — the still first (real product cut-out, brand
+    colours), then image→video with the frame pinned.
+14. **Cast & product kits** — reference packs per synthetic actor and per
+    product (BiRefNet cut-out); optional LoRA; reused across campaigns.
+15. **UGC / presenter pack** — script → voice → portrait → InfiniteTalk
+    (or Wan-S2V) talking clip, intercut with product screens and B-roll;
+    "AI actor" disclosure built in.
+16. **Finishing** — SeedVR2 / ESRGAN upscale, relight, background removal.
+17. **Storyboard takes** — contact sheet of hero frames, 2–3 takes per
+    shot, price per shot and total; approve, swap or regenerate one.
+
+### D. Research for marketers
+
+18. **Weekly trend brief** — HN + YouTube search + Claude web search for the
+    product's niche → trending formats, hooks and topics mapped to
+    ready-to-make briefs.
+19. **Competitor teardown** — pasted ad links or screenshots → hook,
+    structure, offer, CTA → "make ours" briefs.
+20. **Compliance & disclosure** — C2PA / XMP "AI-generated" metadata,
+    on-screen label for synthetic humans, claims check, consent record for
+    any real face or cloned voice (otherwise refused).
+
+### E. Carried over
+
+21. ✅ Supervisor: no duplicate restarts, waits out taken ports.
+22. ✅ Content prompts pick "Anything" more reliably.
+23. Stock: real downloads in the "Anything" pack; footage cut to the beat.
+24. ElevenLabs: voice per brand profile; credit counter in Setup.
 
 ## Safety rules (unchanged, now enforced in `gen`)
 
@@ -120,24 +165,30 @@ synthetic-human asset carries metadata and (by default) an on-screen label.
 - **Live smoke** (opt-in, `SHIPCAST_LIVE=1`, with keys): one image per
   default model, one 5 s i2v, one 10 s talking head; asserts file, size,
   duration, cost logged.
-- **Golden eval set** — 10 briefs (SaaS UGC ad, DTC product-in-hand, founder
-  video, B2B LinkedIn carousel, travel film, recipe, fitness, fintech,
-  developer tool, app store preview). Each run produces a contact sheet; a
+- **Golden eval set** — 12 briefs across materials: SaaS pitch deck, B2B
+  case-study PDF, ebook, LinkedIn carousel, Meta ad set, launch email,
+  landing sections, event poster, DTC product-in-hand image set, UGC video
+  ad, founder video, travel film. Each run produces a contact sheet; a
   vision-model judge scores realism, product fidelity, brand fit, hook
-  strength, text legibility and artefacts (hands, faces, morphing) 1–5; a
+  strength, layout (alignment, hierarchy, overflow), text legibility and
+  artefacts (hands, faces, morphing) 1–5; documents also pass a PDF check
+  (fonts embedded, text selectable, page size, bleed) and emails an HTML
+  check (inline CSS, width ≤ 640, alt text, link count); a
   person reviews the sheet. A release needs ≥4.0 average and no 1s.
 - **Regression**: the existing 47 tests stay green; showcase campaigns
   (SiGMMa, Veracy) re-render unchanged.
 
 ## Order of work
 
-1. `gen` service + registry + fal adapter + cache + cost cap + guard (A1, 13).
-2. Shot compiler + hero-frame → motion (A2, A3) — first realistic B-roll.
-3. Tone & Voice profile + brand score (B8, B9).
-4. Cast & product kits + UGC/presenter pack (A4, A5).
-5. Hook variants + platform export (B10, B11).
-6. Storyboard takes + finishing (A6, A7).
-7. Trend brief + teardown (B12); golden eval run; README and CHANGELOG.
+1. Tone & Voice profile + brand score (A1, A2) — every later pack uses it.
+2. Document pack (B5) and presentation pack with PPTX (B6).
+3. Ad-set pack with hook variants and platform export (B7, A3, A4).
+4. Email pack (B8) and landing pack (B9); print pack (B10).
+5. Trend brief + competitor teardown (D18, D19).
+6. `gen` service with fake + local adapters, shot compiler, cast/product kits,
+   finishing, storyboard takes (C11–C17), compliance (D20).
+7. fal key → live smoke, UGC/presenter pack, golden eval run, README and
+   CHANGELOG, release.
 
 ## Needs from you
 
