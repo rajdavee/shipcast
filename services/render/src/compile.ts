@@ -315,9 +315,17 @@ export async function compileStoryboard(story: Storyboard, opts: { dir: string; 
     const f = e.sc.fields as Record<string, unknown>;
     const src = typeof f.image === 'string' ? (f.image.startsWith('/') ? f.image : join(opts.brandDir ?? '', f.image)) : '';
     if (!src || !existsSync(src)) continue;
-    const w = (await probe(src).catch(() => null))?.video?.width ?? 0;
+    const pv = (await probe(src).catch(() => null))?.video;
+    const w = pv?.width ?? 0;
     if (!w) continue;
-    const cap = w < 1600 ? 1.25 : w < 2400 ? 1.6 : 2.2;
+    let cap = w < 1600 ? 1.25 : w < 2400 ? 1.6 : 2.2;
+    // A wide desktop screen in a tall frame is already cropped at both edges; a deep push cuts the words off.
+    const wide = pv && pv.width / Math.max(1, pv.height) > 1.2;
+    if (vertical && wide) {
+      cap = Math.min(cap, 1.35);
+      const fx = Number(f.focusX ?? 0.5);
+      f.focusX = Math.min(0.68, Math.max(0.32, Number.isFinite(fx) ? fx : 0.5));
+    }
     const want = Number(f.zoom ?? 1.6);
     if (want > cap) f.zoom = cap;
     if (w < 1600 && f.focusX === undefined) f.focusX = 0.5;
