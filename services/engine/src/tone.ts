@@ -248,6 +248,9 @@ export function scoreText(text: string, p: ToneProfile, ch?: Channel): BrandScor
   if (p.claims.requireSource) {
     const allowed = p.claims.allowedStats.join(' ').toLowerCase();
     for (const m of text.matchAll(/(\d+(?:[.,]\d+)?\s?(?:%|x\b|×|percent|times (?:faster|more|less)))/gi)) {
+      // A number with its citation on the same line (a link, or "Source …") is sourced.
+      const line = text.slice(text.lastIndexOf('\n', m.index) + 1, (text.indexOf('\n', m.index) + 1 || text.length + 1) - 1);
+      if (/https?:\/\/|\]\(|\bsource[ds]?\b|\bper\s+[A-Z]/i.test(line)) continue;
       if (!allowed.includes(m[1].toLowerCase().replace(/\s/g, ''))) issues.push({ rule: 'unsourced', severity: 'warn', detail: `Check the source for "${m[1].trim()}"`, match: m[1].trim() });
     }
     for (const m of text.matchAll(/\b(the (?:best|fastest|leading|most (?:advanced|powerful|trusted)) \w+|best-in-class|industry-leading|world-leading|unmatched|unbeatable)\b/gi)) issues.push({ rule: 'claim', severity: 'warn', detail: `Superlative needs proof: "${m[1]}"`, match: m[1] });
@@ -266,8 +269,10 @@ export function scoreText(text: string, p: ToneProfile, ch?: Channel): BrandScor
   if (tags > maxTags) issues.push({ rule: 'hashtags', severity: 'warn', detail: `${tags} hashtags; max ${maxTags}` });
   const ex = (text.match(/!/g) ?? []).length;
   if (ex > Math.max(2, Math.ceil(rg.sentences / 5)) && c.sliders.reservedBold < 80) issues.push({ rule: 'exclaim', severity: 'warn', detail: `${ex} exclamation marks — calmer copy reads more confident` });
-  const shouty = (text.match(/\b[A-Z]{4,}\b/g) ?? []).filter((w) => !/^(HTTP|HTML|JSON|SaaS|API|PDF|CRM|ROI|KPI|B2B|B2C|USA|NASA|AI)$/.test(w));
-  if (shouty.length > 2) issues.push({ rule: 'caps', severity: 'warn', detail: `ALL-CAPS words: ${[...new Set(shouty)].slice(0, 5).join(', ')}` });
+  // Shouting, not acronyms: hype words in capitals, or three capitalised words in a row.
+  const SHOUT = /\b(FREE|NOW|NEW|BEST|HUGE|LIMITED|TODAY|URGENT|AMAZING|NEVER|ALWAYS|MUST|STOP|WOW|BIG|LAST CHANCE|HURRY|ONLY|EXCLUSIVE|GUARANTEED|INSANE)\b/g;
+  const shouty = [...(text.match(SHOUT) ?? []), ...(text.match(/\b[A-Z]{2,}(?:\s+[A-Z]{2,}){2,}\b/g) ?? [])];
+  if (shouty.length) issues.push({ rule: 'caps', severity: 'warn', detail: `Shouting in capitals: ${[...new Set(shouty)].slice(0, 5).join(', ')}` });
   if (p.person === 'we' && /\bI\b/.test(text) && !/\bwe\b/i.test(text) && rg.words > 30) issues.push({ rule: 'person', severity: 'warn', detail: 'Written as "I"; this brand speaks as "we"' });
   const penalty = issues.reduce((a, i) => a + (i.severity === 'error' ? 12 : 4), 0);
   return { score: Math.max(0, 100 - penalty), issues, stats: { words: rg.words, sentences: rg.sentences, grade: rg.grade, emojis, hashtags: tags, exclamations: ex } };

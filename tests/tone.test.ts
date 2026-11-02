@@ -93,3 +93,11 @@ test('ordinary words are not superlative claims', async () => {
   assert.equal(scoreText('Open the first screen, then the first card on the Docket. It is the only matter open today.', DEFAULT_TONE).issues.filter((i) => i.rule === 'claim').length, 0);
   assert.equal(scoreText('We are the best platform and industry-leading in every way you can imagine here.', DEFAULT_TONE).issues.filter((i) => i.rule === 'claim').length, 2);
 });
+
+test('cited numbers and acronyms are not flagged; shouting is', async () => {
+  const { scoreText, DEFAULT_TONE } = await import('@shipcast/engine');
+  const r = scoreText('Gen Z trust fell to 10% ([Wealth Professional](https://x.test)).\nKPMG, SIFMA and FINRA all agree on the direction of travel here.\nSource: Deloitte, 21% mature.', DEFAULT_TONE);
+  assert.equal(r.issues.filter((i) => i.rule === 'unsourced' || i.rule === 'caps').length, 0, JSON.stringify(r.issues));
+  assert.equal(scoreText('Get it FREE today, it is the deal of the year for every single team.', DEFAULT_TONE).issues.filter((i) => i.rule === 'caps').length, 1);
+  assert.equal(scoreText('Our product is 3x faster than anything else you have tried this year.', DEFAULT_TONE).issues.filter((i) => i.rule === 'unsourced').length, 1);
+});
