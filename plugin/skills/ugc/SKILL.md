@@ -25,7 +25,7 @@ not allowed). They *explain* and *recommend*, like a creator would.
    Each prints `{clip, seconds, usd}`. If it exits with code 5 the budget cap was hit: stop, keep what exists, and say so in NOTES.md. Without a connected generation key the clips are labelled placeholders — still write the full storyboard so the user can render for real later.
 5. Write `out/storyboard.json` (read `./catalog.md` for the format):
    - `"preset": "vertical"`, captions `"bold"` or `"highlight"`, music mood that fits, the voice left as configured.
-   - Presenter beats: `{ "scene": "broll", "fields": { "video": "<clip path>", "audio": "yes", "line": "<the words, for on-screen text>" }, "duration": <clip seconds> }` — **no `vo` on these scenes** (the clip carries the voice).
+   - Presenter beats: `{ "scene": "broll", "fields": { "query": "person talking to a phone camera at home", "video": "<clip path>", "audio": "yes", "line": "<the words, for on-screen text>" }, "duration": <clip seconds> }` (`query` is the stock fallback if the clip is missing) — **no `vo` on these scenes** (the clip carries the voice).
    - Middle beats: `product` / `scroll` / `recording` scenes with real screenshots and a `vo` line each (same voice as the presenter).
    - Last frame: `outro` with the CTA and URL.
 6. `out/NOTES.md`: the angle, the presenter description, cost so far, and the disclosure line to use in the post ("AI-generated presenter").

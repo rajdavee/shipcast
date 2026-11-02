@@ -670,7 +670,7 @@ for(let s=1;s<n;s++){const t=.4+s*${slot.toFixed(2)};
     use: 'Real stock footage behind one line, for long videos and stories (a city at night, hands typing, a crowded inbox). Give a concrete visual search `query`. Needs a stock key (Pixabay, or Pexels) in Setup; otherwise it becomes a cinematic shot automatically. Use sparingly: max ~1 in 4 scenes.',
     minSeconds: 3,
     fields: [
-      { id: 'query', type: 'text', label: 'Footage search', optional: true, max: 60, help: 'Concrete and visual: "developer typing at night", "busy train station"' },
+      { id: 'query', type: 'text', label: 'Footage search', max: 60, help: 'Concrete and visual: "developer typing at night", "busy train station"' },
       { id: 'video', type: 'image', label: 'Own clip (.mp4) instead of stock', optional: true, help: 'A generated presenter or product clip from media.mjs gen, path relative to the brief folder or absolute' },
       { id: 'audio', type: 'text', label: 'Play the clip\'s sound (yes/no)', optional: true, help: 'yes for a talking presenter — then give this scene no voiceover line' },
       { id: 'line', type: 'text', label: 'On-screen line', optional: true, max: 90 },
