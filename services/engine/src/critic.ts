@@ -53,6 +53,23 @@ export async function previews(dir: string): Promise<string[]> {
       if (existsSync(sheet)) ordered.push(sheet);
     }
   }
+  // Per-size sets (photo carousels, app-store screens): the first slides of the first set.
+  if (!ordered.length) {
+    for (const d of (await readdir(out, { withFileTypes: true }).catch(() => [])).filter((x) => x.isDirectory() && !['work', 'project', 'variants', 'assets'].includes(x.name))) {
+      const sl = existsSync(join(out, d.name, 'slides')) ? join(out, d.name, 'slides') : join(out, d.name);
+      const pngs = (await readdir(sl).catch(() => [] as string[])).filter((f) => /\.(png|jpe?g)$/.test(f)).sort();
+      if (pngs.length) {
+        ordered.push(...pngs.slice(0, 3).map((f) => join(sl, f)));
+        break;
+      }
+    }
+  }
+  // Loose images (posts, cards, galleries): one of each design, the feed size first.
+  if (!ordered.length) {
+    const imgs = pick(/\.(png|jpe?g)$/).filter((f) => !/brand-score|eval\.sheet|\.full\./.test(f)).sort();
+    const feed = imgs.filter((f) => /-(feed|square)\.(png|jpe?g)$/.test(f));
+    ordered.push(...(feed.length ? feed : imgs).slice(0, 4));
+  }
   if (!ordered.length) {
     for (const sub of ['slides', 'pages', 'print']) {
       const d = join(out, sub);

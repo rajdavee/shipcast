@@ -629,7 +629,9 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
           if (specKind !== 'storyboard' && settings.criticReview !== false && !renderOnly && !criticked && sessionId && Date.now() < deadline - 4 * 60_000 && !canceled && !timedOut) {
             criticked = true;
             await phase('Final review');
-            const v = await judge(pack?.id ?? specKind, step.options._title ?? pack?.name ?? specKind, await previews(cwd)).catch(() => null);
+            const shots = await previews(cwd);
+            const v = shots.length ? await judge(pack?.id ?? specKind, step.options._title ?? pack?.name ?? specKind, shots).catch(() => null) : null;
+            if (!v) await log({ step: step.id, type: 'log', text: shots.length ? 'Critic: no verdict this time' : 'Critic: nothing to look at' });
             if (v) {
               await writeFile(join(cwd, 'out', 'critic.json'), JSON.stringify(v, null, 2)).catch(() => {});
               const weak = criticWeakest(v);
