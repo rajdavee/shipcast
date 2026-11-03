@@ -28,7 +28,7 @@ test('engagement is weighted by intent and read against reach', () => {
 
 test('snapshots: platform number formats, age from the sent time, one per source per age, and guards', async () => {
   const p = await sent('2026-10-01');
-  const s = await addSnapshot({ post: p.id, channel: 'linkedin', source: 'manual', impressions: '1.2K', likes: '3,410', avgViewPct: '140%' as any }, plus('2026-10-01', 24));
+  const s = await addSnapshot({ post: p.id, channel: 'linkedin', source: 'manual', impressions: '1.2K' as any, likes: '3,410' as any, avgViewPct: '140%' as any }, plus('2026-10-01', 24));
   assert.equal(s.impressions, 1200);
   assert.equal(s.likes, 3410);
   assert.equal(s.avgViewPct, 100);
@@ -45,7 +45,7 @@ test('snapshots: platform number formats, age from the sent time, one per source
 test('lift is against your usual on the same channel at the same age, and needs enough history', async () => {
   const days = ['2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08', '2026-10-09'];
   const reach = [1000, 1200, 800, 1000, 3000];
-  const ps = [];
+  const ps: Awaited<ReturnType<typeof sent>>[] = [];
   for (const [i, d] of days.entries()) {
     const p = await sent(d);
     ps.push(p);

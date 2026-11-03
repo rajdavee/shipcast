@@ -98,7 +98,8 @@ export class Browser {
     this.proc = proc;
     const wsUrl = await new Promise<string>((resolve, reject) => {
       let buf = '';
-      const t = setTimeout(() => reject(new Error('Chrome did not start')), 20_000);
+      // Busy CI machines can take well over 20 s to bring Chrome up.
+      const t = setTimeout(() => reject(new Error('Chrome did not start')), 45_000);
       proc.stderr!.on('data', (d) => {
         buf += d;
         const m = buf.match(/DevTools listening on (ws:\/\/\S+)/);

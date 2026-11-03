@@ -254,6 +254,8 @@ export function serviceUrl(name: ServiceName): string {
 /** Submit a job and wait for it. Throws with the job's error on failure. */
 /** fetch that rides out a service restart: connection errors are retried for up to `forMs`. */
 async function fetchRetry(url: string, init: RequestInit | undefined, forMs: number): Promise<Response> {
+  // Tests point services at nothing and shouldn't wait out a restart window.
+  forMs = Math.min(forMs, Number(process.env.SHIPCAST_SERVICE_RETRY_MS) || forMs);
   const t0 = Date.now();
   for (;;) {
     try {

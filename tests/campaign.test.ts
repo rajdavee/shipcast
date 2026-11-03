@@ -11,6 +11,9 @@ process.env.SHIPCAST_HOME = home;
 process.env.SHIPCAST_SKILLHUB = 'off';
 process.env.SHIPCAST_NOTIFY = 'off';
 process.env.SHIPCAST_CLAUDE_BIN = join(import.meta.dirname, 'fake-claude.mjs');
+// Never reach a real Shipcast running on this machine: services point at nothing and fail fast.
+for (const s of ['RENDER', 'STILLS', 'MEDIA', 'QA', 'GEN', 'AGENTS']) process.env[`SHIPCAST_${s}_URL`] = 'http://127.0.0.1:9';
+process.env.SHIPCAST_SERVICE_RETRY_MS = '1500';
 delete process.env.TEST_LICENSE_KEY;
 
 const { createApp } = await import('@shipcast/api');
@@ -188,8 +191,7 @@ test('hook variants only start from a finished piece that has a spec', async () 
 test('choosing a take swaps it into the spec and re-renders without Claude', async () => {
   const c = await api('/api/campaigns', { method: 'POST', json: { name: 'Takes', source: { type: 'url', value: 'example.com' }, deliverables: [{ pack: 'reel' }] } });
   const id = c.body.id;
-  // CI runners are slow to fail a render with no render service; give it room.
-  const done = await waitFor(id, (x) => x.steps[1].status === 'done' || x.steps[1].status === 'failed', 90_000);
+  const done = await waitFor(id, (x) => x.steps[1].status === 'done' || x.steps[1].status === 'failed', 30_000);
   const step = done.steps[1];
   const { writeFileSync, mkdirSync, readFileSync } = await import('node:fs');
   const out = join(home, 'campaigns', id, 'deliverables', step.id, 'out');

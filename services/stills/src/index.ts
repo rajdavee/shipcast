@@ -308,9 +308,9 @@ export function createStillsService() {
             await pg.eval('document.fonts.ready.then(() => true)');
             // Lazy images below the fold haven't loaded yet; load them all before judging any as broken.
             await pg.eval(`Promise.all([...document.images].map((i) => { i.loading = 'eager'; return i.complete ? 0 : new Promise((r) => { i.onload = i.onerror = r; setTimeout(r, 8000); }); })).then(() => true)`);
-            const audit = await pg.eval<{ wide: boolean; broken: number; tiny: number }>(`(() => ({ wide: document.documentElement.scrollWidth > innerWidth + 2, broken: [...document.images].filter((i) => !i.complete || !i.naturalWidth).length, tiny: [...document.querySelectorAll('p,li,a,dd,summary')].filter((e) => e.offsetParent && parseFloat(getComputedStyle(e).fontSize) < 13).length }))()`);
+            const audit = await pg.eval<{ wide: boolean; broken: string[]; tiny: number }>(`(() => ({ wide: document.documentElement.scrollWidth > innerWidth + 2, broken: [...document.images].filter((i) => !i.complete || !i.naturalWidth).map((i) => decodeURIComponent((i.getAttribute('src') || '').split('/').pop())), tiny: [...document.querySelectorAll('p,li,a,dd,summary')].filter((e) => e.offsetParent && parseFloat(getComputedStyle(e).fontSize) < 13).length }))()`);
             if (audit.wide) problems.push(`${view}: the page scrolls sideways — something is wider than the screen.`);
-            if (audit.broken) problems.push(`${view}: ${audit.broken} image(s) didn't load — check the paths.`);
+            if (audit.broken.length) problems.push(`${view}: ${audit.broken.join(', ')} didn't load — check the paths.`);
             if (view === 'mobile' && audit.tiny) problems.push(`mobile: ${audit.tiny} text element(s) under 13px.`);
             previews[view] = join(outDir, `landing-${view}.png`);
             await writeFile(previews[view], await pg.fullPage(16000));
@@ -349,17 +349,30 @@ export function createStillsService() {
         const previews: Record<string, string> = {};
         for (const [view, opts] of [['desktop', { width: 1280, height: 900, scale: 1 }], ['mobile', { width: 390, height: 844, scale: 2, mobile: true }]] as const) {
           ctx.progress(view === 'desktop' ? 0.3 : 0.7, `${view} preview`);
-          const pg = await browser().open(pathToFileURL(index).href, { ...opts, settleMs: 300 });
+          for (let attempt = 0; attempt < 2; attempt++) {
+          const pg = await browser().open(pathToFileURL(index).href, { ...opts, settleMs: 300 }).catch(async (e) => {
+            if (attempt || !/DevTools|timed out|closed|Target/i.test(String((e as Error).message))) throw e;
+            await browser().restart();
+            return null;
+          });
+          if (!pg) continue;
           try {
             await pg.eval('document.fonts.ready.then(() => true)');
-            const audit = await pg.eval<{ wide: boolean; broken: number; tiny: number }>(`(() => ({ wide: document.documentElement.scrollWidth > innerWidth + 2, broken: [...document.images].filter((i) => !i.complete || !i.naturalWidth).length, tiny: [...document.querySelectorAll('article p,article li,figcaption')].filter((e) => e.offsetParent && parseFloat(getComputedStyle(e).fontSize) < 14).length }))()`);
+            // Lazy images below the fold haven't loaded yet; load them all before judging any as broken.
+            await pg.eval(`Promise.all([...document.images].map((i) => { i.loading = 'eager'; return i.complete ? 0 : new Promise((r) => { i.onload = i.onerror = r; setTimeout(r, 8000); }); })).then(() => true)`);
+            const audit = await pg.eval<{ wide: boolean; broken: string[]; tiny: number }>(`(() => ({ wide: document.documentElement.scrollWidth > innerWidth + 2, broken: [...document.images].filter((i) => !i.complete || !i.naturalWidth).map((i) => decodeURIComponent((i.getAttribute('src') || '').split('/').pop())), tiny: [...document.querySelectorAll('article p,article li,figcaption')].filter((e) => e.offsetParent && parseFloat(getComputedStyle(e).fontSize) < 14).length }))()`);
             if (audit.wide) problems.push(`article ${view}: the page scrolls sideways — something is wider than the screen.`);
-            if (audit.broken && !problems.some((p) => p.includes('not found'))) problems.push(`article ${view}: ${audit.broken} image(s) didn't load — check the paths in article.md.`);
+            if (audit.broken.length && !problems.some((p) => p.includes('not found'))) problems.push(`article ${view}: ${audit.broken.join(', ')} didn't load — check the paths in article.md.`);
             if (audit.tiny) problems.push(`article ${view}: ${audit.tiny} text element(s) under 14px.`);
             previews[view] = join(outDir, `article-${view}.png`);
             await writeFile(previews[view], await pg.fullPage(16000));
+            break;
+          } catch (e) {
+            if (attempt || !/DevTools|timed out|closed|Target/i.test(String((e as Error).message))) throw e;
+            await browser().restart();
           } finally {
-            await pg.close();
+            await pg.close().catch(() => {});
+          }
           }
         }
         return { index, previews, title: r.title, problems: [...new Set(problems)] };

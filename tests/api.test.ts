@@ -12,6 +12,9 @@ process.env.SHIPCAST_HOME = home;
 process.env.SHIPCAST_SKILLHUB = 'off';
 process.env.SHIPCAST_CLAUDE_BIN = join(import.meta.dirname, 'fake-claude.mjs');
 process.env.FAKE_CLAUDE_LOG = log;
+// Never reach a real Shipcast running on this machine.
+for (const s of ['RENDER', 'STILLS', 'MEDIA', 'QA', 'GEN', 'AGENTS']) process.env[`SHIPCAST_${s}_URL`] = 'http://127.0.0.1:9';
+process.env.SHIPCAST_SERVICE_RETRY_MS = '1500';
 
 const { createApp } = await import('@shipcast/api');
 const { startWorker } = await import('@shipcast/worker');
