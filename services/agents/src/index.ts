@@ -1,4 +1,4 @@
-import { blockedReason, createService, foregroundBusy, learnOnce, logRun, refreshTrends, runGolden, pickDue, readJobs, readSettings, updateJob, type AgentJob, type AgentKind } from '@shipcast/engine';
+import { blockedReason, createService, foregroundBusy, learnOnce, logRun, refreshTrends, runGolden, runPublisher, pickDue, readJobs, readSettings, updateJob, type AgentJob, type AgentKind, type PublisherReport } from '@shipcast/engine';
 
 /**
  * The agents service: wakes every 20 seconds, starts at most one background
@@ -89,6 +89,24 @@ async function runJob(job: AgentJob, now: Date, handler: AgentHandler | undefine
   return { ...out, ok };
 }
 
+/**
+ * The publisher is not a Claude job: it runs on every tick, beside the
+ * scheduler, ignoring quiet hours and the Claude cap (a post booked for 23:30
+ * should go out at 23:30) but obeying "publishing paused". Its own lock keeps
+ * a slow upload from overlapping the next tick.
+ */
+let lastPublish: { at: string; report?: PublisherReport; error?: string } | undefined;
+export async function publishTick(): Promise<PublisherReport | undefined> {
+  try {
+    const report = await runPublisher();
+    lastPublish = { at: new Date().toISOString(), report };
+    return report;
+  } catch (e) {
+    lastPublish = { at: new Date().toISOString(), error: (e as Error).message.slice(0, 200) };
+    console.error('[publisher] pass failed:', lastPublish.error);
+  }
+}
+
 export function createAgentsService() {
   let timer: ReturnType<typeof setInterval> | undefined;
   let busyTick = false;
@@ -97,15 +115,17 @@ export function createAgentsService() {
     port: AGENTS_PORT,
     version: '0.1.0',
     concurrency: 1,
-    health: async () => ({ jobs: (await readJobs()).map((j) => ({ id: j.id, enabled: j.enabled, nextRun: j.nextRun, running: !!j.running })) }),
+    health: async () => ({ jobs: (await readJobs()).map((j) => ({ id: j.id, enabled: j.enabled, nextRun: j.nextRun, running: !!j.running })), publisher: lastPublish ?? null }),
     handlers: {
       tick: async () => tick(),
+      publish: async () => publishTick(),
     },
   });
   const start = async () => {
     // A crash mid-job leaves "running" set; clear it so the job can run again.
     for (const j of await readJobs()) if (j.running) await updateJob(j.id, { running: false });
     timer = setInterval(async () => {
+      void publishTick();
       if (busyTick) return;
       busyTick = true;
       await tick().catch((e) => console.error('[agents] tick failed:', e)).finally(() => (busyTick = false));
