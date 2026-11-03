@@ -1,0 +1,19 @@
+{
+  "id": "pins-endscreens",
+  "name": "Pinterest Pins & YouTube End Screen",
+  "tagline": "3–5 Pinterest pins at 1000×1500 with a bold title that reads at grid size, and a 1920×1080 YouTube end-screen background that keeps the two video boxes and the subscribe button clear — checked against both.",
+  "category": "design",
+  "order": 17,
+  "estimate": "2–4 min",
+  "accent": "#be123c",
+  "spec": "graphics",
+  "options": [
+    { "key": "pins", "label": "Pins", "type": "number", "default": "4", "min": 3, "max": 5 },
+    { "key": "topic", "label": "Topic (optional)", "type": "text", "default": "", "placeholder": "What the pins are about — blank = the brief's most searchable topics" },
+    { "key": "theme", "label": "Theme", "type": "select", "choices": ["auto", "editorial", "swiss", "bold", "midnight"], "default": "auto" }
+  ],
+  "outputs": ["pins/*.png", "endscreen/*.png", "pins.md", "graphics.json", "*.md"],
+  "skills": [],
+  "tools": ["chrome"],
+  "roles": ["design-taste", "copy"]
+}

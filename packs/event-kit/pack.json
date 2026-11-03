@@ -1,0 +1,23 @@
+{
+  "id": "event-kit",
+  "name": "Webinar / Event Kit",
+  "tagline": "One brief, the whole event: a registration page (date and timezone, speakers, agenda, what you'll learn, FAQ), 16:9 title, agenda and speaker slides, three promo posts and invite, reminder and replay emails — the same date, time, timezone, speakers and register link in every piece.",
+  "category": "design",
+  "order": 15,
+  "estimate": "8–15 min",
+  "accent": "#0e7490",
+  "spec": "landing",
+  "also": ["slides", "graphics", "email"],
+  "options": [
+    { "key": "title", "label": "Event title (optional)", "type": "text", "default": "", "placeholder": "Blank = a session built on the brief's strongest topic" },
+    { "key": "when", "label": "Date, time and timezone", "type": "text", "default": "", "placeholder": "e.g. Tue 18 Nov 2026, 17:00 GMT" },
+    { "key": "speakers", "label": "Speakers (optional)", "type": "text", "default": "", "placeholder": "Name, role; Name, role — blank = role labels or placeholders" },
+    { "key": "url", "label": "Registration link (optional)", "type": "text", "default": "", "placeholder": "Blank = the product URL + /webinar, flagged in NOTES.md" },
+    { "key": "kind", "label": "Kind", "type": "select", "choices": ["webinar", "live demo", "workshop", "meetup", "launch event"], "default": "webinar" }
+  ],
+  "outputs": ["landing/**/*", "landing.zip", "landing-desktop.png", "landing-mobile.png", "landing-copy.md", "slides/*.png", "presentation.pdf", "presentation.pptx", "promo/*.png", "emails/**/*", "*.zip", "*-desktop.png", "*-mobile.png", "emails.md", "event.json", "landing.json", "slides.json", "graphics.json", "email.json", "*.md"],
+  "skills": [],
+  "tools": ["chrome"],
+  "roles": ["copy", "humanize"],
+  "timeoutMinutes": 40
+}
