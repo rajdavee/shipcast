@@ -10,6 +10,11 @@ import {
   appendEvent,
   CALENDAR_CHANNELS,
   addSnapshot,
+  collectNow,
+  home,
+  MAX_SCREENSHOT_BYTES,
+  pendingNumbers,
+  readMetricsFromImage,
   computePerformance,
   deleteSnapshot,
   importMetricsCsv,
@@ -31,6 +36,7 @@ import {
   scheduleProblems,
   toCsv,
   toIcs,
+  type ChannelId,
   type Post,
   type PostStatus,
   blockedReason,
@@ -133,7 +139,7 @@ import {
   updateChannel,
   type OAuthProvider,
 } from '@shipcast/engine';
-import { HttpError, json, readJson, Router, sendFile } from './http.ts';
+import { HttpError, json, readBody, readJson, Router, sendFile } from './http.ts';
 import { loginState, startClaudeLogin, startGithubLogin } from './connect.ts';
 
 const router = new Router();
@@ -284,6 +290,7 @@ router.put('/api/settings', async (req) => {
   for (const k of ['agentsQuietStart', 'agentsQuietEnd'] as const) if (typeof body[k] === 'string' && /^\d{1,2}:\d{2}$/.test(body[k])) patch[k] = body[k];
   if (Number.isFinite(body.agentsMaxClaudeRunsPerDay)) patch.agentsMaxClaudeRunsPerDay = Math.min(50, Math.max(0, Math.round(Number(body.agentsMaxClaudeRunsPerDay))));
   if (typeof body.publishingPaused === 'boolean') patch.publishingPaused = body.publishingPaused;
+  if (typeof body.metricsPaused === 'boolean') patch.metricsPaused = body.metricsPaused;
   return writeSettings(patch);
 });
 
@@ -550,6 +557,42 @@ router.post('/api/metrics/import', async (req) => {
   return importMetricsCsv(csv.slice(0, 5_000_000), CALENDAR_CHANNELS.some((c) => c.id === ch) ? ch : undefined);
 });
 router.get('/api/metrics/performance', async () => computePerformance(await readSnapshots()));
+router.get('/api/metrics/pending', () => pendingNumbers());
+router.post('/api/metrics/collect-now/:postId', async (_q, _r, p) => {
+  const post = await mustPost(p.postId);
+  const r = await publishCall(() => collectNow(post));
+  if (!r.queued.length && !r.manual.length) throw new HttpError(400, 'Nothing on this post has gone out yet.');
+  return { ...r, note: r.queued.length ? 'Queued — numbers arrive within a minute or so (Postiz reads wait their turn).' : 'No connection can read these channels — add their numbers by hand or from a screenshot.' };
+});
+// A stats screenshot: the image itself as the body (?channel=&name=), or { path, channel } for a file already under the Shipcast home.
+// Only a proposal comes back; the confirmed numbers are saved through /api/metrics/snapshots.
+router.post('/api/metrics/read-screenshot', async (req, _r, _p, url) => {
+  const isJson = /json/.test(req.headers['content-type'] ?? '');
+  const b = isJson ? await readJson(req) : {};
+  const ch = String((isJson ? b.channel : url.searchParams.get('channel')) ?? '');
+  if (!CALENDAR_CHANNELS.some((c) => c.id === ch)) throw new HttpError(400, 'channel is required');
+  let file: string;
+  let temp: string | undefined;
+  if (isJson) {
+    if (typeof b.path !== 'string' || !b.path) throw new HttpError(400, 'send the image, or { path, channel }');
+    file = resolve(home(), b.path);
+    if (!insideReal(home(), file)) throw new HttpError(403, 'the screenshot must be a file under the Shipcast home');
+  } else {
+    const ext = (/\.(png|jpe?g|webp|gif)$/i.exec(url.searchParams.get('name') ?? '')?.[0] ?? `.${(req.headers['content-type'] ?? '').replace(/^image\/(jpeg|png|webp|gif).*$/, '$1')}`).toLowerCase();
+    if (!/^\.(png|jpe?g|webp|gif)$/.test(ext)) throw new HttpError(400, 'send a PNG, JPEG, WebP or GIF screenshot');
+    const dir = join(home(), 'metrics', 'screenshots');
+    await mkdir(dir, { recursive: true });
+    temp = file = join(dir, `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}${ext.replace('.jpeg', '.jpg')}`);
+    await writeFileP(file, await readBody(req, MAX_SCREENSHOT_BYTES));
+  }
+  try {
+    return await readMetricsFromImage(file, { channel: ch as ChannelId });
+  } catch (e) {
+    throw new HttpError(422, (e as Error).message.slice(0, 200));
+  } finally {
+    if (temp) await rm(temp, { force: true });
+  }
+});
 
 // ── trend radar: cards the trends agent keeps fresh ────────────────────
 router.get('/api/trends', async (req) => {
