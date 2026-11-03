@@ -22,7 +22,7 @@ test('suggested slots come from the best cells that beat your usual', () => {
 
 test('trend cards are ranked by how well their recipe fits what wins for you', () => {
   const card = (key: string, pack: string) => ({ key, platform: 'linkedin', recipe: { pack } }) as any;
-  assert.deepEqual(trendFit(card('a', 'carousel'), pb), { fit: 1.8, why: 'carousel posts do 1.8× your usual on LinkedIn (9 posts)' });
+  assert.deepEqual(trendFit(card('a', 'carousel'), pb), { fit: 1.8, why: 'Carousel posts do 1.8× your usual on LinkedIn (9 posts)' });
   assert.equal(trendFit(card('b', 'reel'), pb)?.fit, 0.7, 'a reel is vertical video, which does worse for you');
   assert.equal(trendFit(card('d', 'newsletter'), pb), null, 'no evidence either way');
   assert.equal(trendFit(card('c', 'carousel'), null), null);

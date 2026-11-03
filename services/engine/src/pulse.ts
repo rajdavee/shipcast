@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { CALENDAR_CHANNELS, channel, getPost, listPosts, readPlan, savePost, type ChannelId, type Post } from './calendar.ts';
 import { computePerformance, headline, readSnapshots } from './metrics.ts';
 import { campaignDir } from './paths.ts';
-import { formatMedia, readPlaybook, spearman, type Playbook } from './playbook.ts';
+import { formatMedia, levelLabel, readPlaybook, spearman, type Playbook } from './playbook.ts';
 import { winningCaptions } from './planner.ts';
 import { PACK_CHANNEL } from './tone.ts';
 import type { TrendCard } from './trends.ts';
@@ -38,7 +38,9 @@ export function trendFit(card: Pick<TrendCard, 'platform' | 'recipe'>, pb: Playb
   const pick = (feature: string, level?: string) => (level ? cp.model!.effects.find((e) => e.feature === feature && e.level === level && e.n >= 3) : undefined);
   const e = pick('format', card.recipe.pack) ?? pick('mediaKind', formatMedia(card.recipe.pack, ch));
   if (!e) return null;
-  return { fit: Math.round(e.effect * 100) / 100, why: `${e.feature === 'format' ? card.recipe.pack : formatMedia(card.recipe.pack, ch)} posts do ${e.effect.toFixed(1)}× your usual on ${channel(ch)!.name} (${e.n} posts)` };
+  // Readable names ("PDF carousel", "Carousel"), not ids.
+  const name = e.feature === 'format' ? card.recipe.pack.replace(/-/g, ' ').replace(/^./, (c) => c.toUpperCase()) : levelLabel('mediaKind', e.level);
+  return { fit: Math.round(e.effect * 100) / 100, why: `${name} posts do ${e.effect.toFixed(1)}× your usual on ${channel(ch)!.name} (${e.n} posts)` };
 }
 
 /** Rank trend cards for this brand: cards whose recipe you win with first, keeping the radar's order otherwise. */
