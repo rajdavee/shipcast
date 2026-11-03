@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — sprint v8: Pulse, learning from what your audience does
+
+- **Numbers come back** — YouTube stats read automatically; Instagram, X, TikTok and more through Postiz (kept under its hourly limit); everywhere else a gentle "add the numbers" reminder at 1, 3, 7 and 30 days with a quick form, a screenshot Shipcast reads for you to confirm, or the platform's own CSV export.
+- **Lift, not likes** — every post is compared with your own usual on the same channel at the same age, with intent-weighted engagement read against reach.
+- **The Playbook** — a small, local model per channel finds which formats, hooks, times, media and copy patterns win or lose for you, with sample sizes, confidence, the posts behind each finding and a plain-English "why" that never invents a number.
+- **Forecasts** — drafts show a labelled range ("likely 0.8–1.6× your usual"); Shipcast tracks how often its forecasts land, and whether its critic's taste predicts your results.
+- **Feeding it back** — Plan my month leans on your wins and top captions while keeping ~20 % visible experiments; every format's writer gets your winning copy patterns; best posting times; trend cards ranked by fit; "Make more like this" and "Remix"; flops become learning evidence.
+- **Pulse UI** — lift badges and forecast hints on the calendar, a Performance tab per post, Insights → Performance (playbook, heat-map, leaderboard, format × channel, trust panel), fit chips on Ideas.
+- **Reliability** — CI installs ffmpeg and tests never reach a running Shipcast; snapshot writes are locked across processes.
+
 ## Unreleased — sprint v7: content calendar, and a calmer app
 
 - **Content calendar** — month, week and list views with drag to reschedule; an ideas backlog; every post with per-channel copy for ten channels (LinkedIn, Instagram, YouTube, X, TikTok, Threads, Facebook, Pinterest, newsletter, blog), each platform's limits checked as you type, the fold shown, first comments, brand score in the project's own voice, and realistic previews.

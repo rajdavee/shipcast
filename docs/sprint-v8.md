@@ -51,3 +51,16 @@ Unit: snapshot ages, normalisation, shrinkage, ridge fit on synthetic data with 
 
 ## Sources
 [LinkedIn Member Post Analytics API](https://ppc.land/linkedin-enables-third-party-analytics-access-with-new-member-post-api/) · [Instagram media insights](https://developers.facebook.com/docs/instagram-platform/reference/instagram-media/insights/) · [Postiz post analytics](https://docs.postiz.com/public-api/analytics/post.md) · [Buffer: 52M posts engagement study](https://buffer.com/resources/state-of-social-media-engagement/) · [Engagement rate vs reach](https://influenceflow.io/resources/engagement-rate-and-reach-metrics-the-complete-2026-guide-to-social-media-success)
+
+## Status (2026-11-04)
+
+| M | State |
+|---|---|
+| M1 metrics store | Done — snapshots by age, weighted engagement vs reach, lift vs own usual, CSV import, cross-process lock |
+| M2 collectors | Done — YouTube stats/analytics, Postiz analytics queue (≤ 25/h), nudges, screenshot reading with confirm |
+| M3 playbook | Done — features, hook labels, per-channel ridge model with bootstrap bands, playbook + narrative check, forecasts + calibration, Thompson-sampled experiments; recovers planted effects |
+| M4 feedback | Done — planner, per-pack copy brief, suggested slots, trend fit, more-like-this/remix, flops as lessons, critic calibration, daily playbook refresh |
+| M5 UI | Done — calendar badges/forecasts/experiments, drawer Performance/Forecast, Insights → Performance, fit chips, experiments slider |
+| M6 | Done — sample history seeder, showcase, docs, CI green |
+
+Open: LinkedIn personal analytics need partner approval (manual/screenshot/export until then); direct Instagram insights with the user's Meta app; Postiz running-total vs daily-count semantics to confirm on a live instance.

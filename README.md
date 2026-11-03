@@ -178,6 +178,10 @@ Claude with the fix hint; you see what passed.
 
 Publishing is your choice per channel: a **post kit** and a reminder (always works), **direct** LinkedIn and YouTube with your own developer app keys, or your own **Postiz** instance for Instagram, TikTok, X and more. Nothing is posted unless you schedule it, and Settings → Publishing has a pause switch. Subscribe to the calendar from Google/Apple Calendar with the ICS link.
 
+## Learns what works for you
+
+After a post goes out, Shipcast gets its numbers back — automatically for YouTube and anything posted through Postiz, and with a quick form, a screenshot or an export file for the rest. Each post is compared with **your own usual** on that channel at the same age, and a small local model works out what actually wins for your audience: formats, hooks, posting times, media and copy patterns. **Insights → Performance** shows it with the evidence and how sure it is; drafts get a forecast; and everything Shipcast plans and writes next leans on it — while a share of posts deliberately try something new so it keeps learning.
+
 ## Gets better on its own
 
 Shipcast runs a few background agents while you're not using it (Setup → Background agents). They wait until your own campaigns finish, stay out of quiet hours and use a small daily share of your Claude runs.
