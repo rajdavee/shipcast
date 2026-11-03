@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { channel, getPost, listPosts, parseCsv, type ChannelId, type Post } from './calendar.ts';
+import { withDirLock } from './filelock.ts';
 import { home } from './paths.ts';
 
 /**
@@ -59,9 +60,11 @@ export function bucketOf(ageHours: number): AgeBucket | null {
 
 const dir = () => join(home(), 'metrics');
 const file = () => join(dir(), 'snapshots.json');
+// The api and agents services both write snapshots: in-process queue plus a folder lock across processes.
 let chain: Promise<unknown> = Promise.resolve();
 const serial = <T>(fn: () => Promise<T>): Promise<T> => {
-  const next = chain.then(fn, fn);
+  const run = () => withDirLock(dir(), fn);
+  const next = chain.then(run, run);
   chain = next.catch(() => {});
   return next;
 };

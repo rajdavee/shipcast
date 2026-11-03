@@ -84,3 +84,14 @@ test('CSV import matches rows by URL, by id, or by channel and day; reports what
   assert.equal(sa.source, 'csv');
   assert.ok((await readSnapshots()).some((s) => s.post === b.id));
 });
+
+test('snapshot writes from two processes never lose each other', async () => {
+  const { spawn } = await import('node:child_process');
+  const p = await sent('2026-10-25');
+  const script = `const { addSnapshot } = await import('@shipcast/engine'); const ch = process.argv[1]; for (let i = 0; i < 12; i++) await addSnapshot({ post: '${p.id}', channel: 'linkedin', source: ch, likes: i + 1 }, new Date(Date.parse('2026-10-25T03:30:00Z') + (24 + i * 60) * 3600000));`;
+  const run = (src: string) => new Promise<number>((r) => spawn(process.execPath, ['--input-type=module', '-e', script, src], { env: process.env, stdio: 'inherit' }).on('exit', (c) => r(c ?? 1)));
+  assert.deepEqual(await Promise.all([run('manual'), run('screenshot')]), [0, 0]);
+  const mine = (await readSnapshots()).filter((s) => s.post === p.id);
+  assert.equal(mine.filter((s) => s.source === 'manual').length, mine.filter((s) => s.source === 'screenshot').length, 'both writers kept every bucket');
+  assert.ok(mine.length >= 6);
+});
