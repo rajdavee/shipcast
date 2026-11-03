@@ -93,7 +93,7 @@ export function HeatMap({ cells, onCell }: { cells: HeatCell[]; onCell?: (c: Hea
             <tr key={d}>
               <th scope="row">{d}</th>
               {grid[i].map((c, j) => {
-                if (!c) return <td key={j} className="heat-cell empty" aria-label="No posts" />;
+                if (!c) return <td key={j} className="heat-cell blank" aria-label="No posts" />;
                 const l = heatLevel(c.lift);
                 const text = `${fmtX(c.lift)}`;
                 const label = `${d} ${HOUR_LABEL[c.hour].toLowerCase()}: ${fmtX(c.lift)} your usual over ${c.n} post${c.n === 1 ? '' : 's'}`;

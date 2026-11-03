@@ -1350,7 +1350,7 @@ input[type='checkbox'], input[type='radio'], input[type='range'] { accent-color:
 .heat-cell > span { cursor: default; }
 .heat-cell b { font-size: var(--text-sm); font-weight: 650; font-variant-numeric: tabular-nums; line-height: 1.1; }
 .heat-cell small { font-size: 10px; color: var(--text-secondary); line-height: 1; }
-.heat-cell.empty { background: none; box-shadow: inset 0 0 0 1px var(--border); }
+.heat-cell.blank { background: none; box-shadow: inset 0 0 0 1px var(--border); }
 .heat-cell.thin { opacity: 0.6; }
 .t-up.l-1 { background: color-mix(in srgb, var(--ok) 14%, var(--surface)); }
 .t-up.l-2 { background: color-mix(in srgb, var(--ok) 28%, var(--surface)); }
@@ -1369,7 +1369,7 @@ input[type='checkbox'], input[type='radio'], input[type='range'] { accent-color:
 .matrix tbody th { font-size: var(--text-sm); font-weight: 600; text-align: left; padding-right: var(--space-3); white-space: nowrap; }
 .mx-cell { min-width: 110px; height: auto; padding: 8px 12px; text-align: center; }
 .mx-cell b, .mx-cell small { display: block; }
-.mx-cell.empty { color: var(--text-muted); }
+.mx-cell.blank { color: var(--text-muted); }
 .lb { display: grid; gap: var(--space-2); }
 .lb ol { list-style: none; margin: 0 0 var(--space-2); padding: 0; display: grid; gap: 2px; }
 .lb-row { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: var(--space-3); align-items: center; padding: 5px 6px; border-radius: var(--radius-md); text-decoration: none; color: inherit; }

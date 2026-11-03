@@ -239,7 +239,7 @@ function Matrix({ channels, name }: { channels: ChannelPlaybook[]; name: (id: Ch
               <th scope="row">{levelName('mediaKind', k)}</th>
               {cols.map((c) => {
                 const e = c.model!.effects.find((x) => x.feature === 'mediaKind' && x.level === k);
-                if (!e) return <td key={c.channel} className="mx-cell empty">—</td>;
+                if (!e) return <td key={c.channel} className="mx-cell blank">—</td>;
                 const l = heatLevel(e.effect);
                 return <td key={c.channel} className={`mx-cell heat-cell t-${l.tone} l-${l.level}${e.n < 3 ? ' thin' : ''}`} title={`${levelName('mediaKind', k)} on ${name(c.channel)}: ${fmtX(e.effect)} your usual, ${e.n} posts, ${e.confidence} confidence`}><b>{fmtX(e.effect)}</b><small>{e.n} posts</small></td>;
               })}
