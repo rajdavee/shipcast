@@ -17,7 +17,7 @@ import type { Campaign, Step } from './types.ts';
  * morning after the change that caused it.
  */
 
-export const GOLDEN_PACKS = ['carousel', 'social-post', 'presentation', 'document', 'ad-set', 'email', 'landing', 'reel', 'photo-carousel', 'quote-cards'];
+export const GOLDEN_PACKS = ['carousel', 'social-post', 'presentation', 'document', 'ad-set', 'email', 'landing', 'reel', 'photo-carousel', 'quote-cards', 'profile-kit', 'case-study', 'newsletter', 'blog-article'];
 export const GOLDEN_NAME = 'Quality check';
 const MARK = '[shipcast:golden]';
 
