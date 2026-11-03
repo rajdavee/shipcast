@@ -6,6 +6,8 @@ import { toast, useEscape, useFocusTrap } from '../hooks.ts';
 import { Cal, Nav } from './icons.tsx';
 import { baseName, ChannelIcon, StatusPill, Thumb } from './CalendarBits.tsx';
 import { PostPreview } from './PostPreview.tsx';
+import { ForecastPanel, PerformancePanel, wentOut } from './PerformancePanel.tsx';
+import { ExperimentTag } from './PulseBits.tsx';
 
 const VIA_LABEL: Record<PublishVia, string> = { manual: 'Manual', direct: 'Direct', postiz: 'Postiz' };
 const VIA_HINT: Record<PublishVia, string> = { manual: 'You post it from a ready-made kit; Shipcast reminds you at the time.', direct: 'Shipcast posts it with your connected account.', postiz: 'Your Postiz instance posts it at the time.' };
@@ -22,8 +24,14 @@ export function viaOptions(info: ChannelInfo | undefined, conns: PublishConnecti
   return (info?.via ?? ['manual']).filter((v) => v === 'manual' || (v === 'postiz' ? !!conns?.postiz.configured : info?.id === 'linkedin' ? !!conns?.linkedin.connected : info?.id === 'youtube' ? !!conns?.youtube.connected : false));
 }
 
-export function PostDrawer({ initial, channels, plan, conns, campaigns, account, onSaved, onDeleted, onClose }: {
+export type DrawerTab = 'post' | 'performance' | 'forecast';
+
+export function PostDrawer({ initial, channels, plan, conns, campaigns, account, tab: startTab, addFor, onSaved, onDeleted, onCreated, onClose }: {
   initial: Post;
+  tab?: DrawerTab;
+  /** Open the Performance tab with this channel's add-numbers form showing. */
+  addFor?: ChannelId;
+  onCreated?: (posts: Post[], what: string) => void;
   channels: ChannelInfo[];
   plan: ContentPlan | null;
   conns: PublishConnections | null;
@@ -41,6 +49,7 @@ export function PostDrawer({ initial, channels, plan, conns, campaigns, account,
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [tab, setTab] = useState<DrawerTab>(startTab ?? (addFor ? 'performance' : 'post'));
   const panel = useRef<HTMLElement>(null);
   const title = useRef<HTMLInputElement>(null);
   useFocusTrap(panel, true);
@@ -103,6 +112,15 @@ export function PostDrawer({ initial, channels, plan, conns, campaigns, account,
   const problems = scheduleProblems(edit, channels);
   const project = campaigns?.find((c) => c.id === edit.campaign);
   const locked = edit.status === 'published';
+  const out = !!edit.id && wentOut(edit);
+  const tabs: { id: DrawerTab; label: string }[] = !edit.id ? [] : [{ id: 'post', label: 'Post' }, out ? { id: 'performance', label: 'Performance' } : { id: 'forecast', label: 'Forecast' }];
+  const view = tabs.some((t) => t.id === tab) ? tab : 'post';
+  const onTabKey = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+    const i = (tabs.findIndex((t) => t.id === view) + (e.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+    setTab(tabs[i].id);
+    (e.currentTarget.querySelectorAll<HTMLElement>('[role="tab"]')[i])?.focus();
+  };
 
   async function run(name: string, fn: () => Promise<unknown>) {
     setBusy(name);
@@ -192,6 +210,7 @@ export function PostDrawer({ initial, channels, plan, conns, campaigns, account,
       <aside className="drawer" role="dialog" aria-modal="true" aria-label={edit.id ? `Post: ${edit.title}` : 'New post'} ref={panel}>
         <header className="drawer-head">
           <StatusPill status={edit.id ? edit.status : edit.at ? 'draft' : 'idea'} />
+          {edit.experiment && <ExperimentTag reason={edit.experiment} />}
           <input ref={title} className="drawer-title" value={edit.title} placeholder="What's the post about?" aria-label="Title" disabled={locked} onChange={(e) => set({ title: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && !edit.id && edit.title.trim() && create()} />
           <span className="drawer-saved" role="status">{saving === 'saving' ? 'Saving…' : saving === 'saved' && !dirty ? 'Saved' : saving === 'error' ? 'Not saved' : ''}</span>
           <button className="btn ghost icon-btn drawer-close" aria-label="Close" onClick={close}><Nav.close /></button>
@@ -199,6 +218,18 @@ export function PostDrawer({ initial, channels, plan, conns, campaigns, account,
 
         <div className="drawer-body">
           <div className="drawer-edit">
+            {tabs.length > 1 && (
+              <div className="drawer-tabs" role="tablist" aria-label="Post views" onKeyDown={onTabKey}>
+                {tabs.map((t) => (
+                  <button key={t.id} role="tab" id={`dtab-${t.id}`} aria-controls={`dpanel-${t.id}`} aria-selected={view === t.id} tabIndex={view === t.id ? 0 : -1} onClick={() => setTab(t.id)}>{t.label}</button>
+                ))}
+              </div>
+            )}
+            {view === 'performance' ? (
+              <div id="dpanel-performance" role="tabpanel" aria-labelledby="dtab-performance"><PerformancePanel post={edit} channels={channels} conns={conns} addFor={addFor} onCreated={(ps, what) => onCreated?.(ps, what)} /></div>
+            ) : view === 'forecast' ? (
+              <div id="dpanel-forecast" role="tabpanel" aria-labelledby="dtab-forecast"><ForecastPanel post={server ?? edit} channels={channels} /></div>
+            ) : (<>
             <div className="drawer-actions">
               {!edit.id ? (
                 <button className="btn primary" disabled={!edit.title.trim() || !!busy} onClick={create}>{busy === 'create' ? 'Adding…' : edit.at ? 'Add to calendar' : 'Add to ideas'}</button>
@@ -281,6 +312,7 @@ export function PostDrawer({ initial, channels, plan, conns, campaigns, account,
                 <ChannelEditor key={ch.channel} post={edit} ch={ch} info={info} conns={conns} busy={busy} locked={locked || ch.state === 'sent' || ch.state === 'sending'} onChange={(patch) => setCh(ch.channel, patch)} onRemove={() => removeChannel(ch.channel)} onMake={action === 'make' ? make : undefined} onMark={(url) => markSent(ch, url)} onRetry={retry} />
               )}
             </section>
+            </>)}
           </div>
 
           <div className="drawer-preview">
