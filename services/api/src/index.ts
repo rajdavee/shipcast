@@ -56,6 +56,7 @@ import {
   newId,
   parseRepo,
   readCampaign,
+  campaignTone,
   variantSource,
   readEvents,
   readSettings,
@@ -678,7 +679,9 @@ router.post('/api/tones/learn', async (req) => {
 const channelOf = (v: unknown) => (typeof v === 'string' && (CHANNELS as string[]).includes(v) ? (v as Channel) : undefined);
 router.post('/api/tones/score', async (req) => {
   const b = await readJson(req);
-  const tone = (await getTone(String(b.toneId ?? 'default'))) ?? DEFAULT_TONE;
+  // A calendar post scores against its project's own voice (the one its pieces were written in).
+  const camp = !b.toneId && typeof b.campaign === 'string' ? await readCampaign(b.campaign) : null;
+  const tone = camp ? await campaignTone(camp) : ((await getTone(String(b.toneId ?? 'default'))) ?? DEFAULT_TONE);
   return scoreText(String(b.text ?? '').slice(0, 50_000), tone, channelOf(b.channel));
 });
 router.post('/api/tones/rewrite', async (req) => {

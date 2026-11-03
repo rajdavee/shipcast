@@ -83,9 +83,9 @@ ${slots.map((s) => `${s.i}. ${channel(s.channel)!.name} — ${DAYS[new Date(`${s
 ## Formats per channel (pick one for each slot; best first)
 ${CALENDAR_CHANNELS.filter((c) => slots.some((s) => s.channel === c.id)).map((c) => `- ${c.name}: ${c.formats.filter((f) => known.includes(f)).join(', ')}`).join('\n')}
 
-Rules: every idea is specific to this product and audience (no generic tips); no two slots on the same day say the same thing — when one idea runs on two channels, adapt it to each; vary formats and hooks across the month; facts only from the brief; captions follow the channel's culture (LinkedIn: a hook line under 200 characters, short paragraphs; Instagram: first line hooks before "more", 3–5 hashtags at the end); never invent customers, numbers or quotes.
+Rules: every idea is specific to this product and audience (no generic tips); no two slots on the same day say the same thing — when one idea runs on two channels, adapt it to each; vary formats and hooks across the month; facts only from the brief; captions follow the channel's culture (LinkedIn: a hook line under 200 characters, short paragraphs, links go in the first comment, not the caption; Instagram: first line hooks before "more", 3–5 hashtags at the end); never invent customers, numbers or quotes.
 
-Reply with JSON only: [{"slot": <number>, "title": "≤ 70 chars", "pillar": "<pillar name>", "format": "<format id>", "hook": "the first line", "caption": "the full caption for that channel", "hashtags": ["#tag"], "notes": "what to show / how to make it", "trend": "<trend key or empty>"}]`;
+Reply with JSON only: [{"slot": <number>, "title": "≤ 70 chars", "pillar": "<pillar name>", "format": "<format id>", "hook": "the first line", "caption": "the full caption for that channel", "hashtags": ["#tag"], "firstComment": "LinkedIn/Instagram only: the link or extra detail the caption points to, else empty", "notes": "what to show / how to make it", "trend": "<trend key or empty>"}]`;
 }
 
 const ROLE = 'You are the content strategist inside Shipcast, a local marketing studio. Do not use tools. Reply with JSON only.';
@@ -137,7 +137,7 @@ export async function planMonth(opts: { from: string; to: string; project?: stri
         ...(project ? { campaign: project.id } : {}),
         ...(typeof it.trend === 'string' && it.trend ? { trend: it.trend } : {}),
         notes: [it.hook && `Hook: ${it.hook}`, it.notes].filter(Boolean).join('\n'),
-        channels: [{ channel: s.channel, caption: String(it.caption ?? it.hook ?? ''), hashtags: Array.isArray(it.hashtags) ? it.hashtags.slice(0, info.hashtagsMax) : [], media: [], via: 'manual' }],
+        channels: [{ channel: s.channel, caption: String(it.caption ?? it.hook ?? ''), ...(info.firstComment && typeof it.firstComment === 'string' && it.firstComment.trim() ? { firstComment: it.firstComment.trim() } : {}), hashtags: Array.isArray(it.hashtags) ? it.hashtags.slice(0, info.hashtagsMax) : [], media: [], via: 'manual' }],
       }),
     );
   }

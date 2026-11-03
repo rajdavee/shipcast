@@ -328,7 +328,7 @@ function ChannelEditor({ post, ch, info, conns, busy, locked, onChange, onRemove
   useEffect(() => {
     if (!text.trim()) return setScore(null);
     let on = true;
-    const t = setTimeout(() => api.scoreCopy({ text, toneId: 'default', channel: TONE_CHANNELS.includes(ch.channel) ? ch.channel : undefined }).then((s) => on && setScore(s)).catch(() => {}), 600);
+    const t = setTimeout(() => api.scoreCopy({ text, ...(post.campaign ? { campaign: post.campaign } : { toneId: 'default' }), channel: TONE_CHANNELS.includes(ch.channel) ? ch.channel : undefined }).then((s) => on && setScore(s)).catch(() => {}), 600);
     return () => {
       on = false;
       clearTimeout(t);

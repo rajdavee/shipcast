@@ -267,3 +267,10 @@ test('a trend card becomes a backlog idea with its recipe', async () => {
   assert.equal(r.body.channels[0].channel, 'linkedin');
   assert.match(r.body.notes, /Hook pattern: The \{n\} mistakes/);
 });
+
+test('brand score can use a project\'s own voice', async () => {
+  const camp = (await api('/api/campaigns', { method: 'POST', json: { source: { type: 'url', value: 'https://voice.test' }, deliverables: [{ pack: 'carousel' }] } })).body;
+  const r = await api('/api/tones/score', { method: 'POST', json: { text: 'We are thrilled to announce a revolutionary, seamless tool!!!', campaign: camp.id, channel: 'linkedin' } });
+  assert.equal(r.status, 200);
+  assert.ok(typeof r.body.score === 'number' && r.body.score < 100);
+});

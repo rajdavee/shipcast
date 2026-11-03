@@ -26,7 +26,7 @@ test('plan my month fills slots from one call, keeps formats and pillars valid, 
   const ask = async (p: string) => {
     prompt = p;
     return JSON.stringify([
-      { slot: 0, title: 'The 3-minute launch checklist', pillar: 'Teach', format: 'carousel', hook: 'Shipped? Do these 3 things.', caption: 'Shipped? Do these 3 things.\n\n1…', hashtags: ['#launch', '#a', '#b', '#c', '#d', '#e', '#f'] },
+      { slot: 0, title: 'The 3-minute launch checklist', pillar: 'Teach', format: 'carousel', hook: 'Shipped? Do these 3 things.', caption: 'Shipped? Do these 3 things.\n\n1…', firstComment: 'Repo: https://github.com/x/y', hashtags: ['#launch', '#a', '#b', '#c', '#d', '#e', '#f'] },
       { slot: 2, title: 'Before/after reel', pillar: 'Nope', format: 'not-a-format', caption: 'x' },
       { slot: 2, title: 'duplicate slot' },
       { slot: 99, title: 'no such slot' },
@@ -42,6 +42,7 @@ test('plan my month fills slots from one call, keeps formats and pillars valid, 
   assert.equal(a.status, 'draft');
   assert.equal(a.format, 'carousel');
   assert.equal(a.channels[0].hashtags.length, 5, 'hashtags capped to the channel');
+  assert.equal(a.channels[0].firstComment, 'Repo: https://github.com/x/y');
   assert.equal(b.format, 'photo-carousel', 'unknown format falls back to the channel default');
   assert.equal(b.pillar, undefined);
   // Planning again only fills what's left.
