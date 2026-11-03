@@ -170,4 +170,6 @@ export interface Settings {
   agentsMaxClaudeRunsPerDay: number;
   /** Stops the publisher sending anything (scheduled posts wait; nothing is lost). */
   publishingPaused: boolean;
+  /** Stops reading numbers back and asking for them (nothing scheduled is lost: missed windows are skipped). */
+  metricsPaused: boolean;
 }

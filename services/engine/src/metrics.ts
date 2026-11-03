@@ -85,7 +85,8 @@ export function postedAt(p: Post, ch: ChannelId): string | undefined {
   return p.channels.find((c) => c.channel === ch)?.sentAt ?? p.at;
 }
 
-const num = (v: unknown) => {
+/** A number as platforms print it ("1.2K", "3,410", "12 %"); undefined when it isn't one or is negative. */
+export const parseMetricNumber = (v: unknown) => {
   if (v === undefined || v === null || v === '') return undefined;
   // "1.2K", "3,410", "12 %" — the ways platforms print numbers.
   const s = String(v).trim().replace(/,/g, '').replace(/%$/, '').trim();
@@ -94,6 +95,7 @@ const num = (v: unknown) => {
   const n = Number(m[1]) * (m[2] ? (/k/i.test(m[2]) ? 1e3 : 1e6) : 1);
   return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : undefined;
 };
+const num = parseMetricNumber;
 
 /** Record numbers for a published post's channel. Replaces an earlier snapshot from the same source in the same age bucket. */
 export function addSnapshot(input: Partial<Snapshot> & { post: string; channel: ChannelId; source: MetricSource }, now = new Date()): Promise<Snapshot> {

@@ -1,4 +1,4 @@
-import { blockedReason, createService, foregroundBusy, learnOnce, logRun, refreshTrends, runGolden, runPublisher, pickDue, readJobs, readSettings, updateJob, type AgentJob, type AgentKind, type PublisherReport } from '@shipcast/engine';
+import { blockedReason, createService, foregroundBusy, learnOnce, logRun, refreshTrends, runGolden, redactSecrets, runPublisher, runMetrics, pickDue, readJobs, readSettings, updateJob, type AgentJob, type AgentKind, type MetricsReport, type PublisherReport } from '@shipcast/engine';
 
 /**
  * The agents service: wakes every 20 seconds, starts at most one background
@@ -107,6 +107,24 @@ export async function publishTick(): Promise<PublisherReport | undefined> {
   }
 }
 
+/**
+ * The metrics job is not a Claude job either: on every tick it reads numbers
+ * back for posts that reached 1 d / 3 d / 7 d / 30 d (YouTube, the Postiz
+ * queue) and asks for the rest, obeying "metrics paused". Like the
+ * publisher, a pass still going makes the next tick skip it.
+ */
+let lastMetrics: { at: string; report?: MetricsReport; error?: string } | undefined;
+export async function metricsTick(): Promise<MetricsReport | undefined> {
+  try {
+    const report = await runMetrics();
+    lastMetrics = { at: new Date().toISOString(), report };
+    return report;
+  } catch (e) {
+    lastMetrics = { at: new Date().toISOString(), error: (await redactSecrets((e as Error).message ?? '')).slice(0, 200) };
+    console.error('[metrics] pass failed:', lastMetrics.error);
+  }
+}
+
 export function createAgentsService() {
   let timer: ReturnType<typeof setInterval> | undefined;
   let busyTick = false;
@@ -115,10 +133,11 @@ export function createAgentsService() {
     port: AGENTS_PORT,
     version: '0.1.0',
     concurrency: 1,
-    health: async () => ({ jobs: (await readJobs()).map((j) => ({ id: j.id, enabled: j.enabled, nextRun: j.nextRun, running: !!j.running })), publisher: lastPublish ?? null }),
+    health: async () => ({ jobs: (await readJobs()).map((j) => ({ id: j.id, enabled: j.enabled, nextRun: j.nextRun, running: !!j.running })), publisher: lastPublish ?? null, metrics: lastMetrics ?? null }),
     handlers: {
       tick: async () => tick(),
       publish: async () => publishTick(),
+      metrics: async () => metricsTick(),
     },
   });
   const start = async () => {
@@ -126,6 +145,7 @@ export function createAgentsService() {
     for (const j of await readJobs()) if (j.running) await updateJob(j.id, { running: false });
     timer = setInterval(async () => {
       void publishTick();
+      void metricsTick();
       if (busyTick) return;
       busyTick = true;
       await tick().catch((e) => console.error('[agents] tick failed:', e)).finally(() => (busyTick = false));

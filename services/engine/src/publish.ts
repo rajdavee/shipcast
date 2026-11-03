@@ -40,6 +40,8 @@ let http: typeof fetch = (input, init) => fetch(input, init);
 export function setPublishFetch(f: typeof fetch | null) {
   http = f ?? ((input, init) => fetch(input, init));
 }
+/** The same swappable fetch, for the collectors that read numbers back over these connections. */
+export const providerFetch: typeof fetch = (input, init) => http(input, init);
 
 const SECRET = { linkedinClient: 'publish.linkedin.client', linkedinToken: 'publish.linkedin.token', youtubeClient: 'publish.youtube.client', youtubeToken: 'publish.youtube.token', postiz: 'publish.postiz' };
 
@@ -68,8 +70,10 @@ interface YoutubeToken {
   access: string;
   refresh?: string;
   expiresAt: string;
+  /** Scopes Google granted (space-separated); absent on connections made before stats were read. */
+  scope?: string;
 }
-interface PostizConfig {
+export interface PostizConfig {
   url: string;
   key: string;
 }
@@ -105,6 +109,8 @@ async function failure(name: string, r: Response, what: string): Promise<Publish
   const permanent = r.status >= 400 && r.status < 500 && r.status !== 429 && r.status !== 408;
   return new PublishError(`${name} ${what} failed (${r.status})${detail ? `: ${detail}` : ''}`, permanent);
 }
+
+export const providerFailure = failure;
 
 // ── media and copy ─────────────────────────────────────────────────────
 
@@ -147,7 +153,7 @@ export const OAUTH_PROVIDERS: OAuthProvider[] = ['linkedin', 'youtube'];
 
 const OAUTH = {
   linkedin: { authorize: 'https://www.linkedin.com/oauth/v2/authorization', token: 'https://www.linkedin.com/oauth/v2/accessToken', scope: 'openid profile w_member_social', client: SECRET.linkedinClient, extra: {} as Record<string, string> },
-  youtube: { authorize: 'https://accounts.google.com/o/oauth2/v2/auth', token: 'https://oauth2.googleapis.com/token', scope: 'https://www.googleapis.com/auth/youtube.upload', client: SECRET.youtubeClient, extra: { access_type: 'offline', prompt: 'consent', include_granted_scopes: 'true' } as Record<string, string> },
+  youtube: { authorize: 'https://accounts.google.com/o/oauth2/v2/auth', token: 'https://oauth2.googleapis.com/token', scope: 'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/yt-analytics.readonly', client: SECRET.youtubeClient, extra: { access_type: 'offline', prompt: 'consent', include_granted_scopes: 'true' } as Record<string, string> },
 };
 
 // In memory on purpose: a restart simply means clicking Connect again.
@@ -188,7 +194,7 @@ export async function oauthFinish(provider: OAuthProvider, state: string, code: 
     signal: AbortSignal.timeout(20_000),
   });
   if (!r.ok) throw await failure(provider === 'linkedin' ? 'LinkedIn' : 'Google', r, 'sign-in');
-  const tok = (await r.json()) as { access_token?: string; expires_in?: number; refresh_token?: string };
+  const tok = (await r.json()) as { access_token?: string; expires_in?: number; refresh_token?: string; scope?: string };
   if (!tok.access_token) throw new PublishError('No access token came back.', true);
   const expiresAt = new Date(now + (Number(tok.expires_in) || 3600) * 1000).toISOString();
   if (provider === 'linkedin') {
@@ -201,7 +207,7 @@ export async function oauthFinish(provider: OAuthProvider, state: string, code: 
   }
   // Google only sends a refresh token on first consent; keep the old one if this grant has none.
   const old = await secretJson<YoutubeToken>(SECRET.youtubeToken);
-  await saveSecretJson(SECRET.youtubeToken, { access: tok.access_token, refresh: tok.refresh_token ?? old?.refresh, expiresAt } satisfies YoutubeToken);
+  await saveSecretJson(SECRET.youtubeToken, { access: tok.access_token, refresh: tok.refresh_token ?? old?.refresh, expiresAt, ...(tok.scope ? { scope: tok.scope } : {}) } satisfies YoutubeToken);
   return {};
 }
 
@@ -219,10 +225,18 @@ export async function connections(now = Date.now()) {
   const pz = await secretJson<PostizConfig>(SECRET.postiz);
   return {
     linkedin: { configured: !!(await getSecret(SECRET.linkedinClient)), connected: !!li && Date.parse(li.expiresAt) > now, expired: !!li && Date.parse(li.expiresAt) <= now, account: li?.name ?? null, expiresAt: li?.expiresAt ?? null },
-    youtube: { configured: !!(await getSecret(SECRET.youtubeClient)), connected: !!yt && (!!yt.refresh || Date.parse(yt.expiresAt) > now), note: 'Uploads from a Google project that has not passed its audit are kept private by YouTube.' },
+    youtube: { configured: !!(await getSecret(SECRET.youtubeClient)), connected: !!yt && (!!yt.refresh || Date.parse(yt.expiresAt) > now), stats: youtubeStatsAccess(yt), note: 'Uploads from a Google project that has not passed its audit are kept private by YouTube.' },
     postiz: { configured: !!pz, url: pz?.url ?? null, note: 'Postiz posts at the scheduled time; Shipcast marks the channel sent once Postiz accepts it.' },
   };
 }
+
+/** Can this YouTube connection read numbers back? Connections made before stats were added lack the read scopes. */
+function youtubeStatsAccess(t?: YoutubeToken): { stats: boolean; analytics: boolean; needsReconnect: boolean } {
+  const has = (s: string) => !!t?.scope?.split(/[\s,]+/).includes(`https://www.googleapis.com/auth/${s}`);
+  const stats = has('youtube.readonly') || has('youtube');
+  return { stats, analytics: has('yt-analytics.readonly'), needsReconnect: !!t && !stats };
+}
+export const youtubeStats = async () => youtubeStatsAccess(await secretJson<YoutubeToken>(SECRET.youtubeToken));
 
 // ── LinkedIn (personal profile, Share on LinkedIn) ──────────────────────
 
@@ -300,7 +314,7 @@ export const linkedinAdapter: Adapter = {
 
 // ── YouTube (Data API videos.insert, resumable) ────────────────────────
 
-async function youtubeAccess(): Promise<string> {
+export async function youtubeAccess(): Promise<string> {
   const t = await secretJson<YoutubeToken>(SECRET.youtubeToken);
   if (!t) throw new PublishError('YouTube is not connected — connect it in Settings → Connections, or upload this one by hand.', true);
   if (Date.parse(t.expiresAt) > Date.now() + 60_000) return t.access;
@@ -314,9 +328,9 @@ async function youtubeAccess(): Promise<string> {
   });
   if (r.status === 400 || r.status === 401) throw new PublishError('Google no longer accepts the YouTube connection — reconnect it in Settings → Connections.', true);
   if (!r.ok) throw await failure('Google', r, 'token refresh');
-  const tok = (await r.json()) as { access_token?: string; expires_in?: number; refresh_token?: string };
+  const tok = (await r.json()) as { access_token?: string; expires_in?: number; refresh_token?: string; scope?: string };
   if (!tok.access_token) throw new PublishError('Google did not return an access token.');
-  await saveSecretJson(SECRET.youtubeToken, { access: tok.access_token, refresh: tok.refresh_token ?? t.refresh, expiresAt: new Date(Date.now() + (Number(tok.expires_in) || 3600) * 1000).toISOString() } satisfies YoutubeToken);
+  await saveSecretJson(SECRET.youtubeToken, { access: tok.access_token, refresh: tok.refresh_token ?? t.refresh, expiresAt: new Date(Date.now() + (Number(tok.expires_in) || 3600) * 1000).toISOString(), scope: tok.scope ?? t.scope } satisfies YoutubeToken);
   return tok.access_token;
 }
 
@@ -383,7 +397,7 @@ export interface PostizIntegration {
   picture?: string;
 }
 
-async function postizConfig(): Promise<PostizConfig> {
+export async function postizConfig(): Promise<PostizConfig> {
   const c = await secretJson<PostizConfig>(SECRET.postiz);
   if (!c) throw new PublishError('Postiz is not set up — add its address and API key in Settings → Connections.', true);
   return c;

@@ -23,6 +23,7 @@ export const DEFAULT_SETTINGS: Settings = {
   agentsQuietEnd: '07:00',
   agentsMaxClaudeRunsPerDay: 6,
   publishingPaused: false,
+  metricsPaused: false,
 };
 
 export function newId(prefix = ''): string {
