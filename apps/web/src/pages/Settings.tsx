@@ -117,6 +117,8 @@ function Connections({ status, onChange }: { status: Status | null; onChange: ()
         </div>
       </section>
 
+      <PublishingSection />
+
       <VoiceSection />
 
       <BrollSection />
@@ -154,6 +156,123 @@ function Connections({ status, onChange }: { status: Status | null; onChange: ()
         {fixLog && <div className="doc" style={{ marginTop: 12 }}><pre>{fixLog}</pre></div>}
       </section>
     </>
+  );
+}
+
+const OAUTH_APPS = [
+  { id: 'linkedin' as const, title: 'LinkedIn — your profile', what: 'Posts text, images and PDF carousels to your own profile with your own LinkedIn app (Share on LinkedIn product, no review needed).', where: 'linkedin.com/developers → Create app → Products: Share on LinkedIn, Sign In with OpenID Connect' },
+  { id: 'youtube' as const, title: 'YouTube — your channel', what: 'Uploads videos and Shorts with your own Google Cloud project (YouTube Data API v3, OAuth client of type Web).', where: 'console.cloud.google.com → APIs & Services → Credentials' },
+];
+
+/** Publishing accounts: direct LinkedIn and YouTube with the user's own app keys, a Postiz instance for the rest, and one switch to pause it all. */
+function PublishingSection() {
+  const c = useLoad(() => api.publish.connections());
+  const s = useLoad(() => api.settings());
+  const pz = useLoad(() => (c.data?.postiz.configured ? api.publish.postizIntegrations() : Promise.resolve([])), [c.data?.postiz.configured]);
+  const [form, setForm] = useState<Record<string, { a: string; b: string }>>({});
+  const [busy, setBusy] = useState<string | null>(null);
+  const [waiting, setWaiting] = useState<string | null>(null);
+  const redirect = (id: string) => `${location.origin}/oauth/${id}/callback`;
+  // After Connect opens the sign-in tab, check back until the connection shows up.
+  useEffect(() => {
+    if (!waiting) return;
+    const t = setInterval(() => c.reload(), 3000);
+    const stop = setTimeout(() => setWaiting(null), 5 * 60_000);
+    return () => (clearInterval(t), clearTimeout(stop));
+  }, [waiting]);
+  useEffect(() => {
+    if (waiting && c.data?.[waiting as 'linkedin' | 'youtube']?.connected) {
+      toast(`${waiting === 'linkedin' ? 'LinkedIn' : 'YouTube'} connected`);
+      setWaiting(null);
+    }
+  }, [c.data, waiting]);
+  const act = async (id: string, fn: () => Promise<unknown>, done?: string) => {
+    setBusy(id);
+    try {
+      await fn();
+      await c.reload();
+      if (done) toast(done);
+    } catch (e) {
+      toast(String((e as Error).message));
+    } finally {
+      setBusy(null);
+    }
+  };
+  const field = (id: string) => form[id] ?? { a: '', b: '' };
+  const setField = (id: string, k: 'a' | 'b', v: string) => setForm((f) => ({ ...f, [id]: { ...field(id), [k]: v } }));
+  const paused = !!s.data?.publishingPaused;
+
+  return (
+    <section className="setup-section">
+      <h2>Publishing</h2>
+      <p>How calendar posts go out. Without a connection every channel still works as a ready-to-post kit with a reminder. Keys and tokens stay on this computer and are never shown again.</p>
+      <div className="rows">
+        <div className="srow">
+          <i className={`dot ${paused ? 'bad' : 'ok'}`} />
+          <div>
+            <h3>Pause all publishing</h3>
+            <p>{paused ? 'Paused — nothing is sent, even scheduled posts. Reminders for manual posts still show.' : 'Scheduled posts go out at their time.'}</p>
+          </div>
+          <label className="switch"><input type="checkbox" checked={paused} disabled={!s.data} onChange={async (e) => { s.setData(await api.saveSettings({ publishingPaused: e.target.checked })); toast(e.target.checked ? 'Publishing paused' : 'Publishing resumed'); }} /> Pause</label>
+        </div>
+        {OAUTH_APPS.map((app) => {
+          const st = c.data?.[app.id];
+          const li = app.id === 'linkedin' ? c.data?.linkedin : null;
+          const f = field(app.id);
+          return (
+            <div className="srow" key={app.id}>
+              <i className={`dot ${st?.connected ? 'ok' : li?.expired ? 'bad' : ''}`} />
+              <div>
+                <h3>{app.title}</h3>
+                <p>
+                  {!st ? 'Checking…' : st.connected ? <>Connected{li?.account ? ` as ${li.account}` : ''}{li?.expiresAt ? ` · until ${new Date(li.expiresAt).toLocaleDateString()}` : ''}.</> : li?.expired ? 'The sign-in expired — connect again.' : st.configured ? 'App keys saved. Connect to sign in.' : <>{app.what} Keys: {app.where}. Redirect URL: <code>{redirect(app.id)}</code></>}
+                  {app.id === 'youtube' && c.data && <><br />{c.data.youtube.note}</>}
+                </p>
+              </div>
+              {st?.connected ? (
+                <div className="row-actions">
+                  <button className="btn ghost" disabled={busy === app.id} onClick={() => act(app.id, () => api.publish.disconnect(app.id), 'Disconnected')}>Disconnect</button>
+                </div>
+              ) : st?.configured ? (
+                <div className="row-actions">
+                  <button className="btn primary" disabled={busy === app.id} onClick={() => act(app.id, async () => { const r = await api.publish.connect(app.id); window.open(r.url, '_blank', 'noopener'); setWaiting(app.id); })}>{waiting === app.id ? 'Waiting for sign-in…' : 'Connect'}</button>
+                  <button className="btn ghost" disabled={busy === app.id} onClick={() => act(app.id, () => api.publish.disconnect(app.id, true), 'App keys removed')}>Remove keys</button>
+                </div>
+              ) : (
+                <form className="row-actions" onSubmit={(e) => { e.preventDefault(); act(app.id, async () => { await api.publish.saveKeys(app.id, f.a.trim(), f.b.trim()); setForm((x) => ({ ...x, [app.id]: { a: '', b: '' } })); }, 'Keys saved — now Connect'); }}>
+                  <input className="input" autoComplete="off" placeholder="Client ID" value={f.a} onChange={(e) => setField(app.id, 'a', e.target.value)} style={{ width: 170 }} aria-label={`${app.title} client ID`} />
+                  <input className="input" type="password" autoComplete="off" placeholder="Client secret" value={f.b} onChange={(e) => setField(app.id, 'b', e.target.value)} style={{ width: 170 }} aria-label={`${app.title} client secret`} />
+                  <button className="btn primary" disabled={busy === app.id || !f.a.trim() || !f.b.trim()}>Save</button>
+                </form>
+              )}
+            </div>
+          );
+        })}
+        <div className="srow">
+          <i className={`dot ${c.data?.postiz.configured ? (pz.error ? 'bad' : 'ok') : ''}`} />
+          <div>
+            <h3>Postiz — Instagram, TikTok, X and more</h3>
+            <p>
+              {c.data?.postiz.configured ? (
+                <>Connected to <code>{c.data.postiz.url}</code>. {pz.error ? `Can't reach it: ${pz.error}` : pz.data ? (pz.data.length ? `Channels: ${pz.data.filter((i) => !i.disabled).map((i) => `${i.name} (${i.identifier})`).join(', ')}.` : 'No channels added in Postiz yet.') : 'Checking channels…'}</>
+              ) : (
+                <>Your own Postiz instance posts to 30+ platforms. Address like http://localhost:4007; API key from Postiz → Settings → Public API.</>
+              )}
+              {c.data && <><br />{c.data.postiz.note}</>}
+            </p>
+          </div>
+          {c.data?.postiz.configured ? (
+            <button className="btn ghost" disabled={busy === 'postiz'} onClick={() => act('postiz', () => api.publish.disconnect('postiz'), 'Postiz disconnected')}>Disconnect</button>
+          ) : (
+            <form className="row-actions" onSubmit={(e) => { e.preventDefault(); const f = field('postiz'); act('postiz', async () => { const r = await api.publish.savePostiz(f.a.trim(), f.b.trim()); setForm((x) => ({ ...x, postiz: { a: '', b: '' } })); toast(`Postiz connected — ${r.integrations.length} channel${r.integrations.length === 1 ? '' : 's'}`); }); }}>
+              <input className="input" autoComplete="off" placeholder="https://postiz.example.com" value={field('postiz').a} onChange={(e) => setField('postiz', 'a', e.target.value)} style={{ width: 200 }} aria-label="Postiz address" />
+              <input className="input" type="password" autoComplete="off" placeholder="API key" value={field('postiz').b} onChange={(e) => setField('postiz', 'b', e.target.value)} style={{ width: 150 }} aria-label="Postiz API key" />
+              <button className="btn primary" disabled={busy === 'postiz' || !field('postiz').a.trim() || !field('postiz').b.trim()}>{busy === 'postiz' ? 'Checking…' : 'Connect'}</button>
+            </form>
+          )}
+        </div>
+      </div>
+    </section>
   );
 }
 
