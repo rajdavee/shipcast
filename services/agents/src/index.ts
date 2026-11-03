@@ -1,4 +1,4 @@
-import { blockedReason, createService, foregroundBusy, learnOnce, logRun, refreshTrends, runGolden, redactSecrets, runPublisher, runMetrics, pickDue, readJobs, readSettings, updateJob, type AgentJob, type AgentKind, type MetricsReport, type PublisherReport } from '@shipcast/engine';
+import { blockedReason, createService, foregroundBusy, learnOnce, logRun, refreshPlaybook, refreshTrends, runGolden, redactSecrets, runPublisher, runMetrics, pickDue, readJobs, readSettings, updateJob, type AgentJob, type AgentKind, type MetricsReport, type PublisherReport } from '@shipcast/engine';
 
 /**
  * The agents service: wakes every 20 seconds, starts at most one background
@@ -36,7 +36,15 @@ registerAgent('learn', async (ctx) => {
   if (r.added.length) parts.push(`${r.added.length} new lesson${r.added.length === 1 ? '' : 's'}`);
   if (r.kept.length) parts.push(`${r.kept.length} kept`);
   if (r.retired.length) parts.push(`${r.retired.length} retired`);
-  return { summary: parts.join(' · '), claudeRuns: r.claudeRuns };
+  // The playbook (what works for you) is rebuilt from the latest numbers on the same schedule.
+  let extra = 0;
+  if (!(await ctx.shouldYield())) {
+    const pb = await refreshPlaybook().catch(() => null);
+    const ready = pb?.channels.filter((c) => c.ready).length ?? 0;
+    if (pb?.channels.some((c) => c.narrative?.length)) extra = 1;
+    if (ready) parts.push(`playbook ready on ${ready} channel${ready === 1 ? '' : 's'}`);
+  }
+  return { summary: parts.join(' · '), claudeRuns: r.claudeRuns + extra };
 });
 
 registerAgent('golden', async () => runGolden());
