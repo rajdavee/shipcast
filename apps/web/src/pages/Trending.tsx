@@ -30,6 +30,7 @@ export function Trending() {
   const agents = useLoad(() => api.agents(), [], 10000);
   const [platform, setPlatform] = useState('all');
   const [risingOnly, setRisingOnly] = useState(false);
+  const [adding, setAdding] = useState<string | null>(null);
   const job = agents.data?.jobs.find((j) => j.id === 'trends');
   if (!feed.data) return <main className="page"><PageHeader title="Ideas" /><Loading /></main>;
   const cards = feed.data.cards.filter((c) => (platform === 'all' || c.platform === platform || c.platform === 'any') && (!risingOnly || c.strength === 'rising'));
@@ -40,6 +41,17 @@ export function Trending() {
       sessionStorage.setItem(PREFILL_KEY, JSON.stringify({ format: c.recipe.pack, notes }));
     } catch {}
     go('#/new');
+  }
+  async function addToCalendar(c: TrendCard) {
+    setAdding(c.key);
+    try {
+      await api.calendar.fromTrend(c.key, c.platform);
+      toast('Added to your calendar ideas');
+    } catch (e) {
+      toast((e as Error).message);
+    } finally {
+      setAdding(null);
+    }
   }
   async function refresh() {
     await api.refreshTrends();
@@ -87,7 +99,10 @@ export function Trending() {
             </ul>
             <div className="trend-foot">
               <span className="muted">as {formatName(c.recipe.pack)}</span>
-              <button className="btn primary" onClick={() => makeOne(c)}>Make one like this</button>
+              <span className="trend-actions">
+                <button className="btn" disabled={adding === c.key} onClick={() => addToCalendar(c)}>{adding === c.key ? 'Adding…' : 'Add to calendar'}</button>
+                <button className="btn primary" onClick={() => makeOne(c)}>Make one like this</button>
+              </span>
             </div>
           </article>
         ))}

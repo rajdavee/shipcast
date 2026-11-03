@@ -10,8 +10,9 @@ export interface Command { id: string; group: 'Actions' | 'Places' | 'Projects';
 export function commands(campaigns: Campaign[] | null, extra: Command[] = []): Command[] {
   const actions: Command[] = [
     { id: 'a-new', group: 'Actions', label: 'New piece', hint: 'Create', keywords: 'make launch post video carousel', icon: <Nav.create />, run: () => go('/new') },
-    { id: 'a-plan', group: 'Actions', label: 'Plan my month', hint: 'Calendar', keywords: 'schedule calendar posts', icon: <Nav.calendar />, run: () => go('/calendar') },
-    { id: 'a-idea', group: 'Actions', label: 'Add idea', hint: 'Ideas', keywords: 'trend backlog', icon: <Nav.ideas />, run: () => go('/ideas') },
+    { id: 'a-plan', group: 'Actions', label: 'Plan my month', hint: 'Calendar', keywords: 'schedule calendar posts', icon: <Nav.calendar />, run: () => go('/calendar/plan') },
+    { id: 'a-idea', group: 'Actions', label: 'Add idea', hint: 'Calendar backlog', keywords: 'trend backlog note', icon: <Nav.ideas />, run: () => go('/calendar/idea') },
+    { id: 'a-post', group: 'Actions', label: 'New post', hint: 'Calendar', keywords: 'schedule linkedin instagram', icon: <Nav.calendar />, run: () => go('/calendar/new') },
     { id: 'a-settings', group: 'Actions', label: 'Open settings', hint: 'Settings', keywords: 'setup preferences keys', icon: <Nav.settings />, run: () => go('/settings') },
     ...extra,
   ];
