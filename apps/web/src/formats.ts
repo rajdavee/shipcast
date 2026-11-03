@@ -9,6 +9,7 @@ export const FORMATS: { id: string; title: string; line: string; img?: string; r
   { id: 'quote-cards', title: 'Quote cards', line: 'Pull quotes, testimonials and post-style cards', img: '/formats/quote-cards.jpg', ratio: 4 / 5 },
   { id: 'app-store-screens', title: 'App store screens', line: 'iOS and Google Play screenshot sets in a phone frame', img: '/formats/app-store-screens.jpg', ratio: 9 / 16 },
   { id: 'product-hunt-kit', title: 'Product Hunt kit', line: 'Gallery, thumbnail, tagline and maker comment', img: '/formats/product-hunt-kit.jpg', ratio: 1270 / 760 },
+  { id: 'profile-kit', title: 'Profile kit', line: 'Banners, covers, avatar and link previews that match', img: '/formats/profile-kit.jpg', ratio: 16 / 9 },
   { id: 'presentation', title: 'Presentation', line: 'Pitch or sales deck — PDF and editable PowerPoint', img: '/formats/presentation.jpg', ratio: 16 / 9 },
   { id: 'ad-set', title: 'Ad set', line: 'Hook variants in every ad size, with upload sheet', img: '/formats/ad-set.jpg', ratio: 1 },
   { id: 'landing', title: 'Landing page', line: 'Responsive page + section snippets for any site builder', img: '/formats/landing.jpg', ratio: 4 / 5 },
@@ -52,6 +53,7 @@ export function shape(pack: Pack | undefined, step?: Step): number {
   if (pack?.id === 'quote-cards') return 4 / 5;
   if (pack?.id === 'app-store-screens') return 9 / 16;
   if (pack?.id === 'product-hunt-kit') return 1270 / 760;
+  if (pack?.id === 'profile-kit') return 16 / 9;
   if (pack?.id === 'document') return 0.707;
   if (pack?.id === 'ad-set') return 1;
   if (pack?.id === 'print') return 0.707;

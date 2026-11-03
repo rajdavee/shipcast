@@ -1,5 +1,5 @@
 import { pathToFileURL } from 'node:url';
-import { brandCss, fontLinks, type BrandKit } from '@shipcast/engine';
+import { brandCss, fontLinks, type BrandKit, type SafeZone } from '@shipcast/engine';
 
 export type FieldType = 'text' | 'longtext' | 'image' | 'list' | 'enum' | 'color';
 
@@ -36,7 +36,7 @@ export interface RenderCtx {
   /** Platform/tool logos resolved before rendering (name → data URI, null = monogram). */
   icons?: Record<string, string | null>;
   /** Platform safe zone of the canvas, for templates that pad around app overlays. */
-  safe?: { top: number; right: number; bottom: number; left: number };
+  safe?: SafeZone;
 }
 
 export const esc = (s: unknown) =>

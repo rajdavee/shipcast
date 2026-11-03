@@ -345,6 +345,7 @@ export const PACK_CHANNEL: Record<string, Channel> = {
   'quote-cards': 'linkedin',
   'app-store-screens': 'web',
   'product-hunt-kit': 'web',
+  'profile-kit': 'web',
   'social-post': 'linkedin',
   reel: 'tiktok',
   'social-short': 'tiktok',

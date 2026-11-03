@@ -2,7 +2,7 @@ import { copyFile, mkdir, writeFile, readFile, rename, rm } from 'node:fs/promis
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
-import { assertInHome, browser, writePptx, type PptxSlide, createService, FIT_SCRIPT, run, TIDY_PAGE_SCRIPT, getPreset, layoutAuditScript, loadBrand, normalizeBrand, presetForSize, resolveIcons, SERVICE_PORTS, type BrandKit, type LayoutAudit } from '@shipcast/engine';
+import { assertInHome, browser, writePptx, type PptxSlide, createService, FIT_SCRIPT, run, TIDY_PAGE_SCRIPT, getPreset, layoutAuditScript, loadBrand, normalizeBrand, presetForSize, resolveIcons, SERVICE_PORTS, type BrandKit, type LayoutAudit, type SafeZone } from '@shipcast/engine';
 import { CAROUSEL_LAYOUTS, carouselIconNames, renderCarouselSlide, THEMES } from './templates/carousel.ts';
 import type { RenderCtx } from './templates/common.ts';
 import { CARD_LAYOUTS, renderCard, renderThumbnail, THUMBNAIL_LAYOUTS } from './templates/graphics.ts';
@@ -101,7 +101,7 @@ async function brandFrom(input: { brandDir?: string; brand?: Partial<BrandKit> }
   return { brand: normalizeBrand(input.brand) };
 }
 
-function size(preset?: string): { width: number; height: number; safe: { top: number; right: number; bottom: number; left: number } } {
+function size(preset?: string): { width: number; height: number; safe: SafeZone } {
   const p = getPreset(preset ?? 'linkedin-carousel');
   if (p) return { width: p.width, height: p.height, safe: p.safe };
   const m = preset?.match(/^(\d+)x(\d+)$/);
@@ -114,7 +114,7 @@ function size(preset?: string): { width: number; height: number; safe: { top: nu
 }
 
 /** Render an HTML document to PNG/JPG and audit it; one retry on a fresh browser if Chrome dies mid-capture. */
-async function capture(html: string, file: string, width: number, height: number, safe: { top: number; right: number; bottom: number; left: number }, uiShare?: number) {
+async function capture(html: string, file: string, width: number, height: number, safe: SafeZone, uiShare?: number) {
   try {
     return await captureOnce(html, file, width, height, safe, uiShare);
   } catch (e) {
@@ -124,7 +124,7 @@ async function capture(html: string, file: string, width: number, height: number
   }
 }
 
-async function captureOnce(html: string, file: string, width: number, height: number, safe: { top: number; right: number; bottom: number; left: number }, uiShare?: number) {
+async function captureOnce(html: string, file: string, width: number, height: number, safe: SafeZone, uiShare?: number) {
   await mkdir(dirname(file), { recursive: true });
   const htmlFile = file.replace(/\.(png|jpe?g)$/, '.html');
   await writeFile(htmlFile, html);
@@ -519,7 +519,7 @@ export function createStillsService() {
         for (const [i, g] of (input.items ?? []).entries()) {
           ctx.progress(i / input.items.length, g.name);
           const { width, height, safe } = size(g.preset);
-          const rctx: RenderCtx = { brand, width, height, assetsDir, handle: input.handle };
+          const rctx: RenderCtx = { brand, width, height, assetsDir, handle: input.handle, safe };
           const html = g.type === 'thumbnail' ? renderThumbnail(g.layout, g.fields ?? {}, rctx) : renderCard(g.layout, g.theme ?? 'editorial', g.fields ?? {}, rctx);
           // One folder level is allowed (ios/01-hero.png) so store sets stay apart; nothing can climb out of outDir.
           const name = String(g.name || `${g.layout}-${i + 1}.png`).replace(/[^\w./-]/g, '_').split('/').filter((x) => x && !/^\.+$/.test(x)).slice(-2).join('/') || `${g.layout}-${i + 1}.png`;

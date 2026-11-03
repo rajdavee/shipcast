@@ -175,7 +175,8 @@ export async function catalogMarkdown(kind: SpecKind): Promise<string> {
     '# Graphics catalog',
     '',
     'Each item: `{ "type": "thumbnail"|"card", "layout": "<id>", "theme"?: "editorial|swiss|bold|midnight", "preset": "<preset id>", "name": "file.png", "fields": {…} }`',
-    'Presets: `youtube-thumbnail` 1280×720 · `og-card` 1200×630 · `github-banner` 1280×640 · `x-image` 1600×900 · `instagram-post` 1080×1080 · `linkedin-image` 1080×1350 · `linkedin-landscape` 1200×627 · `story-image` 1080×1920 · `x-header` 1500×500 · `linkedin-banner` 1584×396 · `youtube-banner` 2560×1440 · `app-store-ios` 1290×2796 · `play-store` 1080×1920 · `producthunt-gallery` 1270×760 · `producthunt-thumb` 240×240',
+    'Presets: `youtube-thumbnail` 1280×720 · `og-card` 1200×630 · `github-banner` 1280×640 · `x-image` 1600×900 · `instagram-post` 1080×1080 · `linkedin-image` 1080×1350 · `linkedin-landscape` 1200×627 · `story-image` 1080×1920 · `x-header` 1500×500 · `linkedin-banner` 1584×396 · `linkedin-company-banner` 1128×191 · `youtube-banner` 2560×1440 · `facebook-cover` 851×315 · `profile-avatar` 400×400 · `app-store-ios` 1290×2796 · `play-store` 1080×1920 · `producthunt-gallery` 1270×760 · `producthunt-thumb` 240×240',
+    'Profile banners (`profile-banner`, `profile-avatar`): each preset has its own safe area and the audit flags text, logos and images outside it — youtube-banner keeps everything in the centre 1546×423; x-header and linkedin-banner keep clear of the profile photo at the bottom-left, linkedin-company-banner of the page logo; facebook-cover of the sides phones crop; profile-avatar keeps everything inside the inscribed circle. The layouts place content correctly — problems come from copy that is too long.',
     'File names may carry one folder (`ios/01-track.png`) to keep sets apart. Images that fail to load come back to you.',
     'App store screens (`app-screen`): the caption must stay on 2 lines at ≥ 6% of the canvas width — a caption that shrinks further comes back to you. The screenshot fills the phone\'s width and is cut at the bottom, so use a phone-shaped screenshot or crop a desktop one to a tall region about 1 wide by 2 high in pixels (for a 1440×900 capture: `#crop=x,0,0.29,1`). No real device art or store badges — the frame is generic.',
     'Quotes and people: `pull-quote`, `testimonial`, `quote-post` and `post-card` carry exact words from the brief or source only, attributed to the real person or post. With no real quote, write clearly placeholder words and set `"sample": "yes"` — the image is then labelled "Sample copy — not a real customer". Never invent a named customer, a rating or a platform logo.',
@@ -262,7 +263,7 @@ export async function renderSpec(kind: SpecKind, cwd: string, briefDir: string, 
         return [
           ...g.audit.overflow.map((x: string) => `${at}: text overflows (${x}).`),
           ...g.audit.offCanvas.map((x: string) => `${at}: text runs off the canvas (${x}).`),
-          ...g.audit.unsafe.slice(0, 2).map((x: string) => `${at}: ${x} sits inside the ${g.preset} safe margin — platform UI may cover it.`),
+          ...g.audit.unsafe.slice(0, 2).map((x: string) => (/ — (outside|under) /.test(x) ? `${at}: ${x.replace(' — ', ' sits ')} — keep it inside the ${g.preset} safe area.` : `${at}: ${x} sits inside the ${g.preset} safe margin — platform UI may cover it.`)),
           ...(g.audit.tinyShots?.length && !/-(portrait|wide|story)\./.test(g.file) ? [`${at.replace(/-feed(?=\.)/, '')} (every size): ${g.audit.tinyShots[0]}`] : []),
           ...(g.audit.small ?? []).slice(0, 1).map((x: string) => `${at}: ${x} had to shrink below its readable size to fit — shorten it.`),
           ...(g.audit.broken?.length ? [`${at}: image ${g.audit.broken[0]} didn't load — use a real file from assets/ (path relative to the brief folder).`] : []),
@@ -356,6 +357,38 @@ export function checkLaunchCopy(md: string | null): string[] {
   const all = [tagline, desc, comment].join(' ').toLowerCase();
   for (const p of BANNED_PHRASES) if (all.includes(p)) out.push(`launch-copy.md: uses "${p}" — rewrite it in plain, specific words.`);
   return out.slice(0, 12);
+}
+
+/** Every profile surface a brand needs, so a kit can't quietly skip one. */
+export const PROFILE_KIT_PRESETS = ['linkedin-banner', 'linkedin-company-banner', 'x-header', 'youtube-banner', 'facebook-cover', 'profile-avatar', 'og-card', 'github-banner'];
+
+/** Profile kit (graphics.json): every surface present, and one design system across them. */
+export function checkProfileKit(spec: any): string[] {
+  const items: any[] = Array.isArray(spec?.items) ? spec.items : [];
+  const out: string[] = [];
+  for (const p of PROFILE_KIT_PRESETS) if (!items.some((i) => i?.preset === p)) out.push(`graphics.json: the kit has no ${p} — add it (${p === 'profile-avatar' ? 'layout profile-avatar' : 'layout profile-banner'}).`);
+  const themes = [...new Set(items.map((i) => i?.theme ?? 'editorial'))];
+  if (themes.length > 1) out.push(`graphics.json: the kit mixes themes (${themes.join(', ')}) — use one theme on every item so the profiles read as one brand.`);
+  const motifs = [...new Set(items.filter((i) => i?.layout === 'profile-banner').map((i) => i?.fields?.motif ?? 'grid'))];
+  if (motifs.length > 1) out.push(`graphics.json: the banners mix motifs (${motifs.join(', ')}) — pick one.`);
+  for (const i of items) {
+    if (i?.preset === 'profile-avatar' && i.layout !== 'profile-avatar') out.push(`graphics.json: ${i.name} must use the profile-avatar layout (circle-safe).`);
+    if (i?.fields?.image && !['og-card', 'github-banner'].includes(i.preset)) out.push(`graphics.json: ${i.name} carries a screenshot — only og-card and github-banner have room for one; drop it.`);
+  }
+  return out.slice(0, 12);
+}
+
+/** Format-specific checks that need more than one spec or a copy file; run after every render round. */
+export async function packChecks(packId: string, outDir: string): Promise<string[]> {
+  const json = async (f: string) => JSON.parse(await readFile(join(outDir, f), 'utf8').catch(() => 'null'));
+  const text = (f: string) => readFile(join(outDir, f), 'utf8').catch(() => null);
+  try {
+    if (packId === 'product-hunt-kit') return checkLaunchCopy(await text('launch-copy.md'));
+    if (packId === 'profile-kit') return checkProfileKit(await json('graphics.json'));
+  } catch (e) {
+    return [`A spec is not valid JSON: ${(e as Error).message}`];
+  }
+  return [];
 }
 
 /** Platform limits for the copy kit; returns problems to send back to Claude. */

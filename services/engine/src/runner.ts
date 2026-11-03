@@ -1,7 +1,7 @@
 import { lessonsBrief } from './learn.ts';
 import { criticSummary, criticWeakest, judge, previews } from './critic.ts';
 import { cp, mkdir, writeFile, rm } from 'node:fs/promises';
-import { catalogMarkdown, checkCopy, checkLaunchCopy, renderSpec, SPEC_FILE, type SpecKind } from './specs.ts';
+import { catalogMarkdown, checkCopy, packChecks, renderSpec, SPEC_FILE, type SpecKind } from './specs.ts';
 import { readFile, readdir, rename, stat } from 'node:fs/promises';
 import { shortsFromStoryboard } from './shorts.ts';
 import { recentPatterns, scenePattern, varietyFeedback } from './variety.ts';
@@ -604,10 +604,8 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
         if ((pack?.id === 'document' || pack?.id === 'presentation' || pack?.id === 'ad-set' || pack?.id === 'email' || pack?.id === 'landing') && step.options.theme && step.options.theme !== 'auto') force.theme = step.options.theme;
         if (pack?.id === 'document' && step.options.size && step.options.size !== 'auto') force.size = step.options.size;
         const r = await renderSpec(specKind, cwd, join(dir, 'brief'), { force });
-        if (pack?.id === 'product-hunt-kit') {
-          const copy = checkLaunchCopy(await readFile(join(cwd, 'out', 'launch-copy.md'), 'utf8').catch(() => null));
-          if (copy.length) Object.assign(r, { ok: false, feedback: [...r.feedback, ...copy] });
-        }
+        const extra = await packChecks(pack?.id ?? '', join(cwd, 'out'));
+        if (extra.length) Object.assign(r, { ok: false, feedback: [...r.feedback, ...extra] });
         await log({ step: step.id, type: 'log', text: r.ok ? `Rendered: ${r.summary}` : `Quality check found ${r.feedback.length} issue(s): ${r.feedback.slice(0, 3).join(' · ')}` });
         if (r.ok) {
           // Director's review: QA can't judge taste. Claude looks at the frames once and may revise.

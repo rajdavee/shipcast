@@ -156,6 +156,15 @@ em{font-style:normal;color:var(--accent)}
 .dev .scr>img{width:100%;height:auto}
 .dev .cam{position:absolute;z-index:6;left:50%;top:calc(var(--dw) * .055);width:calc(var(--dw) * .04);height:calc(var(--dw) * .04);margin-left:calc(var(--dw) * -.02);border-radius:50%;background:#0b0c0f;box-shadow:0 0 0 calc(var(--dw) * .006) #23262c}
 .dev .ui-label{font-size:calc(var(--dw) * .028)}
+.pf-bg{position:absolute;inset:0}
+.pf-box{position:absolute;display:flex;align-items:center}
+.pf-in{display:flex;flex-direction:column;width:100%;min-width:0}
+.pf-in.row{flex-direction:row;align-items:center}.pf-in.shot{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:center}.pf-in.shot .frame{min-width:0}
+.pf-txt{display:flex;flex-direction:column;min-width:0;flex:1}
+.pf-in h1{line-height:1.02;max-width:100%}.pf-in p{line-height:1.3;max-width:34ch}
+.pf-logo{display:inline-flex;flex:none;line-height:1}.pf-logo .logo{height:1em;width:auto;max-width:6em;object-fit:contain}.pf-logo .wordmark{font:800 1em/1 var(--font-display);letter-spacing:-.03em}
+.pf-url{font-family:var(--font-mono);font-weight:600;color:var(--muted);max-width:100%;white-space:nowrap;overflow:hidden}
+.pf-rule{flex:none;width:3px;align-self:stretch;border-radius:2px;background:var(--accent)}
 .post footer svg{width:1.15em;height:1.15em;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
 `;
 
@@ -185,6 +194,38 @@ const quoteBox = (ctx: RenderCtx) => {
   // 4:5 has a fifth more height than square: spend it on bigger type rather than empty card.
   return { land, u: land ? 0.72 : ctx.height / ctx.width > 1.2 ? 1.1 : 1, pad: land ? 64 : 96 };
 };
+
+/** The part of a banner every device shows, minus the corner a profile photo or page logo covers. */
+function contentBox(ctx: RenderCtx) {
+  const s = ctx.safe ?? { top: 0, right: 0, bottom: 0, left: 0 };
+  const gap = Math.round(ctx.width * 0.02);
+  let l = s.left;
+  let r = ctx.width - s.right;
+  // Photos sit in a bottom corner and cover most of a short banner's height: keep the whole block beside them.
+  for (const a of s.avoid ?? []) {
+    if (a.x <= l) l = Math.max(l, a.x + a.w + gap);
+    else if (a.x + a.w >= r) r = Math.min(r, a.x - gap);
+  }
+  return { x: l, y: s.top, w: r - l, h: ctx.height - s.top - s.bottom };
+}
+
+const MOTIFS: Record<string, string> = {
+  grid: 'background-image:linear-gradient(color-mix(in srgb,var(--fg) 7%,transparent) 1px,transparent 1px),linear-gradient(90deg,color-mix(in srgb,var(--fg) 7%,transparent) 1px,transparent 1px);background-size:var(--cell) var(--cell);background-position:var(--cx) var(--cy)',
+  rings: 'background-image:repeating-radial-gradient(circle at var(--cx) var(--cy),transparent 0 calc(var(--cell) - 2px),color-mix(in srgb,var(--fg) 9%,transparent) calc(var(--cell) - 2px) var(--cell))',
+  dots: 'background-image:radial-gradient(color-mix(in srgb,var(--fg) 16%,transparent) 1.5px,transparent 2.5px);background-size:var(--cell) var(--cell);background-position:var(--cx) var(--cy)',
+  plain: '',
+};
+
+// Banner copy scales down together until it fits the safe box; text pushed under its data-min-font floor is reported.
+const PROFILE_FIT = `<script>window.__shipcastFit = () => {
+  const box = document.querySelector('.pf-box'), inn = document.querySelector('.pf-in');
+  if (!box || !inn) return 0;
+  const room = () => box.clientHeight - parseFloat(getComputedStyle(box).paddingTop) * 2;
+  const over = () => inn.getBoundingClientRect().height > room() + 1 || inn.scrollWidth > inn.clientWidth + 1 || [...inn.querySelectorAll('h1,p,.pf-url')].some((e) => e.scrollWidth > e.clientWidth + 2);
+  let n = 0;
+  while (over() && n < 40) { inn.querySelectorAll('[data-s]').forEach((e) => { e.style.fontSize = parseFloat(getComputedStyle(e).fontSize) * 0.95 + 'px'; }); n++; }
+  return n;
+};</script>`;
 
 export const CARD_LAYOUTS: Layout[] = [
   {
@@ -414,6 +455,66 @@ ${logo(ctx)}<div><div style="font:900 220px/.7 var(--font-display);color:var(--a
       const mark = ctx.brand.logo
         ? `<img src="${img(ctx.brand.logo, ctx)}" alt="" style="width:${Math.round(s * 0.66)}px;height:${Math.round(s * 0.66)}px;object-fit:contain">`
         : `<span style="font:800 ${Math.round(s * 0.5)}px/1 var(--font-display);letter-spacing:-.05em;color:${fg}">${esc(String(f.mark ?? '').slice(0, 2) || initials(ctx.brand.name))}</span>`;
+      return `<div class="c" style="align-items:center;justify-content:center;background:${bg}">${mark}</div>`;
+    },
+  },
+  {
+    id: 'profile-banner',
+    label: 'Profile banner, cover or link preview',
+    use: "One design for every profile header and link preview — linkedin-banner (personal), linkedin-company-banner, x-header, youtube-banner, facebook-cover, og-card and github-banner. Words and logo sit inside the preset's safe area and beside the profile photo; only the background motif bleeds to the edges. Use the same theme, motif and words on every size so the set reads as one brand.",
+    fields: [
+      { id: 'title', type: 'text', label: 'Headline (≤ 6 words)', max: 48, help: '*word* = accent' },
+      { id: 'sub', type: 'text', label: 'Supporting line (≤ 12 words)', max: 90, optional: true },
+      { id: 'url', type: 'text', label: 'URL or handle', max: 40, optional: true },
+      { id: 'motif', type: 'enum', label: 'Background motif', choices: ['grid', 'rings', 'dots', 'plain'], optional: true },
+      { id: 'align', type: 'enum', label: 'Alignment', choices: ['auto', 'center', 'start', 'end'], optional: true, help: 'auto = beside the profile photo, centred elsewhere' },
+      { id: 'image', type: 'image', label: 'Screenshot (og-card and github-banner only; crop it)', optional: true },
+    ],
+    html: (f, ctx) => {
+      const b = contentBox(ctx);
+      const pad = Math.round(Math.min(b.w, b.h) * 0.08);
+      const iw = b.w - pad * 2;
+      const ih = b.h - pad * 2;
+      const n = Math.max(10, String(f.title ?? '').replace(/[*=]/g, '').length);
+      const shot = !!f.image && b.h >= 480;
+      const row = !shot && b.w / b.h > 4.4;
+      const tw = shot ? iw * 0.5 : row ? iw * 0.72 : iw;
+      // Wide banners aim for a one-line headline; beside a screenshot the column is narrow, so two lines.
+      const h1 = Math.round(Math.min(ih * (row ? 0.36 : shot ? 0.17 : 0.24), ((shot ? 2 : 1) * tw) / (n * (shot ? 0.6 : 0.5))));
+      const sub = Math.round(h1 * (row || shot ? 0.5 : 0.42));
+      // Banners are seen scaled to the screen: floors follow the strip every device shows, not the whole canvas.
+      const floor = (k: number, min: number) => Math.max(min, Math.round(b.w * k));
+      const align = f.align && f.align !== 'auto' ? String(f.align) : shot ? 'start' : ctx.safe?.avoid?.length ? 'end' : 'center';
+      const ai = { start: 'flex-start', end: 'flex-end' }[align] ?? 'center';
+      const ta = row || align === 'start' ? 'left' : align === 'end' ? 'right' : 'center';
+      const mark = (px: number) => `<span class="pf-logo" data-s style="font-size:${px}px">${logo(ctx)}</span>`;
+      const text = `<div class="pf-txt" style="align-items:${row ? 'flex-start' : ai};text-align:${ta};gap:${Math.round(h1 * 0.3)}px">${row ? '' : mark(Math.round(h1 * 0.7))}
+<h1 data-s data-fit-lines="2" data-min-font="${floor(0.034, 20)}" style="font-size:${h1}px">${rich(f.title)}</h1>${f.sub ? `<p data-s data-min-font="${floor(0.017, 14)}" style="font-size:${sub}px">${rich(f.sub)}</p>` : ''}${f.url ? `<span class="pf-url" data-s data-min-font="${floor(0.015, 13)}" style="font-size:${Math.round(sub * 0.85)}px">${esc(f.url)}</span>` : ''}</div>`;
+      const inner = row ? `${mark(Math.round(ih * 0.5))}<i class="pf-rule"></i>${text}` : shot ? `${text}<div class="frame" style="height:${ih - 8}px"><div class="bar"><i></i><i></i><i></i></div><img src="${img(f.image, ctx)}"></div>` : text;
+      const cx = Math.round(b.x + b.w / 2);
+      const cy = Math.round(b.y + b.h / 2);
+      return `<div class="pf-bg" style="--cx:${cx}px;--cy:${cy}px;--cell:${Math.max(24, Math.round(b.h / 6))}px;${MOTIFS[f.motif as string] ?? MOTIFS.grid}"></div>
+<div class="pf-bg" style="background:radial-gradient(${Math.round(b.w * 0.7)}px ${Math.round(b.h * 1.3)}px at ${cx}px ${cy}px,color-mix(in srgb,var(--accent) 20%,transparent),transparent 70%)"></div>
+<div class="c pf-box" style="left:${b.x}px;top:${b.y}px;width:${b.w}px;height:${b.h}px;padding:${pad}px;justify-content:${row ? 'flex-start' : ai}"><div class="pf-in${row ? ' row' : ''}${shot ? ' shot' : ''}" style="gap:${Math.round(row ? ih * 0.3 : pad)}px">${inner}</div></div>${PROFILE_FIT}`;
+    },
+  },
+  {
+    id: 'profile-avatar',
+    label: 'Avatar / profile logo (circle-safe)',
+    use: 'The 400×400 profile picture for every platform (preset profile-avatar): the brand mark alone, centred well inside the circle the platforms crop to, on the same ground as the banners. No words; a 1–2 letter monogram only when the brand has no logo.',
+    fields: [
+      { id: 'mark', type: 'text', label: 'Monogram if there is no logo', max: 2, optional: true },
+      { id: 'bg', type: 'enum', label: 'Background', choices: ['theme', 'light', 'dark', 'brand'], optional: true, help: "theme = the set's ground (default)" },
+    ],
+    html: (f, ctx) => {
+      const s = Math.min(ctx.width, ctx.height);
+      const plain = { light: '#ffffff', dark: '#0f1115', brand: 'var(--brand-primary)' }[f.bg as string];
+      const fg = f.bg === 'brand' ? 'var(--brand-on-primary)' : f.bg === 'dark' ? 'var(--accent-on-dark)' : f.bg === 'light' ? 'var(--accent-on-light)' : 'var(--accent)';
+      // A square mark 0.58 × the side has its corners 0.41 × the side from the centre: inside the 0.5 circle with room to spare.
+      const mark = ctx.brand.logo
+        ? `<img src="${img(ctx.brand.logo, ctx)}" alt="" style="width:${Math.round(s * 0.58)}px;height:${Math.round(s * 0.58)}px;object-fit:contain">`
+        : `<span style="font:800 ${Math.round(s * 0.36)}px/1 var(--font-display);letter-spacing:-.05em;color:${fg}">${esc(String(f.mark ?? '').slice(0, 2) || initials(ctx.brand.name))}</span>`;
+      const bg = plain ?? 'var(--bg);background-image:radial-gradient(circle at 50% 50%,color-mix(in srgb,var(--accent) 22%,transparent),transparent 62%)';
       return `<div class="c" style="align-items:center;justify-content:center;background:${bg}">${mark}</div>`;
     },
   },

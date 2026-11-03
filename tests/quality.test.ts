@@ -43,6 +43,29 @@ test('Product Hunt launch copy is checked against the listing limits', async () 
   assert.ok(checkLaunchCopy('## Name\nX\n').some((p) => /Tagline/.test(p)), 'missing sections are named');
 });
 
+test('profile presets carry their platform crops: YouTube centre strip, photo corners, a circle for avatars', () => {
+  const yt = getPreset('youtube-banner')!;
+  assert.deepEqual([yt.width - yt.safe.left - yt.safe.right, yt.height - yt.safe.top - yt.safe.bottom], [1546, 423]);
+  assert.equal(getPreset('profile-avatar')?.safe.circle, true);
+  for (const id of ['linkedin-banner', 'linkedin-company-banner', 'x-header']) {
+    const p = getPreset(id)!;
+    for (const a of p.safe.avoid ?? []) assert.ok(a.x === 0 && a.y + a.h === p.height, `${id}: the photo sits in the bottom-left corner`);
+    assert.ok(p.safe.avoid?.length && p.safe.images, id);
+  }
+  assert.deepEqual([getPreset('linkedin-company-banner')!.width, getPreset('linkedin-company-banner')!.height, getPreset('facebook-cover')!.width, getPreset('facebook-cover')!.height], [1128, 191, 851, 315]);
+});
+
+test('profile kit check wants every surface and one design system', async () => {
+  const { checkProfileKit, PROFILE_KIT_PRESETS } = await import('@shipcast/engine');
+  const items = PROFILE_KIT_PRESETS.map((preset: string) => ({ preset, layout: preset === 'profile-avatar' ? 'profile-avatar' : 'profile-banner', theme: 'midnight', name: `${preset}.png`, fields: { motif: 'grid' } }));
+  assert.deepEqual(checkProfileKit({ items }), []);
+  const bad = checkProfileKit({ items: [...items.slice(1, 5).map((i: any) => ({ ...i, theme: 'swiss' })), ...items.slice(5), { ...items[3], name: 'x.png', fields: { motif: 'dots', image: 'a.png' } }] }).join(' | ');
+  assert.match(bad, /no linkedin-banner/);
+  assert.match(bad, /mixes themes/);
+  assert.match(bad, /mix motifs/);
+  assert.match(bad, /x\.png carries a screenshot/);
+});
+
 test('music is deterministic, the requested length, and not silent', () => {
   const a = makeMusic({ mood: 'tech', seconds: 6, seed: 3 });
   const b = makeMusic({ mood: 'tech', seconds: 6, seed: 3 });
