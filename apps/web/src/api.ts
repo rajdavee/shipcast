@@ -112,6 +112,7 @@ export interface Settings {
   agentsQuietStart?: string;
   agentsQuietEnd?: string;
   agentsMaxClaudeRunsPerDay?: number;
+  publishingPaused?: boolean;
 }
 
 export interface AgentJob {
@@ -221,6 +222,15 @@ export interface BrandScore {
   stats: { words: number; sentences: number; grade: number; emojis: number; hashtags: number; exclamations: number };
 }
 
+export type { ChannelInfo, ContentPlan, Post, PostChannel, PostStatus } from './calendar-model.ts';
+import type { ChannelInfo, ContentPlan, Post, PostStatus } from './calendar-model.ts';
+export interface PublishConnections {
+  linkedin: { configured: boolean; connected: boolean; expired: boolean; account: string | null; expiresAt: string | null };
+  youtube: { configured: boolean; connected: boolean; note: string };
+  postiz: { configured: boolean; url: string | null; note: string };
+}
+export interface PostizIntegration { id: string; name: string; identifier: string; profile?: string; disabled?: boolean; picture?: string }
+
 export type StockProvider = 'pixabay' | 'unsplash' | 'pexels';
 export interface StockState {
   connected: boolean;
@@ -300,6 +310,41 @@ export const api = {
   tree: (id: string) => call<{ brief: string[]; deliverables: string[]; uploads: string[] }>('GET', `/api/campaigns/${id}/tree`),
   preview: (id: string, step: string, spec: unknown) => call<{ frames: string[]; scenes: { id: string; start: number; duration: number }[]; duration: number }>('POST', `/api/campaigns/${id}/steps/${step}/preview`, { spec }),
   reveal: (id: string) => call<{ ok: true }>('POST', `/api/campaigns/${id}/reveal`),
+  calendar: {
+    channels: () => call<ChannelInfo[]>('GET', '/api/calendar/channels'),
+    posts: (q: { from?: string; to?: string; channel?: string; status?: PostStatus[]; unscheduled?: boolean } = {}) => {
+      const p = new URLSearchParams();
+      if (q.from) p.set('from', q.from);
+      if (q.to) p.set('to', q.to);
+      if (q.channel) p.set('channel', q.channel);
+      if (q.status?.length) p.set('status', q.status.join(','));
+      if (q.unscheduled) p.set('unscheduled', '1');
+      return call<Post[]>('GET', `/api/calendar/posts${p.size ? `?${p}` : ''}`);
+    },
+    create: (post: Partial<Post>) => call<Post>('POST', '/api/calendar/posts', post),
+    save: (id: string, patch: Partial<Post>) => call<Post>('PUT', `/api/calendar/posts/${id}`, patch),
+    remove: (id: string) => call<{ ok: true }>('DELETE', `/api/calendar/posts/${id}`),
+    check: (id: string) => call<{ problems: string[]; channels: Record<string, string[]> }>('GET', `/api/calendar/posts/${id}/check`),
+    plan: () => call<ContentPlan>('GET', '/api/calendar/plan'),
+    savePlan: (plan: Partial<ContentPlan>) => call<ContentPlan>('PUT', '/api/calendar/plan', plan),
+    planMonth: (b: { from: string; to: string; project?: string }) => call<{ created: Post[]; skipped: number; slots: number }>('POST', '/api/calendar/plan-month', b),
+    make: (id: string, b: { project?: string; format?: string } = {}) => call<Post>('POST', `/api/calendar/posts/${id}/make`, b),
+    fromTrend: (key: string, channel?: string) => call<Post>('POST', '/api/calendar/from-trend', { key, channel }),
+    importCsv: (csv: string) => call<{ created: number; problems: string[] }>('POST', '/api/calendar/import', { csv }),
+    markSent: (id: string, channel: string, url?: string) => call<Post>('POST', `/api/calendar/posts/${id}/channels/${channel}/sent`, url ? { url } : {}),
+    sendNow: (id: string) => call<{ post: Post; note: string }>('POST', `/api/calendar/posts/${id}/send-now`),
+    kitUrl: (id: string, channel: string) => `/api/calendar/posts/${id}/kit/${channel}`,
+    icsUrl: () => `${location.origin}/api/calendar.ics`,
+    csvUrl: () => '/api/calendar/export.csv',
+  },
+  publish: {
+    connections: () => call<PublishConnections>('GET', '/api/publish/connections'),
+    saveKeys: (provider: 'linkedin' | 'youtube', clientId: string, clientSecret: string) => call<PublishConnections>('PUT', `/api/publish/${provider}`, { clientId, clientSecret }),
+    savePostiz: (url: string, apiKey: string) => call<PublishConnections & { integrations: PostizIntegration[] }>('PUT', '/api/publish/postiz', { url, apiKey }),
+    postizIntegrations: () => call<PostizIntegration[]>('GET', '/api/publish/postiz/integrations'),
+    connect: (provider: 'linkedin' | 'youtube') => call<{ url: string; redirect: string }>('GET', `/api/publish/${provider}/connect`),
+    disconnect: (provider: 'linkedin' | 'youtube' | 'postiz', keys = false) => call<PublishConnections>('DELETE', `/api/publish/${provider}${keys ? '?keys=1' : ''}`),
+  },
   upload: async (id: string, file: File) => {
     const res = await fetch(`/api/campaigns/${id}/uploads?name=${encodeURIComponent(file.name)}`, { method: 'POST', body: file });
     if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'upload failed');

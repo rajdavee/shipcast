@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 // Small stroke icons, drawn for Shipcast.
 const P = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' } as const;
 
@@ -81,6 +82,61 @@ export const Nav = {
   enter: () => (
     <svg viewBox="0 0 24 24" {...P}><path d="M19 5v6a3 3 0 01-3 3H6M10 10l-4 4 4 4" /></svg>
   ),
+};
+
+/** Generic glyphs per channel — what the channel is for, never a platform's logo. */
+export const ChannelGlyph: Record<string, () => ReactNode> = {
+  linkedin: () => (
+    <svg viewBox="0 0 24 24" {...P}><rect x="3.5" y="7.5" width="17" height="12" rx="2.5" /><path d="M9 7.5V6a1.5 1.5 0 011.5-1.5h3A1.5 1.5 0 0115 6v1.5M3.5 12.5h17" /></svg>
+  ),
+  instagram: () => (
+    <svg viewBox="0 0 24 24" {...P}><rect x="3.5" y="6" width="17" height="13.5" rx="3" /><circle cx="12" cy="12.75" r="3.5" /><path d="M8 6l1.2-2h5.6L16 6" /></svg>
+  ),
+  youtube: () => (
+    <svg viewBox="0 0 24 24" {...P}><rect x="3" y="5.5" width="18" height="13" rx="3.5" /><path d="M10.5 9.5v5l4.5-2.5z" /></svg>
+  ),
+  x: () => (
+    <svg viewBox="0 0 24 24" {...P}><path d="M4.5 18.5l2-4A7 7 0 1112 19a7 7 0 01-3-.7z" /></svg>
+  ),
+  tiktok: () => (
+    <svg viewBox="0 0 24 24" {...P}><path d="M10 17.5V5l9-1.5V15" /><circle cx="7.5" cy="17.5" r="2.5" /><circle cx="16.5" cy="15" r="2.5" /></svg>
+  ),
+  threads: () => (
+    <svg viewBox="0 0 24 24" {...P}><circle cx="12" cy="12" r="3.5" /><path d="M15.5 12v1.5a2.5 2.5 0 005 0V12a8.5 8.5 0 10-3.5 6.9" /></svg>
+  ),
+  facebook: () => (
+    <svg viewBox="0 0 24 24" {...P}><circle cx="9" cy="8.5" r="3" /><path d="M3.5 19a5.5 5.5 0 0111 0M15.5 5.6a3 3 0 010 5.8M17.5 14a5.5 5.5 0 013 5" /></svg>
+  ),
+  pinterest: () => (
+    <svg viewBox="0 0 24 24" {...P}><path d="M12 21v-6M8 4.5h8l-1 5 3 3.5H6l3-3.5z" /></svg>
+  ),
+  newsletter: () => (
+    <svg viewBox="0 0 24 24" {...P}><rect x="3.5" y="5.5" width="17" height="13" rx="2.5" /><path d="M4 7l8 6 8-6" /></svg>
+  ),
+  blog: () => (
+    <svg viewBox="0 0 24 24" {...P}><path d="M6 3.5h8l4 4v13H6z" /><path d="M14 3.5v4h4M9 12h6M9 15.5h6" /></svg>
+  ),
+};
+
+/** Small calendar and editor glyphs. */
+export const Cal = {
+  prev: () => <svg viewBox="0 0 24 24" {...P}><path d="M15 5l-7 7 7 7" /></svg>,
+  next: () => <svg viewBox="0 0 24 24" {...P}><path d="M9 5l7 7-7 7" /></svg>,
+  plus: () => <svg viewBox="0 0 24 24" {...P}><path d="M12 5v14M5 12h14" /></svg>,
+  more: () => <svg viewBox="0 0 24 24" {...P}><circle cx="5.5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="18.5" cy="12" r="1" /></svg>,
+  spark: () => <svg viewBox="0 0 24 24" {...P}><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z" /></svg>,
+  grip: () => <svg viewBox="0 0 24 24" {...P}><circle cx="9" cy="7" r=".8" /><circle cx="15" cy="7" r=".8" /><circle cx="9" cy="12" r=".8" /><circle cx="15" cy="12" r=".8" /><circle cx="9" cy="17" r=".8" /><circle cx="15" cy="17" r=".8" /></svg>,
+  trash: () => <svg viewBox="0 0 24 24" {...P}><path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13" /></svg>,
+  link: () => <svg viewBox="0 0 24 24" {...P}><path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1" /></svg>,
+  download: () => <svg viewBox="0 0 24 24" {...P}><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19.5h14" /></svg>,
+  clock: () => <svg viewBox="0 0 24 24" {...P}><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></svg>,
+  heart: () => <svg viewBox="0 0 24 24" {...P}><path d="M12 20s-7.5-4.5-7.5-10A4.3 4.3 0 0112 7.5 4.3 4.3 0 0119.5 10c0 5.5-7.5 10-7.5 10z" /></svg>,
+  bubble: () => <svg viewBox="0 0 24 24" {...P}><path d="M20 11.5a8 8 0 01-11.6 7.1L4 20l1.4-4.2A8 8 0 1120 11.5z" /></svg>,
+  send: () => <svg viewBox="0 0 24 24" {...P}><path d="M21 3.5L10 14M21 3.5l-6.5 17-4.5-6.5-6.5-4.5z" /></svg>,
+  thumb: () => <svg viewBox="0 0 24 24" {...P}><path d="M7.5 10.5v9h-3v-9zM7.5 10.5L11 4c1.5 0 2.5 1 2.2 2.6L12.7 9.5h5.6a2 2 0 012 2.3l-1.1 6a2 2 0 01-2 1.7H7.5" /></svg>,
+  repost: () => <svg viewBox="0 0 24 24" {...P}><path d="M17 3.5l3 3-3 3M4 11.5V9.5a3 3 0 013-3h13M7 20.5l-3-3 3-3M20 12.5v2a3 3 0 01-3 3H4" /></svg>,
+  bookmark: () => <svg viewBox="0 0 24 24" {...P}><path d="M6.5 3.5h11v17l-5.5-4-5.5 4z" /></svg>,
+  doc: () => <svg viewBox="0 0 24 24" {...P}><path d="M6 3.5h8l4 4v13H6z" /><path d="M14 3.5v4h4" /></svg>,
 };
 
 export function Mark({ className = 'brand-mark' }: { className?: string }) {
