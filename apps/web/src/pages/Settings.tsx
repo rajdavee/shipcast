@@ -201,6 +201,8 @@ function PublishingSection() {
   const field = (id: string) => form[id] ?? { a: '', b: '' };
   const setField = (id: string, k: 'a' | 'b', v: string) => setForm((f) => ({ ...f, [id]: { ...field(id), [k]: v } }));
   const paused = !!s.data?.publishingPaused;
+  const metricsPaused = !!s.data?.metricsPaused;
+  const ytReconnect = !!c.data?.youtube.stats?.needsReconnect;
 
   return (
     <section className="setup-section">
@@ -215,6 +217,14 @@ function PublishingSection() {
           </div>
           <label className="switch"><input type="checkbox" checked={paused} disabled={!s.data} onChange={async (e) => { s.setData(await api.saveSettings({ publishingPaused: e.target.checked })); toast(e.target.checked ? 'Publishing paused' : 'Publishing resumed'); }} /> Pause</label>
         </div>
+        <div className="srow">
+          <i className={`dot ${metricsPaused ? 'bad' : 'ok'}`} />
+          <div>
+            <h3>Pause collecting numbers</h3>
+            <p>{metricsPaused ? 'Paused — no stats are read from YouTube or Postiz, and no reminders ask for numbers. Numbers you add yourself still count.' : 'After a post goes out, its numbers are read at 1, 3, 7 and 30 days where a connection can, and you get a reminder where none can.'}</p>
+          </div>
+          <label className="switch"><input type="checkbox" checked={metricsPaused} disabled={!s.data} onChange={async (e) => { s.setData(await api.saveSettings({ metricsPaused: e.target.checked })); toast(e.target.checked ? 'Collecting numbers paused' : 'Collecting numbers resumed'); }} /> Pause</label>
+        </div>
         {OAUTH_APPS.map((app) => {
           const st = c.data?.[app.id];
           const li = app.id === 'linkedin' ? c.data?.linkedin : null;
@@ -228,9 +238,13 @@ function PublishingSection() {
                   {!st ? 'Checking…' : st.connected ? <>Connected{li?.account ? ` as ${li.account}` : ''}{li?.expiresAt ? ` · until ${new Date(li.expiresAt).toLocaleDateString()}` : ''}.</> : li?.expired ? 'The sign-in expired — connect again.' : st.configured ? 'App keys saved. Connect to sign in.' : <>{app.what} Keys: {app.where}. Redirect URL: <code>{redirect(app.id)}</code></>}
                   {app.id === 'youtube' && c.data && <><br />{c.data.youtube.note}</>}
                 </p>
+                {app.id === 'youtube' && ytReconnect && st?.connected && (
+                  <p className="notice" role="status"><b>Reconnect YouTube to read stats.</b> This sign-in was made before Shipcast could read views and likes back — connect again and allow the new read-only access.</p>
+                )}
               </div>
               {st?.connected ? (
                 <div className="row-actions">
+                  {app.id === 'youtube' && ytReconnect && <button className="btn primary" disabled={busy === app.id} onClick={() => act(app.id, async () => { const r = await api.publish.connect(app.id); window.open(r.url, '_blank', 'noopener'); addEventListener('focus', () => c.reload(), { once: true }); }, 'Finish signing in in the new tab')}>Reconnect</button>}
                   <button className="btn ghost" disabled={busy === app.id} onClick={() => act(app.id, () => api.publish.disconnect(app.id), 'Disconnected')}>Disconnect</button>
                 </div>
               ) : st?.configured ? (

@@ -9,7 +9,7 @@ import { Campaign } from './pages/Campaign.tsx';
 import { Library } from './pages/Library.tsx';
 import { Settings } from './pages/Settings.tsx';
 import { Voice } from './pages/Voice.tsx';
-import { Learning } from './pages/Learning.tsx';
+import { Insights } from './pages/Insights.tsx';
 import { Trending } from './pages/Trending.tsx';
 import { Calendar } from './pages/Calendar.tsx';
 
@@ -55,13 +55,13 @@ export function App() {
       ) : route[0] === 'library' ? (
         <Library campaigns={campaigns.data} />
       ) : route[0] === 'calendar' ? (
-        <Calendar sub={route[1]} />
+        <Calendar sub={route[1]} arg={route[2]} />
       ) : route[0] === 'brand' ? (
         <Voice />
       ) : route[0] === 'ideas' ? (
         <Trending />
       ) : route[0] === 'insights' ? (
-        <Learning />
+        <Insights tab={route[1]} />
       ) : route[0] === 'settings' ? (
         <Settings tab={route[1] as SettingsTab} status={status.data} onChange={status.reload} />
       ) : (

@@ -2,14 +2,14 @@ import { useState } from 'react';
 import { api, type Lesson } from '../api.ts';
 import { toast, useLoad } from '../hooks.ts';
 import { formatTitle } from '../formats.ts';
-import { EmptyState, Loading, PageHeader } from '../components/ui.tsx';
+import { EmptyState, Loading } from '../components/ui.tsx';
 import { Nav } from '../components/icons.tsx';
 
 const pct = (r?: { rate: number; runs: number }) => (r && r.runs ? `${Math.round(r.rate * 100)}% of ${r.runs} runs` : '—');
 const STATUS: Record<Lesson['status'], string> = { trial: 'On trial', kept: 'Kept — it works', retired: 'Retired — no effect', off: 'Off' };
 const formatName = formatTitle;
 
-/** What Shipcast learned from its own runs, and whether each lesson is paying off. */
+/** Insights → Quality & learning: what Shipcast learned from its own runs, and whether each lesson is paying off. */
 export function Learning() {
   const data = useLoad(() => api.lessons(), [], 15000);
   const agents = useLoad(() => api.agents(), [], 10000);
@@ -17,7 +17,7 @@ export function Learning() {
   const quality = useLoad(() => api.quality(), [], 30000);
   const job = agents.data?.jobs.find((j) => j.id === 'learn');
   const golden = agents.data?.jobs.find((j) => j.id === 'golden');
-  if (!data.data) return <main className="page narrow"><PageHeader title="Insights" /><Loading /></main>;
+  if (!data.data) return <Loading />;
   const { lessons, packs, categories } = data.data;
   const label = (c: string) => categories.find((x) => x.id === c)?.label ?? c;
   const byPack = [...new Set(lessons.map((l) => l.pack))];
@@ -44,11 +44,7 @@ export function Learning() {
   }
 
   return (
-    <main className="page narrow">
-      <PageHeader
-        title="Insights"
-        description="Quality over time, and what Shipcast learned from its own runs."
-      />
+    <div className="learning">
       <p className="intro">
         Shipcast reads its own quality checks, the creative director's notes, brand-voice slips, eval scores and the changes you ask for. Problems that keep coming back become short lessons for that format. Each lesson is on trial: after {10} more runs it's kept if the problem got rarer, and retired if it didn't.
       </p>
@@ -143,6 +139,6 @@ export function Learning() {
           ))}
         </div>
       </section>
-    </main>
+    </div>
   );
 }

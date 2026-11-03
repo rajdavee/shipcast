@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
-import { api, type Campaign, type PublishConnections } from '../api.ts';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
+import { api, type Campaign, type Forecast, type PendingNumbers, type Performance, type PublishConnections } from '../api.ts';
 import { addDays, bucketByDay, CHANNEL_ORDER, filterPosts, localParts, minutesOf, monthGrid, moveToDay, shiftAnchor, slotTime, snapMinutes, startOfWeek, STATUS_LABEL, STATUSES, timeOf, todayIn, viewRange, weekDates, zonedToUtc, type ChannelId, type ChannelInfo, type ContentPlan, type Post, type PostStatus, type View } from '../calendar-model.ts';
 import { toast, useEscape, useLoad, useMedia } from '../hooks.ts';
-import { EmptyState, Loading, PageHeader } from '../components/ui.tsx';
+import { Dialog, EmptyState, Loading, PageHeader } from '../components/ui.tsx';
 import { Cal, Nav } from '../components/icons.tsx';
 import { channelName, ChannelIcon, StatusPill } from '../components/CalendarBits.tsx';
-import { blankChannel, PostDrawer } from '../components/PostDrawer.tsx';
+import { blankChannel, PostDrawer, type DrawerTab } from '../components/PostDrawer.tsx';
+import { ExperimentTag, ForecastHint, LiftBadge } from '../components/PulseBits.tsx';
+import { BUCKET_ADJ, heatStrength, liftTone, postHeadline } from '../pulse-model.ts';
 import { ImportDialog, PlanMonthDialog, PlanSettingsDialog, plannable, SubscribeDialog, type PlanRun } from '../components/CalendarDialogs.tsx';
 
 const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -17,11 +19,13 @@ const fmtDay = (d: string, o: Intl.DateTimeFormatOptions) => new Date(`${d}T12:0
 // What is being dragged: a post id and where on the chip it was grabbed (so week drops land where the chip's top is).
 let dragging: { id: string; grabY: number } | null = null;
 
-type DrawerTarget = { post: Post } | null;
-type DialogKind = 'plan' | 'settings' | 'subscribe' | 'import' | null;
+type DrawerTarget = { post: Post; tab?: DrawerTab; addFor?: ChannelId } | null;
+type DialogKind = 'plan' | 'settings' | 'subscribe' | 'import' | 'numbers' | null;
+/** What a chip shows about results: the real lift once published, a forecast before. */
+interface Pulse { lift: Map<string, Performance>; fc: Map<string, Forecast> }
 
 /** The content calendar: month / week / list, an ideas backlog, and a drawer per post. */
-export function Calendar({ sub }: { sub?: string }) {
+export function Calendar({ sub, arg }: { sub?: string; arg?: string }) {
   const phone = useMedia('(max-width: 699px)');
   const wide = useMedia('(min-width: 1100px)');
   const [view, setView] = useState<View>(() => (typeof matchMedia !== 'undefined' && matchMedia('(max-width: 699px)').matches ? 'list' : 'month'));
@@ -30,6 +34,9 @@ export function Calendar({ sub }: { sub?: string }) {
   const plan = useLoad(() => api.calendar.plan());
   const conns = useLoad(() => api.publish.connections().catch(() => null as PublishConnections | null));
   const campaigns = useLoad(() => api.campaigns());
+  const perf = useLoad(() => api.metrics.performance().catch(() => [] as Performance[]), [], 60000);
+  const pending = useLoad(() => api.metrics.pending().catch(() => [] as PendingNumbers[]), [], 60000);
+  const [forecasts, setForecasts] = useState<Map<string, Forecast>>(new Map());
   const tz = plan.data?.tz ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
   const today = todayIn(tz);
   const [anchor, setAnchor] = useState(today);
@@ -50,8 +57,17 @@ export function Calendar({ sub }: { sub?: string }) {
       setTimeout(() => ideaInput.current?.focus(), 60);
     } else if (sub === 'plan') setDialog('plan');
     else if (sub === 'new') openNew();
+    else if (sub === 'post' && arg) {
+      // From Insights: open the post behind a finding, on its numbers.
+      if (!posts.data) return;
+      const p = posts.data.find((x) => x.id === arg);
+      if (p) {
+        if (p.at) setAnchor(localParts(p.at, tz).date);
+        setDrawer({ post: p, tab: p.status === 'published' ? 'performance' : undefined });
+      } else toast('That post is gone');
+    }
     location.replace('#/calendar');
-  }, [sub, plan.data]);
+  }, [sub, arg, plan.data, !!posts.data]);
 
   const all = posts.data ?? [];
   const chInfo = channels.data ?? [];
@@ -62,6 +78,33 @@ export function Calendar({ sub }: { sub?: string }) {
   const defaultChannel = (): ChannelId => chFilter[0] ?? (Object.keys(plan.data?.cadence ?? {}).find((k) => plan.data?.cadence[k as ChannelId]?.perWeek) as ChannelId) ?? 'linkedin';
   const chips = CHANNEL_ORDER.filter((id) => id === 'linkedin' || id === 'instagram' || all.some((p) => p.channels.some((c) => c.channel === id)) || plan.data?.cadence[id]?.perWeek);
   const account = conns.data?.linkedin.account || plannable(campaigns.data)[0]?.name || campaigns.data?.[0]?.name || 'Your name';
+
+  const pulse = useMemo<Pulse>(() => {
+    const lift = new Map<string, Performance>();
+    for (const p of all)
+      if (p.status === 'published') {
+        const h = postHeadline(perf.data ?? [], p);
+        if (h) lift.set(p.id, h);
+      }
+    return { lift, fc: forecasts };
+  }, [all, perf.data, forecasts]);
+  // Forecasts for upcoming posts, once there's a model to ask; refetched when one of them changes.
+  const upcoming = all.filter((p) => p.at && p.status !== 'published' && p.status !== 'failed' && Date.parse(p.at) > Date.now() - 86_400_000).sort((a, b) => a.at!.localeCompare(b.at!)).slice(0, 40);
+  const fcKey = upcoming.map((p) => `${p.id}@${p.updatedAt}`).join();
+  useEffect(() => {
+    if (!upcoming.length) return;
+    let on = true;
+    api.metrics.playbook().then(async (pb) => {
+      if (!pb.channels.some((c) => c.ready)) return;
+      const out = new Map<string, Forecast>();
+      await Promise.all(upcoming.map(async (p) => {
+        const f = (await api.metrics.forecast(p.id).catch(() => null))?.forecasts.find((x) => x.forecast)?.forecast;
+        if (f) out.set(p.id, f);
+      }));
+      if (on) setForecasts(out);
+    }).catch(() => {});
+    return () => void (on = false);
+  }, [fcKey]);
 
   const replace = (p: Post) => posts.setData((list) => (list ? (list.some((x) => x.id === p.id) ? list.map((x) => (x.id === p.id ? p : x)) : [...list, p]) : [p]));
   const drop = (id: string) => posts.setData((list) => list?.filter((x) => x.id !== id) ?? null);
@@ -123,9 +166,18 @@ export function Calendar({ sub }: { sub?: string }) {
   const loading = !posts.data || !channels.data || !plan.data;
   const empty = !loading && all.length === 0;
   const open = (p: Post) => setDrawer({ post: p });
-  const ctx: ViewCtx = { tz, today, chInfo, fresh, onOpen: open, onMove: move, onQuickAdd: quickAdd };
+  const ctx: ViewCtx = { tz, today, chInfo, fresh, pulse, onOpen: open, onMove: move, onQuickAdd: quickAdd };
+  const wanted = pending.data ?? [];
+  // New ideas from a winner land highlighted in the backlog, where the user can see them.
+  const created = (ps: Post[], what: string) => {
+    ps.forEach(replace);
+    setFresh(new Set(ps.map((p) => p.id)));
+    setDrawer(null);
+    if (!wide) setPane('ideas');
+    toast(what);
+  };
 
-  const backlog = <Backlog ideas={ideas} chInfo={chInfo} inputRef={ideaInput} onAdd={(t) => quickAdd(null, t)} onOpen={open} onDropBack={(id) => move(id, null)} />;
+  const backlog = <Backlog ideas={ideas} chInfo={chInfo} fresh={fresh} inputRef={ideaInput} onAdd={(t) => quickAdd(null, t)} onOpen={open} onDropBack={(id) => move(id, null)} />;
 
   return (
     <main className="page cal-page">
@@ -156,6 +208,11 @@ export function Calendar({ sub }: { sub?: string }) {
               <button className="btn icon-btn sm" aria-label={`Previous ${view === 'list' ? '4 weeks' : view}`} onClick={() => setAnchor(shiftAnchor(view, anchor, -1))}><Cal.prev /></button>
               <button className="btn icon-btn sm" aria-label={`Next ${view === 'list' ? '4 weeks' : view}`} onClick={() => setAnchor(shiftAnchor(view, anchor, 1))}><Cal.next /></button>
               <h2 className="cal-title" aria-live="polite">{title}</h2>
+              {wanted.length > 0 && (
+                <button className="numbers-pill" onClick={() => setDialog('numbers')} aria-haspopup="dialog" title="Published posts waiting for their numbers">
+                  <i className="dot warn" />Numbers wanted <span className="count-badge">{wanted.length}</span>
+                </button>
+              )}
             </div>
             <div className="seg cal-views" role="radiogroup" aria-label="View">
               {(['month', 'week', 'list'] as View[]).map((v) => (
@@ -222,6 +279,9 @@ export function Calendar({ sub }: { sub?: string }) {
         <PostDrawer
           key={drawer.post.id || 'new'}
           initial={drawer.post}
+          tab={drawer.tab}
+          addFor={drawer.addFor}
+          onCreated={created}
           channels={chInfo}
           plan={plan.data}
           conns={conns.data}
@@ -229,15 +289,33 @@ export function Calendar({ sub }: { sub?: string }) {
           account={account}
           onSaved={(p) => {
             replace(p);
+            void pending.reload();
             if (!drawer.post.id) setDrawer({ post: p });
           }}
           onDeleted={drop}
-          onClose={() => setDrawer(null)}
+          onClose={() => {
+            setDrawer(null);
+            // Numbers may have been added inside the drawer.
+            perf.reload();
+            pending.reload();
+          }}
         />
       )}
       {dialog === 'plan' && plan.data && <PlanMonthDialog plan={plan.data} channels={chInfo} posts={all} campaigns={campaigns.data} running={planning} onRun={runPlan} onClose={() => setDialog(null)} onSettings={() => setDialog('settings')} />}
       {dialog === 'settings' && plan.data && <PlanSettingsDialog plan={plan.data} channels={chInfo} onSaved={(p) => plan.setData(p)} onClose={() => setDialog(null)} />}
       {dialog === 'subscribe' && <SubscribeDialog onClose={() => setDialog(null)} />}
+      {dialog === 'numbers' && (
+        <NumbersWanted
+          list={wanted}
+          chInfo={chInfo}
+          onClose={() => setDialog(null)}
+          onAdd={(n) => {
+            const p = all.find((x) => x.id === n.post);
+            setDialog(null);
+            if (p) setDrawer({ post: p, tab: 'performance', addFor: n.channel });
+          }}
+        />
+      )}
       {dialog === 'import' && <ImportDialog onDone={posts.reload} onClose={() => setDialog(null)} />}
     </main>
   );
@@ -248,6 +326,7 @@ interface ViewCtx {
   today: string;
   chInfo: ChannelInfo[];
   fresh: Set<string>;
+  pulse: Pulse;
   onOpen: (p: Post) => void;
   onMove: (id: string, date: string | null, minutes?: number) => void;
   onQuickAdd: (date: string | null, title: string) => void;
@@ -289,12 +368,37 @@ function MoreMenu({ items }: { items: { label: string; run?: () => void; href?: 
   );
 }
 
-function PostChip({ p, tz, chInfo, fresh, onOpen, compact }: { p: Post; tz: string; chInfo: ChannelInfo[]; fresh: boolean; onOpen: (p: Post) => void; compact?: boolean }) {
+/** Result or forecast for a chip, as words for its label. */
+function pulseWords(p: Post, pulse: Pulse): string {
+  const h = pulse.lift.get(p.id);
+  if (h) return h.lift !== undefined ? `, ${h.lift.toFixed(1)} times your usual` : ', no baseline yet';
+  const f = pulse.fc.get(p.id);
+  return `${f ? `, forecast about ${f.lift.toFixed(1)} times your usual` : ''}${p.experiment ? ', experiment' : ''}`;
+}
+
+function PulseMarks({ p, pulse }: { p: Post; pulse: Pulse }) {
+  const h = pulse.lift.get(p.id);
+  const f = !h && pulse.fc.get(p.id);
+  if (!h && !f && !p.experiment) return null;
+  return (
+    <span className="chip-pulse">
+      {h && <LiftBadge lift={h.lift} />}
+      {f && <ForecastHint f={f} />}
+      {p.experiment && p.status !== 'published' && <ExperimentTag reason={p.experiment} compact />}
+    </span>
+  );
+}
+
+function PostChip({ p, tz, chInfo, fresh, pulse, onOpen, compact }: { p: Post; tz: string; chInfo: ChannelInfo[]; fresh: boolean; pulse: Pulse; onOpen: (p: Post) => void; compact?: boolean }) {
   const time = p.at ? localParts(p.at, tz).time : '';
   const names = p.channels.map((c) => channelName(chInfo, c.channel)).join(', ');
+  const h = pulse.lift.get(p.id);
+  const tone = liftTone(h?.lift);
   return (
     <button
-      className={`chip st-${p.status}${fresh ? ' fresh' : ''}${compact ? ' compact' : ''}`}
+      className={`chip st-${p.status}${fresh ? ' fresh' : ''}${compact ? ' compact' : ''}${tone === 'up' || tone === 'down' ? ` heat-${tone}` : ''}`}
+      // Subtle on purpose: half of all posts sit below the median, and the calendar shouldn't shout about it.
+      style={h ? ({ '--heat': `${Math.round(heatStrength(h.lift) * (tone === 'up' ? 22 : 14))}%` } as CSSProperties) : undefined}
       draggable={p.status !== 'published'}
       onDragStart={(e) => {
         dragging = { id: p.id, grabY: e.clientY - e.currentTarget.getBoundingClientRect().top };
@@ -307,11 +411,12 @@ function PostChip({ p, tz, chInfo, fresh, onOpen, compact }: { p: Post; tz: stri
         e.currentTarget.classList.remove('dragging');
       }}
       onClick={() => onOpen(p)}
-      aria-label={`${p.title}${time ? `, ${time}` : ''}, ${STATUS_LABEL[p.status]}${names ? `, ${names}` : ''}`}
-      title={`${p.title}${names ? ` · ${names}` : ''} · ${STATUS_LABEL[p.status]}`}
+      aria-label={`${p.title}${time ? `, ${time}` : ''}, ${STATUS_LABEL[p.status]}${names ? `, ${names}` : ''}${pulseWords(p, pulse)}`}
+      title={`${p.title}${names ? ` · ${names}` : ''} · ${STATUS_LABEL[p.status]}${p.experiment ? `\n${p.experiment}` : ''}`}
     >
       <span className="chip-chs" aria-hidden="true">{p.channels.slice(0, 2).map((c) => <ChannelIcon key={c.channel} id={c.channel} />)}{p.channels.length > 2 && <small>+{p.channels.length - 2}</small>}</span>
       {time && <span className="chip-time tnum">{time}</span>}
+      <PulseMarks p={p} pulse={pulse} />
       <span className="chip-title">{p.title}</span>
     </button>
   );
@@ -367,7 +472,7 @@ function QuickAdd({ onAdd, onCancel, label }: { onAdd: (t: string) => void; onCa
   );
 }
 
-function MonthView({ anchor, byDay, today, tz, chInfo, fresh, onOpen, onMove, onQuickAdd, onAnchor, onMore, onNew, phone }: ViewCtx & { anchor: string; byDay: Map<string, Post[]>; onAnchor: (d: string) => void; onMore: (d: string) => void; onNew: (d: string) => void; phone: boolean }) {
+function MonthView({ anchor, byDay, today, tz, chInfo, fresh, pulse, onOpen, onMove, onQuickAdd, onAnchor, onMore, onNew, phone }: ViewCtx & { anchor: string; byDay: Map<string, Post[]>; onAnchor: (d: string) => void; onMore: (d: string) => void; onNew: (d: string) => void; phone: boolean }) {
   const weeks = monthGrid(anchor);
   const month = anchor.slice(0, 7);
   const [focus, setFocus] = useState(anchor.slice(0, 7) === today.slice(0, 7) ? today : `${month}-01`);
@@ -403,7 +508,7 @@ function MonthView({ anchor, byDay, today, tz, chInfo, fresh, onOpen, onMove, on
       {weeks.map((w) => (
         <div className="month-row" role="row" key={w[0]}>
           {w.map((d) => (
-            <DayCell key={d} d={d} out={d.slice(0, 7) !== month} today={d === today} past={d < today} list={byDay.get(d) ?? []} max={max} tabIndex={(inGrid ? focus : `${month}-01`) === d ? 0 : -1} onFocus={() => setFocus(d)} onKey={(e) => onKey(e, d)} adding={adding === d} setAdding={(v) => setAdding(v ? d : null)} {...{ tz, chInfo, fresh, onOpen, onMove, onQuickAdd, onMore, onNew }} />
+            <DayCell key={d} d={d} out={d.slice(0, 7) !== month} today={d === today} past={d < today} list={byDay.get(d) ?? []} max={max} tabIndex={(inGrid ? focus : `${month}-01`) === d ? 0 : -1} onFocus={() => setFocus(d)} onKey={(e) => onKey(e, d)} adding={adding === d} setAdding={(v) => setAdding(v ? d : null)} {...{ tz, chInfo, fresh, pulse, onOpen, onMove, onQuickAdd, onMore, onNew }} />
           ))}
         </div>
       ))}
@@ -412,9 +517,9 @@ function MonthView({ anchor, byDay, today, tz, chInfo, fresh, onOpen, onMove, on
   );
 }
 
-function DayCell({ d, out, today, past, list, max, tabIndex, onFocus, onKey, adding, setAdding, tz, chInfo, fresh, onOpen, onMove, onQuickAdd, onMore, onNew }: {
+function DayCell({ d, out, today, past, list, max, tabIndex, onFocus, onKey, adding, setAdding, tz, chInfo, fresh, pulse, onOpen, onMove, onQuickAdd, onMore, onNew }: {
   d: string; out: boolean; today: boolean; past: boolean; list: Post[]; max: number; tabIndex: number; onFocus: () => void; onKey: (e: KeyboardEvent<HTMLDivElement>) => void; adding: boolean; setAdding: (v: boolean) => void;
-  tz: string; chInfo: ChannelInfo[]; fresh: Set<string>; onOpen: (p: Post) => void; onMove: ViewCtx['onMove']; onQuickAdd: ViewCtx['onQuickAdd']; onMore: (d: string) => void; onNew: (d: string) => void;
+  tz: string; chInfo: ChannelInfo[]; fresh: Set<string>; pulse: Pulse; onOpen: (p: Post) => void; onMove: ViewCtx['onMove']; onQuickAdd: ViewCtx['onQuickAdd']; onMore: (d: string) => void; onNew: (d: string) => void;
 }) {
   const drop = useDrop((id) => onMove(id, d));
   const label = fmtDay(d, { weekday: 'long', day: 'numeric', month: 'long' });
@@ -436,14 +541,14 @@ function DayCell({ d, out, today, past, list, max, tabIndex, onFocus, onKey, add
       </div>
       {adding && <QuickAdd label={`New post on ${label}`} onAdd={(t) => onQuickAdd(d, t)} onCancel={() => setAdding(false)} />}
       <div className="day-chips">
-        {list.slice(0, list.length > max ? max - 1 : max).map((p) => <PostChip key={p.id} p={p} tz={tz} chInfo={chInfo} fresh={fresh.has(p.id)} onOpen={onOpen} compact />)}
+        {list.slice(0, list.length > max ? max - 1 : max).map((p) => <PostChip key={p.id} p={p} tz={tz} chInfo={chInfo} fresh={fresh.has(p.id)} pulse={pulse} onOpen={onOpen} compact />)}
         {list.length > max && <button className="day-more" onClick={() => onMore(d)}>+{list.length - max + 1} more</button>}
       </div>
     </div>
   );
 }
 
-function WeekView({ anchor, byDay, today, tz, chInfo, fresh, onOpen, onMove }: ViewCtx & { anchor: string; byDay: Map<string, Post[]> }) {
+function WeekView({ anchor, byDay, today, tz, chInfo, fresh, pulse, onOpen, onMove }: ViewCtx & { anchor: string; byDay: Map<string, Post[]> }) {
   const days = weekDates(anchor);
   const hours = Array.from({ length: (DAY_END - DAY_START) / 60 }, (_, i) => DAY_START + i * 60);
   const scroller = useRef<HTMLDivElement>(null);
@@ -512,7 +617,7 @@ function WeekView({ anchor, byDay, today, tz, chInfo, fresh, onOpen, onMove }: V
                 {ghost?.d === d && <div className="week-ghost" style={{ top: top(ghost.m) }}><span>{timeOf(ghost.m)}</span></div>}
                 {placed.map(({ p, m, lane }) => (
                   <div key={p.id} className="week-item" style={{ top: top(m), left: `calc(${(lane / n) * 100}% + 2px)`, width: `calc(${100 / n}% - 4px)` }}>
-                    <PostChip p={p} tz={tz} chInfo={chInfo} fresh={fresh.has(p.id)} onOpen={onOpen} />
+                    <PostChip p={p} tz={tz} chInfo={chInfo} fresh={fresh.has(p.id)} pulse={pulse} onOpen={onOpen} />
                   </div>
                 ))}
               </div>
@@ -524,7 +629,7 @@ function WeekView({ anchor, byDay, today, tz, chInfo, fresh, onOpen, onMove }: V
   );
 }
 
-function ListView({ from, to, byDay, today, tz, chInfo, fresh, onOpen, onNew }: ViewCtx & { from: string; to: string; byDay: Map<string, Post[]>; onNew: (d: string) => void }) {
+function ListView({ from, to, byDay, today, tz, chInfo, fresh, pulse, onOpen, onNew }: ViewCtx & { from: string; to: string; byDay: Map<string, Post[]>; onNew: (d: string) => void }) {
   const days: string[] = [];
   for (let d = from; d <= to; d = addDays(d, 1)) if (byDay.get(d)?.length) days.push(d);
   if (!days.length) {
@@ -542,7 +647,7 @@ function ListView({ from, to, byDay, today, tz, chInfo, fresh, onOpen, onNew }: 
           <ul>
             {byDay.get(d)!.map((p) => (
               <li key={p.id}>
-                <button className={`list-row st-${p.status}${fresh.has(p.id) ? ' fresh' : ''}`} onClick={() => onOpen(p)}>
+                <button className={`list-row st-${p.status}${fresh.has(p.id) ? ' fresh' : ''}`} onClick={() => onOpen(p)} aria-label={`${p.title}, ${localParts(p.at!, tz).time}, ${STATUS_LABEL[p.status]}${pulseWords(p, pulse)}`}>
                   <span className="tnum list-time">{localParts(p.at!, tz).time}</span>
                   <span className="list-main">
                     <b>{p.title}</b>
@@ -551,7 +656,7 @@ function ListView({ from, to, byDay, today, tz, chInfo, fresh, onOpen, onNew }: 
                       {p.pillar && <span className="muted">· {p.pillar}</span>}
                     </span>
                   </span>
-                  <StatusPill status={p.status} small />
+                  <span className="list-end"><PulseMarks p={p} pulse={pulse} /><StatusPill status={p.status} small /></span>
                 </button>
               </li>
             ))}
@@ -562,7 +667,7 @@ function ListView({ from, to, byDay, today, tz, chInfo, fresh, onOpen, onNew }: 
   );
 }
 
-function Backlog({ ideas, chInfo, inputRef, onAdd, onOpen, onDropBack }: { ideas: Post[]; chInfo: ChannelInfo[]; inputRef: RefObject<HTMLInputElement | null>; onAdd: (t: string) => void; onOpen: (p: Post) => void; onDropBack: (id: string) => void }) {
+function Backlog({ ideas, chInfo, fresh, inputRef, onAdd, onOpen, onDropBack }: { ideas: Post[]; chInfo: ChannelInfo[]; fresh: Set<string>; inputRef: RefObject<HTMLInputElement | null>; onAdd: (t: string) => void; onOpen: (p: Post) => void; onDropBack: (id: string) => void }) {
   const [q, setQ] = useState('');
   const [t, setT] = useState('');
   const drop = useDrop((id) => onDropBack(id));
@@ -586,7 +691,7 @@ function Backlog({ ideas, chInfo, inputRef, onAdd, onOpen, onDropBack }: { ideas
         <ul className="backlog-list">
           {list.map((p) => (
             <li key={p.id}>
-              <IdeaCard p={p} chInfo={chInfo} onOpen={onOpen} />
+              <IdeaCard p={p} chInfo={chInfo} fresh={fresh.has(p.id)} onOpen={onOpen} />
             </li>
           ))}
         </ul>
@@ -595,10 +700,10 @@ function Backlog({ ideas, chInfo, inputRef, onAdd, onOpen, onDropBack }: { ideas
   );
 }
 
-function IdeaCard({ p, chInfo, onOpen }: { p: Post; chInfo: ChannelInfo[]; onOpen: (p: Post) => void }): ReactNode {
+function IdeaCard({ p, chInfo, fresh, onOpen }: { p: Post; chInfo: ChannelInfo[]; fresh: boolean; onOpen: (p: Post) => void }): ReactNode {
   return (
     <button
-      className="idea"
+      className={`idea${fresh ? ' fresh' : ''}`}
       draggable
       onDragStart={(e) => {
         dragging = { id: p.id, grabY: 10 };
@@ -622,5 +727,24 @@ function IdeaCard({ p, chInfo, onOpen }: { p: Post; chInfo: ChannelInfo[]; onOpe
         </span>
       </span>
     </button>
+  );
+}
+
+/** Published posts waiting for their numbers (no collector can read them), oldest ask first. */
+function NumbersWanted({ list, chInfo, onAdd, onClose }: { list: PendingNumbers[]; chInfo: ChannelInfo[]; onAdd: (n: PendingNumbers) => void; onClose: () => void }) {
+  const rows = [...list].sort((a, b) => a.since.localeCompare(b.since));
+  return (
+    <Dialog title="Numbers wanted" onClose={onClose} foot={<><span className="hint">Asked at 1, 3, 7 and 30 days where no connection can read them.</span><button className="btn" onClick={onClose}>Close</button></>}>
+      <p className="dialog-lead">Type them, drop a screenshot of the post's stats, or import the platform's CSV — a few seconds each, and every one teaches the playbook.</p>
+      <ul className="wanted">
+        {rows.map((n) => (
+          <li key={`${n.post}|${n.channel}|${n.bucket}`}>
+            <ChannelIcon id={n.channel} label={channelName(chInfo, n.channel)} />
+            <span className="wanted-main"><b>{n.title}</b><small className="muted">{channelName(chInfo, n.channel)} · the {BUCKET_ADJ[n.bucket]} reading</small></span>
+            <button className="btn sm primary" onClick={() => onAdd(n)}>Add numbers</button>
+          </li>
+        ))}
+      </ul>
+    </Dialog>
   );
 }

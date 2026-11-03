@@ -113,6 +113,7 @@ export interface Settings {
   agentsQuietEnd?: string;
   agentsMaxClaudeRunsPerDay?: number;
   publishingPaused?: boolean;
+  metricsPaused?: boolean;
 }
 
 export interface AgentJob {
@@ -141,6 +142,9 @@ export interface TrendCard {
   lastSeen: string;
   seen: number;
   archived?: boolean;
+  /** × your usual for this recipe's format on its channel, from the playbook. */
+  fit?: number;
+  fitWhy?: string;
 }
 export interface TrendFeed {
   refreshedAt: string | null;
@@ -223,13 +227,16 @@ export interface BrandScore {
 }
 
 export type { ChannelInfo, ContentPlan, Post, PostChannel, PostStatus } from './calendar-model.ts';
-import type { ChannelInfo, ContentPlan, Post, PostStatus } from './calendar-model.ts';
+import type { ChannelId, ChannelInfo, ContentPlan, Post, PostStatus } from './calendar-model.ts';
 export interface PublishConnections {
   linkedin: { configured: boolean; connected: boolean; expired: boolean; account: string | null; expiresAt: string | null };
-  youtube: { configured: boolean; connected: boolean; note: string };
+  youtube: { configured: boolean; connected: boolean; note: string; stats?: { stats: boolean; analytics: boolean; needsReconnect: boolean } };
   postiz: { configured: boolean; url: string | null; note: string };
 }
 export interface PostizIntegration { id: string; name: string; identifier: string; profile?: string; disabled?: boolean; picture?: string }
+
+export type { AgeBucket, MetricKey, MetricSource, Snapshot, Performance, Effect, PlaybookFinding, HeatCell, ChannelModel, ChannelPlaybook, Playbook, Forecast, Calibration, CriticCalibration, PendingNumbers, ScreenshotReading } from './pulse-model.ts';
+import type { Snapshot, Performance, Playbook, Forecast, Calibration, CriticCalibration, PendingNumbers, ScreenshotReading, MetricKey } from './pulse-model.ts';
 
 export type StockProvider = 'pixabay' | 'unsplash' | 'pexels';
 export interface StockState {
@@ -344,6 +351,28 @@ export const api = {
     postizIntegrations: () => call<PostizIntegration[]>('GET', '/api/publish/postiz/integrations'),
     connect: (provider: 'linkedin' | 'youtube') => call<{ url: string; redirect: string }>('GET', `/api/publish/${provider}/connect`),
     disconnect: (provider: 'linkedin' | 'youtube' | 'postiz', keys = false) => call<PublishConnections>('DELETE', `/api/publish/${provider}${keys ? '?keys=1' : ''}`),
+  },
+  metrics: {
+    post: (id: string) => call<{ snapshots: Snapshot[]; performance: Performance[] }>('GET', `/api/metrics/posts/${id}`),
+    add: (b: { post: string; channel: ChannelId; source: 'manual' | 'screenshot' } & Partial<Record<MetricKey, number>>) => call<Snapshot>('POST', '/api/metrics/snapshots', b),
+    remove: (id: string) => call<{ ok: true }>('DELETE', `/api/metrics/snapshots/${id}`),
+    importCsv: (csv: string, channel?: ChannelId) => call<{ saved: number; unmatched: string[] }>('POST', '/api/metrics/import', { csv, channel }),
+    performance: () => call<Performance[]>('GET', '/api/metrics/performance'),
+    pending: () => call<PendingNumbers[]>('GET', '/api/metrics/pending'),
+    collectNow: (postId: string) => call<{ queued: ChannelId[]; manual: ChannelId[]; note: string }>('POST', `/api/metrics/collect-now/${postId}`),
+    readScreenshot: async (file: Blob & { name?: string }, channel: ChannelId): Promise<ScreenshotReading> => {
+      const res = await fetch(`/api/metrics/read-screenshot?channel=${channel}&name=${encodeURIComponent(file.name ?? 'screenshot.png')}`, { method: 'POST', headers: { 'content-type': file.type || 'application/octet-stream' }, body: file });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? `${res.status} ${res.statusText}`);
+      return data as ScreenshotReading;
+    },
+    playbook: () => call<Playbook | { computedAt: null; channels: [] }>('GET', '/api/metrics/playbook'),
+    refreshPlaybook: (narrative = true) => call<Playbook>('POST', '/api/metrics/playbook/refresh', { narrative }),
+    forecast: (postId: string) => call<{ post: string; forecasts: { channel: ChannelId; forecast: Forecast | null }[] }>('GET', `/api/metrics/forecast/${postId}`),
+    calibration: () => call<Calibration & { critic: CriticCalibration }>('GET', '/api/metrics/calibration'),
+    suggestedSlots: () => call<Partial<Record<ChannelId, { slots: string[]; why: string[] }>>>('GET', '/api/metrics/suggested-slots'),
+    more: (postId: string) => call<Post>('POST', `/api/calendar/posts/${postId}/more`),
+    remix: (postId: string, channels?: ChannelId[]) => call<Post[]>('POST', `/api/calendar/posts/${postId}/remix`, channels ? { channels } : {}),
   },
   upload: async (id: string, file: File) => {
     const res = await fetch(`/api/campaigns/${id}/uploads?name=${encodeURIComponent(file.name)}`, { method: 'POST', body: file });

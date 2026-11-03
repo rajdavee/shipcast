@@ -88,6 +88,7 @@ export function Trending() {
               <span className={`tag ${c.strength}`}>{c.strength === 'rising' ? '↑ Rising' : c.strength === 'fading' ? '↓ Fading' : 'Steady'}</span>
               <span>{KIND[c.kind]} · {platformName(c.platform)}</span>
               <span className="muted">{c.seen > 1 ? `seen ${c.seen}× since ${new Date(c.firstSeen).toLocaleDateString()}` : 'new'}</span>
+              {c.fit !== undefined && <FitChip fit={c.fit} why={c.fitWhy} />}
             </div>
             <h3>{c.title}</h3>
             <p>{c.what}</p>
@@ -108,5 +109,16 @@ export function Trending() {
         ))}
       </div>
     </main>
+  );
+}
+
+/** How well a trend's recipe matches what wins for you, with the playbook's reason on hover or focus. */
+function FitChip({ fit, why }: { fit: number; why?: string }) {
+  const good = fit >= 1;
+  const text = `${good ? 'Fits you' : 'Weak fit'} ×${fit.toFixed(1)}`;
+  return (
+    <span className={`fit-chip ${good ? 'up' : 'down'}${why ? ' has-tip' : ''}`} tabIndex={why ? 0 : undefined} data-tip={why} aria-label={why ? `${text}: ${why}` : text}>
+      {text}
+    </span>
   );
 }

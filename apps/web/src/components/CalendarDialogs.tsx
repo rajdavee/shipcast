@@ -137,6 +137,7 @@ export function PlanSettingsDialog({ plan, channels, onSaved, onClose }: { plan:
   const [error, setError] = useState<string | null>(null);
   const [newSlot, setNewSlot] = useState<Record<string, { day: string; time: string }>>({});
   const sum = p.pillars.reduce((a, x) => a + x.share, 0);
+  const explore = Math.round((p.explore ?? 0.2) * 100);
   const setShare = (i: number, v: number) => {
     const next = rebalance(p.pillars.map((x) => x.share), i, v);
     setP({ ...p, pillars: p.pillars.map((x, j) => ({ ...x, share: next[j] })) });
@@ -193,6 +194,14 @@ export function PlanSettingsDialog({ plan, channels, onSaved, onClose }: { plan:
           const shares = rebalance([...p.pillars.map((y) => y.share), 0], p.pillars.length, 10);
           setP({ ...p, pillars: [...p.pillars.map((y, j) => ({ ...y, share: shares[j] })), { name: 'New pillar', share: shares[p.pillars.length] }] });
         }}><Cal.plus />Add pillar</button>}
+      </section>
+      <section className="plan-sec">
+        <h3>Experiments</h3>
+        <p className="hint" id="explore-hint">Share of planned posts that deliberately try something new — a format or hook with few posts behind it — so the playbook keeps learning. They're marked “Experiment” on the calendar. 0 turns them off.</p>
+        <div className="explore-row">
+          <input type="range" min={0} max={50} step={5} value={explore} aria-label="Experiments, percent of planned posts" aria-describedby="explore-hint" aria-valuetext={`${explore}% of planned posts`} onChange={(e) => setP({ ...p, explore: Number(e.target.value) / 100 })} />
+          <span className="tnum share">{explore}%</span>
+        </div>
       </section>
       <section className="plan-sec">
         <h3>Cadence</h3>
