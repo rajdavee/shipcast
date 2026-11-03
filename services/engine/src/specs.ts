@@ -70,6 +70,7 @@ export async function catalogMarkdown(kind: SpecKind): Promise<string> {
       'Spec: `{ "title": "running head", "size": "a4|letter", "theme": "<theme>", "footer": "url or line on every page", "pages": [ { "layout": "<id>", "fields": {…} } ] }`',
       `Themes: ${Object.entries(c.document.themes).map(([k, v]) => `\`${k}\` — ${v}`).join('; ')}`,
       `Sizes: ${Object.entries(c.document.sizes).map(([k, v]) => `\`${k}\` ${v}`).join(' · ')} (Letter for US audiences, A4 elsewhere).`,
+      'Templates without a real customer: set `"sample": true` on the spec and every page is labelled "Sample — replace with your customer".',
       'Rich text: `*word*` accent · `**word**` bold · `==word==` highlight. Body fields take light markdown: blank-line paragraphs, `- ` bullets, `1. ` steps, `### ` subheads, `> ` callouts.',
       'Images: paths relative to the brief folder (e.g. `assets/screens/home.png`). Zoom into the detail that proves the point by adding `#crop=x,y,w,h` (fractions of the image, e.g. `assets/screens/docket.png#crop=0.05,0.1,0.55,0.45`) — a whole screen shrunk into a box is unreadable. Icons: a brand name ("Slack") or a plain icon word ("shield-check").',
       'Every page is checked after rendering: overflow, images that did not load, and pages under ~55% full come back to you to fix.',
@@ -108,6 +109,8 @@ export async function catalogMarkdown(kind: SpecKind): Promise<string> {
       '- `stats` — `heading?`, `stats`: ["value | label | source", ≤ 4] — verified only',
       '- `testimonials` — `heading?`, `items`: ["quote | name | role, company", ≤ 3] — real people only',
       '- `comparison` — `heading`, `leftTitle`, `left`, `rightTitle`, `right`',
+      '- `versus` — `eyebrow?`, `heading`, `sub?`, `us`, `them` (names in text — never a logo), `rows`: ["feature | yes|no|partial | yes|no|partial | note with [n] source", 4–10], `sources`: ["[1] title — URL, date checked"] — an honest table: include rows they win',
+      '- `choose` — `heading?` ("Who should pick which"), `us`, `them`, `usFor`: [3–4], `themFor`: [3–4] — fair to both',
       '- `pricing` — `heading`, `sub?`, `url`, `cta?`, `tiers`: ["*name | price | note | feature; feature | button text"] (leading * = recommended) — real prices only',
       '- `faq` — `heading?`, `items`: ["question | answer", 4–8] — answer real objections',
       '- `cta` — `heading`, `sub?`, `cta`, `url`, `note?`',
@@ -175,7 +178,8 @@ export async function catalogMarkdown(kind: SpecKind): Promise<string> {
     '# Graphics catalog',
     '',
     'Each item: `{ "type": "thumbnail"|"card", "layout": "<id>", "theme"?: "editorial|swiss|bold|midnight", "preset": "<preset id>", "name": "file.png", "fields": {…} }`',
-    'Presets: `youtube-thumbnail` 1280×720 · `og-card` 1200×630 · `github-banner` 1280×640 · `x-image` 1600×900 · `instagram-post` 1080×1080 · `linkedin-image` 1080×1350 · `linkedin-landscape` 1200×627 · `story-image` 1080×1920 · `x-header` 1500×500 · `linkedin-banner` 1584×396 · `youtube-banner` 2560×1440 · `app-store-ios` 1290×2796 · `play-store` 1080×1920 · `producthunt-gallery` 1270×760 · `producthunt-thumb` 240×240',
+    'Presets: `youtube-thumbnail` 1280×720 · `og-card` 1200×630 · `github-banner` 1280×640 · `x-image` 1600×900 · `instagram-post` 1080×1080 · `linkedin-image` 1080×1350 · `linkedin-landscape` 1200×627 · `story-image` 1080×1920 · `x-header` 1500×500 · `linkedin-banner` 1584×396 · `linkedin-company-banner` 1128×191 · `youtube-banner` 2560×1440 · `facebook-cover` 851×315 · `profile-avatar` 400×400 · `app-store-ios` 1290×2796 · `play-store` 1080×1920 · `producthunt-gallery` 1270×760 · `producthunt-thumb` 240×240',
+    'Profile banners (`profile-banner`, `profile-avatar`): each preset has its own safe area and the audit flags text, logos and images outside it — youtube-banner keeps everything in the centre 1546×423; x-header and linkedin-banner keep clear of the profile photo at the bottom-left, linkedin-company-banner of the page logo; facebook-cover of the sides phones crop; profile-avatar keeps everything inside the inscribed circle. The layouts place content correctly — problems come from copy that is too long.',
     'File names may carry one folder (`ios/01-track.png`) to keep sets apart. Images that fail to load come back to you.',
     'App store screens (`app-screen`): the caption must stay on 2 lines at ≥ 6% of the canvas width — a caption that shrinks further comes back to you. The screenshot fills the phone\'s width and is cut at the bottom, so use a phone-shaped screenshot or crop a desktop one to a tall region about 1 wide by 2 high in pixels (for a 1440×900 capture: `#crop=x,0,0.29,1`). No real device art or store badges — the frame is generic.',
     'Quotes and people: `pull-quote`, `testimonial`, `quote-post` and `post-card` carry exact words from the brief or source only, attributed to the real person or post. With no real quote, write clearly placeholder words and set `"sample": "yes"` — the image is then labelled "Sample copy — not a real customer". Never invent a named customer, a rating or a platform logo.',
@@ -262,7 +266,7 @@ export async function renderSpec(kind: SpecKind, cwd: string, briefDir: string, 
         return [
           ...g.audit.overflow.map((x: string) => `${at}: text overflows (${x}).`),
           ...g.audit.offCanvas.map((x: string) => `${at}: text runs off the canvas (${x}).`),
-          ...g.audit.unsafe.slice(0, 2).map((x: string) => `${at}: ${x} sits inside the ${g.preset} safe margin — platform UI may cover it.`),
+          ...g.audit.unsafe.slice(0, 2).map((x: string) => (/ — (outside|under) /.test(x) ? `${at}: ${x.replace(' — ', ' sits ')} — keep it inside the ${g.preset} safe area.` : `${at}: ${x} sits inside the ${g.preset} safe margin — platform UI may cover it.`)),
           ...(g.audit.tinyShots?.length && !/-(portrait|wide|story)\./.test(g.file) ? [`${at.replace(/-feed(?=\.)/, '')} (every size): ${g.audit.tinyShots[0]}`] : []),
           ...(g.audit.small ?? []).slice(0, 1).map((x: string) => `${at}: ${x} had to shrink below its readable size to fit — shorten it.`),
           ...(g.audit.broken?.length ? [`${at}: image ${g.audit.broken[0]} didn't load — use a real file from assets/ (path relative to the brief folder).`] : []),
@@ -329,6 +333,25 @@ export async function renderSpec(kind: SpecKind, cwd: string, briefDir: string, 
   }
 }
 
+const FAILED = new Set(['render failed', 'no spec', 'bad json', 'invalid storyboard']);
+
+/**
+ * Formats made of two specs (a battlecard PDF plus its public page, a case
+ * study plus its social cards) render each one; problems name the file they
+ * belong to. Format options only steer the main spec.
+ */
+export async function renderSpecs(kinds: SpecKind[], cwd: string, briefDir: string, opts: { handle?: string; force?: Record<string, unknown> } = {}): Promise<SpecResult> {
+  if (kinds.length === 1) return renderSpec(kinds[0], cwd, briefDir, opts);
+  const rs = [];
+  for (const [i, k] of kinds.entries()) rs.push({ k, r: await renderSpec(k, cwd, briefDir, i ? { handle: opts.handle } : opts) });
+  const failed = rs.find((x) => FAILED.has(x.r.summary));
+  return {
+    ok: rs.every((x) => x.r.ok),
+    feedback: rs.flatMap((x, i) => (i ? x.r.feedback.map((f) => (f.includes(SPEC_FILE[x.k]) ? f : `${SPEC_FILE[x.k]}: ${f}`)) : x.r.feedback)),
+    summary: failed ? failed.r.summary : rs.map((x) => x.r.summary).join(' + '),
+  };
+}
+
 /** Phrases that read as generic AI marketing copy (research §G). */
 export const BANNED_PHRASES = [
   'excited to announce', 'excited to share', 'thrilled to', 'game-changer', 'game changer', 'revolutionize', 'revolutionary', 'unlock', 'supercharge',
@@ -356,6 +379,111 @@ export function checkLaunchCopy(md: string | null): string[] {
   const all = [tagline, desc, comment].join(' ').toLowerCase();
   for (const p of BANNED_PHRASES) if (all.includes(p)) out.push(`launch-copy.md: uses "${p}" — rewrite it in plain, specific words.`);
   return out.slice(0, 12);
+}
+
+/** Every profile surface a brand needs, so a kit can't quietly skip one. */
+export const PROFILE_KIT_PRESETS = ['linkedin-banner', 'linkedin-company-banner', 'x-header', 'youtube-banner', 'facebook-cover', 'profile-avatar', 'og-card', 'github-banner'];
+
+/** Profile kit (graphics.json): every surface present, and one design system across them. */
+export function checkProfileKit(spec: any): string[] {
+  const items: any[] = Array.isArray(spec?.items) ? spec.items : [];
+  const out: string[] = [];
+  for (const p of PROFILE_KIT_PRESETS) if (!items.some((i) => i?.preset === p)) out.push(`graphics.json: the kit has no ${p} — add it (${p === 'profile-avatar' ? 'layout profile-avatar' : 'layout profile-banner'}).`);
+  const themes = [...new Set(items.map((i) => i?.theme ?? 'editorial'))];
+  if (themes.length > 1) out.push(`graphics.json: the kit mixes themes (${themes.join(', ')}) — use one theme on every item so the profiles read as one brand.`);
+  const motifs = [...new Set(items.filter((i) => i?.layout === 'profile-banner').map((i) => i?.fields?.motif ?? 'grid'))];
+  if (motifs.length > 1) out.push(`graphics.json: the banners mix motifs (${motifs.join(', ')}) — pick one.`);
+  for (const i of items) {
+    if (i?.preset === 'profile-avatar' && i.layout !== 'profile-avatar') out.push(`graphics.json: ${i.name} must use the profile-avatar layout (circle-safe).`);
+    if (i?.fields?.image && !['og-card', 'github-banner'].includes(i.preset)) out.push(`graphics.json: ${i.name} carries a screenshot — only og-card and github-banner have room for one; drop it.`);
+  }
+  return out.slice(0, 12);
+}
+
+/** Words that turn a comparison into an attack; the rule is plain, checkable differences only. */
+export const DISPARAGING = ['terrible', 'awful', 'garbage', 'scam', 'worst', 'clunky', 'bloated', 'overpriced', 'rip-off', 'ripoff', 'sucks', 'useless', 'nightmare', 'inferior', 'outdated', 'dinosaur', 'shady', 'pathetic', 'joke', 'crap', 'incompetent', 'lazy', 'mediocre', 'amateur'];
+
+const texts = (v: unknown): string[] => (typeof v === 'string' ? [v] : Array.isArray(v) ? v.flatMap(texts) : v && typeof v === 'object' ? Object.values(v).flatMap(texts) : []);
+const refs = (s: string) => [...s.matchAll(/\[(\d+)\]/g)].map((m) => m[1]);
+
+/**
+ * Battlecard (document.json) + public comparison page (landing.json): every
+ * competitor claim cites a source, nothing unverified reaches the public page,
+ * no disparaging words and no one else's marks.
+ */
+export function checkComparison(doc: any, landing: any): string[] {
+  const out: string[] = [];
+  const card = (doc?.pages ?? []).find((p: any) => p?.layout === 'battlecard')?.fields;
+  if (!card) out.push('document.json: add a battlecard page (layout battlecard).');
+  else {
+    if (!texts(card.theyWin).length) out.push('document.json: "where they win" is empty — every competitor wins somewhere; say where, honestly.');
+    const have = new Set(texts(card.sources).flatMap(refs));
+    if (!have.size) out.push('document.json: the battlecard lists no sources — number them ("[1] title — URL, date checked").');
+    if (!refs(String(card.theirPitch ?? '')).length) out.push('document.json: "their pitch" needs a [n] source (their own site or docs).');
+    const missing = [...new Set(texts([card.theirPitch, card.weWin, card.theyWin, card.objections, card.proof, card.pricing]).flatMap(refs))].filter((n) => !have.has(n));
+    if (have.size && missing.length) out.push(`document.json: the battlecard cites [${missing.join('], [')}] but the sources don't list ${missing.length > 1 ? 'them' : 'it'}.`);
+  }
+  const secs: any[] = Array.isArray(landing?.sections) ? landing.sections : [];
+  if (!landing) out.push('landing.json was not written — the public comparison page is part of this format.');
+  else for (const t of ['hero', 'versus', 'choose', 'faq', 'cta']) if (!secs.some((s) => s?.type === t)) out.push(`landing.json: the comparison page needs a "${t}" section.`);
+  const vs = secs.find((s) => s?.type === 'versus');
+  if (vs) {
+    const src = new Set(texts(vs.sources).flatMap(refs));
+    if (!src.size) out.push('landing.json: the comparison table has no sources — list them in "sources" ("[1] title — URL") and cite them in the row notes.');
+    for (const row of texts(vs.rows)) {
+      const [feature, a, b, note] = row.split('|').map((x) => x.trim());
+      if ([a, b].some((c) => !/^(yes|no|partial|partly|✓|✔|✗|✕|×|~|◐)$/i.test(c ?? ''))) out.push(`landing.json: row "${feature}" — cells must be yes, no or partial; put the detail in the note.`);
+      const bad = refs(note ?? '').filter((n) => !src.has(n));
+      if (bad.length) out.push(`landing.json: row "${feature}" cites [${bad.join('], [')}], which "sources" doesn't list.`);
+    }
+  }
+  if (secs.some((s) => s?.type === 'logos')) out.push('landing.json: drop the logos section — a comparison page names the competitor in text only, never their logo.');
+  const comp = String(card?.competitor ?? vs?.them ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+  const imgs = [...texts(secs.map((s) => s?.image)), ...texts((doc?.pages ?? []).map((p: any) => p?.fields?.image))];
+  if (comp.length > 2 && imgs.some((p) => p.toLowerCase().replace(/[^a-z0-9]+/g, '').includes(comp))) out.push("Don't show the competitor's logo or screenshots — name them in text only.");
+  const pub = texts(secs).join(' ').toLowerCase();
+  for (const w of ['to verify', 'unverified', 'tbd', 'citation needed']) if (pub.includes(w)) out.push(`landing.json: "${w}" on the public page — leave unverified claims out of it and list them in NOTES.md.`);
+  const all = `${pub} ${texts(card).join(' ').toLowerCase()}`;
+  for (const w of DISPARAGING) if (new RegExp(`\\b${w}\\b`).test(all)) out.push(`Uses "${w}" about a competitor — describe the difference plainly, without disparaging words.`);
+  return out.slice(0, 14);
+}
+
+/**
+ * Case study (document.json + graphics.json): the classic structure, the two
+ * social cards, and no invented customer — a template is labelled everywhere.
+ */
+export function checkCaseStudy(doc: any, graphics: any, notes: string | null): string[] {
+  const out: string[] = [];
+  const pages: any[] = Array.isArray(doc?.pages) ? doc.pages : [];
+  if (pages.length < 2 || pages.length > 4) out.push(`document.json: a case study is 2–4 pages, not ${pages.length}.`);
+  const res = pages.find((p) => p?.layout === 'case-results' || p?.layout === 'case-study');
+  if (!pages.some((p) => p?.layout === 'case-snapshot' || p?.layout === 'case-study')) out.push('document.json: add the customer snapshot and challenge (layout case-snapshot).');
+  if (!res) out.push('document.json: add the results page (layout case-results) — big numbers, the quote, what\'s next.');
+  else if (!texts(res.fields?.results).some((r) => /\d/.test(r))) out.push('document.json: the results have no numbers — use the customer\'s real figures (or sample placeholders in a template).');
+  const sample = /^(yes|true)$/i.test(String(doc?.sample ?? ''));
+  const cards: any[] = (Array.isArray(graphics?.items) ? graphics.items : []).filter((i: any) => i?.layout === 'case-card');
+  for (const p of ['linkedin-image', 'linkedin-landscape']) if (!cards.some((c) => c.preset === p)) out.push(`graphics.json: add the ${p} case-card (${p === 'linkedin-image' ? '1080×1350' : '1200×627'}).`);
+  const unlabeled = cards.filter((c) => !/^(yes|true)$/i.test(String(c?.fields?.sample ?? '')));
+  if (sample && unlabeled.length) out.push('graphics.json: the document is a sample template, so every case-card needs "sample": "yes".');
+  if (!sample && cards.length && unlabeled.length < cards.length) out.push('A card is marked sample but the document is not — if the story is real, drop "sample"; if not, set "sample": true on document.json too.');
+  if (sample && !/need|replace|missing/i.test(notes ?? '')) out.push('NOTES.md: say exactly what the user needs to supply to make this real (customer, approval, numbers, a quote).');
+  if (!sample && res?.layout === 'case-results' && res.fields?.quote && !res.fields?.who) out.push('document.json: the quote needs who said it ("Name, Role, Company").');
+  return out.slice(0, 12);
+}
+
+/** Format-specific checks that need more than one spec or a copy file; run after every render round. */
+export async function packChecks(packId: string, outDir: string): Promise<string[]> {
+  const json = async (f: string) => JSON.parse(await readFile(join(outDir, f), 'utf8').catch(() => 'null'));
+  const text = (f: string) => readFile(join(outDir, f), 'utf8').catch(() => null);
+  try {
+    if (packId === 'product-hunt-kit') return checkLaunchCopy(await text('launch-copy.md'));
+    if (packId === 'profile-kit') return checkProfileKit(await json('graphics.json'));
+    if (packId === 'battlecard') return checkComparison(await json('document.json'), await json('landing.json'));
+    if (packId === 'case-study') return checkCaseStudy(await json('document.json'), await json('graphics.json'), await text('NOTES.md'));
+  } catch (e) {
+    return [`A spec is not valid JSON: ${(e as Error).message}`];
+  }
+  return [];
 }
 
 /** Platform limits for the copy kit; returns problems to send back to Claude. */

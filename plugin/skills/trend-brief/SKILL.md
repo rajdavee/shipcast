@@ -26,7 +26,7 @@ audience cares about and what to make about them this week.
    - **Formats that are working** — what posts/videos in this niche get traction right now (length, hook style, format), with examples.
    - **Hooks to borrow** — 8–12 hook lines adapted to the product (pattern, not copy).
    - **Don't touch** — trends that look tempting but are off-brand, risky or already saturated.
-2. `out/briefs.json` — 5–8 ready-to-make ideas: `[{ "title", "pack": "<Shipcast format id: carousel | photo-carousel | social-post | quote-cards | reel | infographic | document | presentation | ad-set | email | landing | launch-film | youtube-video | copy-kit>", "angle", "hook", "why_now", "evidence": ["url"] }]`.
+2. `out/briefs.json` — 5–8 ready-to-make ideas: `[{ "title", "pack": "<Shipcast format id: carousel | photo-carousel | social-post | quote-cards | reel | infographic | document | case-study | battlecard | presentation | ad-set | email | landing | launch-film | youtube-video | copy-kit>", "angle", "hook", "why_now", "evidence": ["url"] }]`.
 3. `out/NOTES.md` — sources checked and what you couldn't verify.
 
 Every claim cites a source. Never invent numbers, quotes or "trends". Follow the brand voice section of the prompt for the hooks.

@@ -187,6 +187,112 @@ test('Product Hunt gallery and thumbnail render at 1270×760 and 240×240 withou
   assert.ok(existsSync(join(out, 'gallery', '02-why.png')) && existsSync(join(out, 'thumbnail.png')));
 });
 
+const shipcast = { name: 'Shipcast', logo: join(process.cwd(), 'docs', 'assets', 'mark.svg'), colors: { background: '#0b0d12', primary: '#2b3bff' } };
+const clean = (it: any) => {
+  for (const k of ['overflow', 'offCanvas', 'unsafe', 'tinyShots', 'small', 'broken']) assert.deepEqual(it.audit[k], [], `${it.file.split('/').pop()} ${k}`);
+};
+
+test('profile kit: one banner design fits every platform safe area, the avatar stays inside its circle', { skip: !hasChrome && 'no Chrome' }, async () => {
+  const out = join(home, 'profile');
+  const shot = join(process.cwd(), 'docs', 'assets', 'studio-new.png');
+  const fields = { title: 'Paste a link. Get a *launch*.', sub: 'Videos, carousels, decks and posts from one URL — on your machine.', url: 'github.com/rajdavee/shipcast', motif: 'grid' };
+  const { PROFILE_KIT_PRESETS } = await import('@shipcast/engine');
+  const items = PROFILE_KIT_PRESETS.map((preset: string) => ({ type: 'card', layout: preset === 'profile-avatar' ? 'profile-avatar' : 'profile-banner', theme: 'midnight', preset, name: `profile/${preset}.png`, fields: preset === 'og-card' ? { ...fields, image: `${shot}#crop=0.4,0.2,0.08,0.1` } : preset === 'profile-avatar' ? {} : fields }));
+  items.push({ type: 'card', layout: 'profile-avatar', theme: 'swiss', preset: 'profile-avatar', name: 'profile/mono.png', fields: { bg: 'brand' } as any });
+  const job = await run('graphics', { brand: shipcast, outDir: out, items: items.slice(0, -1) });
+  assert.equal(job.status, 'done', job.error);
+  assert.equal(job.output.items.length, 8);
+  job.output.items.forEach(clean);
+  const mono = await run('graphics', { brand: { ...shipcast, logo: undefined }, outDir: out, items: items.slice(-1) });
+  clean(mono.output.items[0]);
+  // Swapping themes changes the colours, never the safe placement.
+  for (const theme of ['editorial', 'bold']) (await run('graphics', { brand: shipcast, outDir: join(out, theme), items: items.slice(0, 5).map((i) => ({ ...i, theme })) })).output.items.forEach(clean);
+});
+
+test('safe-area audit flags content outside the YouTube strip, under a profile photo and outside an avatar circle', { skip: !hasChrome && 'no Chrome' }, async () => {
+  const logo = join(process.cwd(), 'docs', 'assets', 'mark.svg');
+  const page = (body: string) => `<html><body style="margin:0;position:relative;font:40px sans-serif">${body}</body></html>`;
+  const check = async (name: string, preset: string, body: string) => {
+    const f = join(home, `${name}.html`);
+    writeFileSync(f, page(body));
+    const job = await run('html', { file: f, out: join(home, `${name}.png`), preset });
+    assert.equal(job.status, 'done', job.error);
+    return job.output.audit.unsafe as string[];
+  };
+  const yt = await check('yt', 'youtube-banner', `<h1 style="position:absolute;left:1000px;top:640px;margin:0">Centred</h1><img src="${logo}" style="position:absolute;left:80px;top:80px;width:120px">`);
+  assert.equal(yt.length, 1, yt.join(' | '));
+  assert.match(yt[0], /^image mark\.svg — outside the safe area/);
+  assert.match((await check('yt2', 'youtube-banner', '<h1 style="position:absolute;left:1000px;top:120px;margin:0">Cropped on phones</h1>'))[0] ?? '', /Cropped on phones/);
+  const li = await check('li', 'linkedin-banner', '<p style="position:absolute;left:60px;top:300px;margin:0">Under the photo</p><p style="position:absolute;left:60px;top:40px;margin:0">Top-left is fine</p>');
+  assert.deepEqual(li.map((x) => x.split(' — ')[1]), ['under the profile photo']);
+  const av = await check('av', 'profile-avatar', '<p style="position:absolute;left:12px;top:12px;margin:0">AB</p><p style="position:absolute;left:170px;top:170px;margin:0">OK</p>');
+  assert.deepEqual(av.map((x) => x.split(' — ')[1]), ['outside the round crop']);
+  assert.deepEqual(await check('av2', 'profile-avatar', `<img src="${logo}" style="position:absolute;left:84px;top:84px;width:232px;height:232px;object-fit:contain">`), [], 'a mark 0.58 × the side fits the circle');
+  assert.equal((await check('av3', 'profile-avatar', `<img src="${logo}" style="position:absolute;left:0;top:0;width:400px;height:400px">`)).length, 1, 'a full-bleed square mark loses its corners');
+});
+
+test('battlecard: a dense one-page PDF at Letter and A4 that fits, plus an honest comparison page', { skip: !hasChrome && 'no Chrome' }, async () => {
+  const fields = {
+    competitor: 'a launch agency', updated: 'Nov 2026 · Marketing',
+    theirPitch: 'A team of designers and editors that plans and produces launch assets by hand, with rounds of review [1].',
+    ourPitch: 'Paste a link and get the whole launch set the same afternoon — made on your own machine and re-made in minutes when the product changes.',
+    weWin: ['Speed: a full asset set in one sitting, not a multi-week brief', 'Cost: runs on the plan you already have', 'Changes: edit a spec and re-render in minutes', 'Privacy: files stay on your machine'],
+    theyWin: ['Original brand strategy and naming', 'Live-action shoots with real people', 'Hands-on account management'],
+    objections: ['Will it look generic? | Every piece is checked for overflow, safe zones and legibility and uses your brand kit.', 'We already pay an agency. | Keep them for strategy; use Shipcast for everyday assets.', 'Is it hard to set up? | One command installs it.'],
+    proof: ['Open source under MIT [2]', 'Over 30 formats from one brief [2]'],
+    pricing: 'Free and open source; it uses your existing Claude Code plan. Ask the buyer for their current agency spend rather than quoting a number.',
+    sources: ['[1] Buyer interviews — Oct 2026', '[2] github.com/rajdavee/shipcast README — Nov 2026'],
+  };
+  for (const size of ['letter', 'a4']) {
+    const job = await run('document', { brand: shipcast, size, theme: 'clean', outDir: join(home, `bc-${size}`), pages: [{ layout: 'battlecard', fields }] });
+    assert.equal(job.status, 'done', job.error);
+    assert.deepEqual(job.output.problems, [], size);
+  }
+  const { checkComparison } = await import('@shipcast/engine');
+  const landing = {
+    title: 'Shipcast vs a launch agency', theme: 'light',
+    sections: [
+      { type: 'hero', headline: 'Shipcast vs a launch agency', sub: 'Where each one fits — honestly.', cta: 'Try Shipcast', url: 'https://github.com/rajdavee/shipcast' },
+      { type: 'versus', heading: 'Side by side', us: 'Shipcast', them: 'A launch agency', rows: ['Assets the same day | yes | no | Agencies work in weekly rounds [1]', 'Brand strategy | no | yes', 'Re-render after a change | yes | partial | Usually a change request [1]'], sources: ['[1] Buyer interviews, Oct 2026'] },
+      { type: 'choose', us: 'Shipcast', them: 'an agency', usFor: ['Small teams shipping often'], themFor: ['Rebrands and naming'] },
+      { type: 'faq', items: ['Can I use both? | Yes.'] },
+      { type: 'cta', heading: 'Make your launch set today', cta: 'Get started', url: 'https://github.com/rajdavee/shipcast' },
+    ],
+  };
+  assert.deepEqual(checkComparison({ pages: [{ layout: 'battlecard', fields }] }, landing), []);
+  const out = join(home, 'versus');
+  const page = await run('landing', { brand: { name: 'Shipcast', colors: shipcast.colors }, outDir: out, ...landing });
+  assert.equal(page.status, 'done', page.error);
+  assert.deepEqual(page.output.problems, []);
+  const html = (await import('node:fs')).readFileSync(join(out, 'landing', 'index.html'), 'utf8');
+  assert.match(html, /class="v-yes"[\s\S]*class="v-no"[\s\S]*class="v-partial"/);
+  assert.ok(!/<img/.test(html.split('<main>')[1]), 'no logos or pictures of the competitor');
+});
+
+test('case study: 4 pages and two social cards, a template labelled on every page and card', { skip: !hasChrome && 'no Chrome' }, async () => {
+  const pages = [
+    { layout: 'cover', fields: { kicker: 'Case study', title: 'A *full campaign* in an afternoon', subtitle: 'How a two-person team shipped every launch asset without an agency.', meta: 'Sample customer story' } },
+    { layout: 'case-snapshot', fields: { client: 'Sample Co', heading: 'Launch assets took longer than the product', facts: ['Industry | B2B software', 'Team | 2 founders', 'Region | Remote', 'Customer since | Sample date'], summary: 'A small team needed launch videos, carousels and a deck in days, not weeks — without hiring.', challenge: 'Every launch meant weeks of design work before anything could be posted. The product was ready; the marketing was not.\n\n- Videos needed an editor and several rounds of review\n- Every channel wanted another size of every image\n- A late product change meant starting over\n\nThe team tried templates, but every template still needed a designer to fill it, and nobody owned the job. Launch dates slipped while the assets caught up, and the posts that did go out looked different on every channel.\n\n> Replace this with the customer\'s own words about the problem.' } },
+    { layout: 'article', fields: { heading: 'The solution', body: 'They pasted their product URL into Shipcast and picked the formats they needed. The brief came back in minutes; every asset was rendered and checked for overflow, safe zones and legibility before anyone looked at it.\n\nWhen the product changed the week before launch, they edited the copy and re-rendered — no new brief, no new invoice.\n\n### What they used\n- Launch film and a vertical reel\n- A LinkedIn carousel and quote cards\n- A pitch deck and a one-pager for sales\n\n### How the week went\n1. Monday: brief and first renders\n2. Tuesday: edits to copy and crops\n3. Wednesday: everything scheduled', aside: "Sample story — replace every line with the customer's real account." } },
+    { layout: 'case-results', fields: { heading: 'A whole launch set in one afternoon', results: ['1 day | from brief to every asset | was ? weeks', '30+ | formats from one brief', '0 | agency hours billed'], body: "Replace these with the customer's verified numbers and say where each one came from.", quote: 'Replace with a real quote from the customer, word for word.', who: 'Name, Role, Company', next: 'They plan to run every release through Shipcast and add the newsletter format next.' } },
+  ];
+  for (const size of ['a4', 'letter']) {
+    const out = join(home, `case-${size}`);
+    const job = await run('document', { brand: shipcast, size, theme: 'clean', title: 'Case study — Sample Co', sample: true, outDir: out, pages });
+    assert.equal(job.status, 'done', job.error);
+    assert.deepEqual(job.output.problems, [], size);
+    assert.equal(((await import('node:fs')).readFileSync(join(out, 'document.html'), 'utf8').match(/class="sample-band"/g) ?? []).length, 4, 'every page says it is a sample');
+  }
+  const fields = { client: 'Sample Co', title: 'A whole launch set in *one afternoon*', stats: ['1 day | brief to every asset', '30+ | formats from one brief', '0 | agency hours'], quote: 'Replace with a real quote from the customer.', who: 'Name, Role', sample: 'yes' };
+  const out = join(home, 'case-cards');
+  const items = ['linkedin-image', 'linkedin-landscape'].flatMap((preset) => [{ type: 'card', layout: 'case-card', theme: 'editorial', preset, name: `cards/${preset}.png`, fields }, { type: 'card', layout: 'case-card', theme: 'swiss', preset, name: `cards/${preset}-one.png`, fields: { client: 'Shipcast', title: 'Thirty formats from one brief', stats: ['30+ | formats'] } }]);
+  const job = await run('graphics', { brand: shipcast, outDir: out, items });
+  assert.equal(job.status, 'done', job.error);
+  job.output.items.forEach(clean);
+  assert.match((await import('node:fs')).readFileSync(join(out, 'cards', 'linkedin-landscape.html'), 'utf8'), /data-sample>Sample — replace with your customer/);
+  assert.ok(!/data-sample/.test((await import('node:fs')).readFileSync(join(out, 'cards', 'linkedin-image-one.html'), 'utf8')));
+});
+
 test('stills audit catches text that overflows', { skip: !hasChrome && 'no Chrome' }, async () => {
   const f = join(home, 'bad.html');
   writeFileSync(f, '<html><body style="margin:0"><div style="width:200px;overflow:hidden;white-space:nowrap;font-size:40px">This headline is far too long for its box</div></body></html>');

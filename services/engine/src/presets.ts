@@ -10,6 +10,12 @@ export interface SafeZone {
   right: number;
   bottom: number;
   left: number;
+  /** Profile photos and logos the platform lays over the image (canvas px). */
+  avoid?: { x: number; y: number; w: number; h: number; what: string }[];
+  /** Shown cropped to the inscribed circle (avatars): content must sit inside it. */
+  circle?: boolean;
+  /** Logos and pictures count as content too, not just text — the platform crops the whole image. */
+  images?: boolean;
 }
 
 export interface PlatformPreset {
@@ -69,10 +75,14 @@ export const PRESETS: PlatformPreset[] = [
   { id: 'og-card', label: 'Link preview (OG)', kind: 'image', width: 1200, height: 630, safe: { top: 65, right: 100, bottom: 65, left: 100 } },
   { id: 'x-image', label: 'X image (16:9)', kind: 'image', width: 1600, height: 900, maxBytes: 5 * MB, safe: box(60) },
   { id: 'story-image', label: 'Story card', kind: 'image', width: 1080, height: 1920, safe: { top: 270, right: 65, bottom: 380, left: 65 } },
-  { id: 'github-banner', label: 'GitHub social preview', kind: 'image', width: 1280, height: 640, safe: box(40) },
-  { id: 'linkedin-banner', label: 'LinkedIn banner', kind: 'image', width: 1584, height: 396, maxBytes: 8 * MB, safe: { top: 20, right: 20, bottom: 20, left: 420 }, notes: 'Profile photo covers the bottom-left.' },
-  { id: 'x-header', label: 'X header', kind: 'image', width: 1500, height: 500, maxBytes: 2 * MB, safe: { top: 20, right: 20, bottom: 20, left: 360 } },
-  { id: 'youtube-banner', label: 'YouTube channel art', kind: 'image', width: 2560, height: 1440, maxBytes: 6 * MB, safe: { top: 508, right: 507, bottom: 509, left: 507 }, notes: 'Only the centre 1546×423 shows on every device.' },
+  { id: 'github-banner', label: 'GitHub social preview', kind: 'image', width: 1280, height: 640, safe: box(40), notes: 'Repository settings → social preview; 40 px border keeps it clear of rounded crops.' },
+  // ── profile banners: each platform crops differently and lays its own photo over a corner ──
+  { id: 'linkedin-banner', label: 'LinkedIn personal banner', kind: 'image', width: 1584, height: 396, maxBytes: 8 * MB, safe: { top: 24, right: 48, bottom: 24, left: 48, images: true, avoid: [{ x: 0, y: 150, w: 470, h: 246, what: 'the profile photo' }] }, notes: 'Profile photo covers the bottom-left; phones trim the sides.' },
+  { id: 'linkedin-company-banner', label: 'LinkedIn company cover', kind: 'image', width: 1128, height: 191, maxBytes: 3 * MB, safe: { top: 16, right: 32, bottom: 16, left: 32, images: true, avoid: [{ x: 0, y: 105, w: 250, h: 86, what: 'the page logo' }] }, notes: 'The page logo overlaps the bottom-left.' },
+  { id: 'x-header', label: 'X header', kind: 'image', width: 1500, height: 500, maxBytes: 2 * MB, safe: { top: 60, right: 40, bottom: 60, left: 40, images: true, avoid: [{ x: 0, y: 320, w: 400, h: 180, what: 'the profile photo' }] }, notes: 'Phones trim top and bottom; the profile photo covers the bottom-left.' },
+  { id: 'youtube-banner', label: 'YouTube channel art', kind: 'image', width: 2560, height: 1440, maxBytes: 6 * MB, safe: { top: 508, right: 507, bottom: 509, left: 507, images: true }, notes: 'Only the centre 1546×423 shows on every device; TVs show it all.' },
+  { id: 'facebook-cover', label: 'Facebook cover', kind: 'image', width: 851, height: 315, maxBytes: 3 * MB, safe: { top: 16, right: 106, bottom: 16, left: 106, images: true }, notes: 'Phones show only the centre ~640 px.' },
+  { id: 'profile-avatar', label: 'Avatar / profile logo', kind: 'image', width: 400, height: 400, maxBytes: 2 * MB, safe: { top: 0, right: 0, bottom: 0, left: 0, circle: true, images: true }, notes: 'Every platform crops to a circle (some to a rounded square).' },
 ];
 
 export function getPreset(id: string): PlatformPreset | undefined {

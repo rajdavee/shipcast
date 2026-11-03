@@ -1,0 +1,22 @@
+{
+  "id": "battlecard",
+  "name": "Battlecard & Comparison Page",
+  "tagline": "An internal one-page sales battlecard against one competitor (PDF) and an honest public \"X vs Y\" comparison page — every claim about them sourced, no disparaging words, no logos but your own.",
+  "category": "design",
+  "order": 12,
+  "estimate": "5–10 min",
+  "accent": "#b45309",
+  "spec": "document",
+  "also": ["landing"],
+  "options": [
+    { "key": "competitor", "label": "Competitor", "type": "text", "default": "", "placeholder": "e.g. the tool buyers compare you with most — blank = from the brief" },
+    { "key": "research", "label": "What you know about them (optional)", "type": "text", "default": "", "placeholder": "Links, pricing page, win/loss notes" },
+    { "key": "size", "label": "Paper", "type": "select", "choices": ["auto", "letter", "a4"], "default": "auto" },
+    { "key": "theme", "label": "Theme", "type": "select", "choices": ["auto", "clean", "editorial", "dark"], "default": "auto" }
+  ],
+  "outputs": ["document.pdf", "pages/*.png", "landing/**/*", "landing.zip", "landing-desktop.png", "landing-mobile.png", "landing-copy.md", "document.json", "landing.json", "*.md"],
+  "skills": [],
+  "tools": ["chrome"],
+  "roles": ["copy", "humanize"],
+  "timeoutMinutes": 30
+}

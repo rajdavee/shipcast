@@ -1,0 +1,19 @@
+{
+  "id": "profile-kit",
+  "name": "Social Profile Kit",
+  "tagline": "Matching brand assets for every profile — LinkedIn personal and company banners, X header, YouTube channel art, Facebook cover, a circle-safe avatar, an Open Graph image and a GitHub social preview — each checked against its platform's safe area.",
+  "category": "design",
+  "order": 11,
+  "estimate": "2–4 min",
+  "accent": "#0f766e",
+  "spec": "graphics",
+  "options": [
+    { "key": "theme", "label": "Theme", "type": "select", "choices": ["auto", "editorial", "swiss", "bold", "midnight"], "default": "auto" },
+    { "key": "motif", "label": "Background motif", "type": "select", "choices": ["auto", "grid", "rings", "dots", "plain"], "default": "auto" },
+    { "key": "headline", "label": "Headline (optional)", "type": "text", "default": "", "placeholder": "Blank = the brand's one-line promise from the brief" }
+  ],
+  "outputs": ["profile/*.png", "graphics.json", "*.md"],
+  "skills": [],
+  "tools": ["chrome"],
+  "roles": ["design-taste", "copy"]
+}

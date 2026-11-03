@@ -3,6 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { findChrome } from './doctor.ts';
+import type { SafeZone } from './presets.ts';
 
 /**
  * Minimal Chrome DevTools Protocol client on Node's built-in WebSocket.
@@ -237,10 +238,17 @@ export function browser(): Browser {
  * smallest rendered type size.
  */
 /** uiShare: smallest readable UI text as a share of canvas width — 2.2% for phone feeds, ~1.2% for screens. */
-export function layoutAuditScript(safe: { top: number; right: number; bottom: number; left: number }, width: number, height: number, uiShare = 0.022): string {
+export function layoutAuditScript(safe: SafeZone, width: number, height: number, uiShare = 0.022): string {
   return `(() => {
     const W = ${width}, H = ${height}, S = ${JSON.stringify(safe)};
     const out = { overflow: [], offCanvas: [], unsafe: [], minFont: 999, textCount: 0 };
+    // Avatars crop to the inscribed circle; profile photos and page logos sit over fixed corners.
+    const R = Math.min(W, H) / 2;
+    const cover = (r) => {
+      if (S.circle && [[r.left, r.top], [r.right, r.top], [r.left, r.bottom], [r.right, r.bottom]].some(([x, y]) => Math.hypot(x - W / 2, y - H / 2) > R + 1)) return 'outside the round crop';
+      const a = (S.avoid || []).find((a) => r.right > a.x && r.left < a.x + a.w && r.bottom > a.y && r.top < a.y + a.h);
+      return a ? 'under ' + a.what : '';
+    };
     const label = (el) => (el.id ? '#' + el.id : el.tagName.toLowerCase() + (el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\\s+/)[0] : '')) + ' "' + (el.textContent || '').trim().slice(0, 40) + '"';
     for (const el of document.querySelectorAll('body *')) {
       const cs = getComputedStyle(el);
@@ -254,7 +262,28 @@ export function layoutAuditScript(safe: { top: number; right: number; bottom: nu
       const block = cs.display !== 'inline';
       if (block && el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 3 || el.scrollHeight > el.clientHeight + 2 && /hidden|clip/.test(cs.overflowY)) out.overflow.push(label(el));
       if (r.left < -1 || r.top < -1 || r.right > W + 1 || r.bottom > H + 1) out.offCanvas.push(label(el));
-      else if (!el.closest('[data-safe-ignore]') && (r.left < S.left || r.top < S.top || r.right > W - S.right || r.bottom > H - S.bottom)) out.unsafe.push(label(el));
+      else if (!el.closest('[data-safe-ignore]')) {
+        // Crops and overlays are judged on the glyphs themselves (a block heading is often wider than its words).
+        const rg = document.createRange(); rg.selectNodeContents(el);
+        const w = cover(rg.getBoundingClientRect());
+        if (w) out.unsafe.push(label(el) + ' — ' + w);
+        else if (r.left < S.left || r.top < S.top || r.right > W - S.right || r.bottom > H - S.bottom) out.unsafe.push(label(el));
+      }
+    }
+    // Banners and avatars are cropped whole: a logo or picture outside the safe area is lost like text is.
+    if (S.images) for (const el of document.querySelectorAll('img, [data-key]')) {
+      if (el.closest('[data-safe-ignore]')) continue;
+      const cs = getComputedStyle(el);
+      if (cs.visibility === 'hidden' || cs.display === 'none' || Number(cs.opacity) === 0) continue;
+      let r = el.getBoundingClientRect();
+      if (!r.width || !r.height) continue;
+      if (el.tagName === 'IMG' && cs.objectFit === 'contain' && el.naturalWidth && el.naturalHeight) {
+        const k = Math.min(r.width / el.naturalWidth, r.height / el.naturalHeight), cw = el.naturalWidth * k, ch = el.naturalHeight * k;
+        r = { left: r.left + (r.width - cw) / 2, top: r.top + (r.height - ch) / 2, right: r.left + (r.width + cw) / 2, bottom: r.top + (r.height + ch) / 2 };
+      }
+      const name = el.tagName === 'IMG' ? 'image ' + decodeURIComponent((el.getAttribute('src') || '').split('/').pop() || '').slice(0, 40) : label(el);
+      const w = cover(r) || (r.left < S.left - 1 || r.top < S.top - 1 || r.right > W - S.right + 1 || r.bottom > H - S.bottom + 1 ? 'outside the safe area' : '');
+      if (w) out.unsafe.push(name + ' — ' + w);
     }
     // Screenshots whose UI text lands too small to read. UI body text is ~13 CSS px; a crop's file name
     // carries the CSS width of screen it covers (-ui620), otherwise 2x captures are assumed past 2400px.
