@@ -240,3 +240,18 @@ test('content calendar: create, refuse an unready schedule, schedule, ICS, CSV r
   assert.equal((await api(`/api/calendar/posts/${p.id}`, { method: 'DELETE' })).status, 404);
   assert.equal((await api('/api/calendar/plan', { method: 'PUT', json: { cadence: { linkedin: { perWeek: 2, slots: ['Tue 09:00'] } } } })).body.cadence.linkedin.perWeek, 2);
 });
+
+test('make it: a calendar post becomes a deliverable in its project', async () => {
+  const post = (await api('/api/calendar/posts', { method: 'POST', json: { title: 'Carousel: 5 launch mistakes', format: 'carousel', channels: [{ channel: 'linkedin', caption: 'Five mistakes.', hashtags: [], media: [], via: 'manual' }] } })).body;
+  const bad = await api(`/api/calendar/posts/${post.id}/make`, { method: 'POST', json: { project: 'c-nope' } });
+  assert.equal(bad.status, 400);
+  const camp = (await api('/api/campaigns', { method: 'POST', json: { source: { type: 'url', value: 'https://example.com' }, deliverables: [{ pack: 'carousel' }] } })).body;
+  const made = await api(`/api/calendar/posts/${post.id}/make`, { method: 'POST', json: { project: camp.id } });
+  assert.equal(made.status, 200);
+  assert.equal(made.body.campaign, camp.id);
+  const c = (await api(`/api/campaigns/${camp.id}`)).body;
+  const step = c.steps.find((s: any) => s.id === made.body.step);
+  assert.equal(step.pack, 'carousel');
+  assert.equal(step.options._title, 'Carousel: 5 launch mistakes');
+  assert.equal((await api('/api/calendar/plan-month', { method: 'POST', json: { from: 'soon' } })).status, 400);
+});

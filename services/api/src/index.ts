@@ -9,6 +9,9 @@ import { pipeline } from 'node:stream/promises';
 import {
   appendEvent,
   CALENDAR_CHANNELS,
+  planMonth,
+  planProject,
+  syncMadePosts,
   channelProblems,
   deletePost,
   getPost,
@@ -286,8 +289,10 @@ router.put('/api/agents/:id', async (req, _r, p) => {
 // ── content calendar: posts across channels, the plan, ICS and CSV ──────
 const calendarQuery = (req: { url?: string }) => new URL(req.url ?? '/', 'http://x').searchParams;
 router.get('/api/calendar/channels', () => CALENDAR_CHANNELS);
-router.get('/api/calendar/posts', (req) => {
+router.get('/api/calendar/posts', async (req) => {
   const q = calendarQuery(req);
+  // Finished deliverables attach their files to the posts that asked for them.
+  await syncMadePosts().catch(() => 0);
   return listPosts({ from: q.get('from') ?? undefined, to: q.get('to') ?? undefined, channel: q.get('channel') ?? undefined, unscheduled: q.get('unscheduled') === '1', status: (q.get('status') ?? '').split(',').filter(Boolean) as PostStatus[] });
 });
 async function checkedSave(body: Partial<Post>, id?: string) {
@@ -312,6 +317,31 @@ router.get('/api/calendar/posts/:id/check', async (_q, _r, p) => {
   return { problems: scheduleProblems(post), channels: Object.fromEntries(post.channels.map((c) => [c.channel, channelProblems(c)])) };
 });
 router.get('/api/calendar/plan', () => readPlan());
+router.post('/api/calendar/plan-month', async (req) => {
+  const b = await readJson(req);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(b.from ?? '') || !/^\d{4}-\d{2}-\d{2}$/.test(b.to ?? '')) throw new HttpError(400, 'from and to must be YYYY-MM-DD');
+  try {
+    return await planMonth({ from: b.from, to: b.to, project: typeof b.project === 'string' ? b.project : undefined });
+  } catch (e) {
+    throw new HttpError(400, (e as Error).message);
+  }
+});
+// Make it: the post becomes a deliverable in its project; its files attach when it renders.
+router.post('/api/calendar/posts/:id/make', async (req, _r, p) => {
+  const post = await getPost(p.id);
+  if (!post) throw new HttpError(404, 'post not found');
+  const b = await readJson(req);
+  const project = await planProject(typeof b.project === 'string' ? b.project : post.campaign);
+  if (!project) throw new HttpError(400, 'Make a project for your product first (Create) — the post is made from its research.');
+  const format = String(b.format ?? post.format ?? '');
+  if (!(await getPack(format))) throw new HttpError(400, `pick a format for this post (unknown "${format}")`);
+  const brief = [post.notes, ...post.channels.map((c) => `${c.channel} caption: ${c.caption}`)].filter(Boolean).join('\n').slice(0, 1800);
+  const step = makeStep('pack', format, await packOptions(format, { _title: post.title, _brief: `Content calendar post${post.at ? ` for ${post.at.slice(0, 10)}` : ''}. ${brief}` }));
+  await updateCampaign(project.id, (c) => void c.steps.push(step));
+  await appendEvent(project.id, { step: step.id, type: 'log', text: `Added ${format} from the content calendar: ${post.title}` });
+  return savePost({ id: post.id, campaign: project.id, step: step.id, format, status: post.status === 'idea' ? 'idea' : 'draft' });
+});
+
 router.put('/api/calendar/plan', async (req) => savePlan(await readJson(req)));
 router.get('/api/calendar.ics', async (_q, res) => {
   res.writeHead(200, { 'content-type': 'text/calendar; charset=utf-8', 'cache-control': 'no-store' });
