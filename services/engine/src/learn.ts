@@ -6,6 +6,8 @@ import { join } from 'node:path';
 import { runClaude } from './claude.ts';
 import { campaignDir, home } from './paths.ts';
 import { listCampaigns } from './store.ts';
+import { listPosts } from './calendar.ts';
+import { computePerformance, headline, MIN_BASELINE, readSnapshots } from './metrics.ts';
 
 /**
  * The learning loop. Every campaign already leaves a trail: quality checks that
@@ -32,6 +34,7 @@ export interface Incident {
 
 /** Ordered: the first match wins. "infra" problems are counted but never become lessons. */
 export const CATEGORIES: { id: string; label: string; test: RegExp }[] = [
+  { id: 'underperformed', label: 'Posts well below your usual', test: /^Underperformed:/ },
   { id: 'infra', label: 'Tool or service failure', test: /DevTools|fetch failed|unknown kind|render failed|timed out|ECONN|isn't reachable|transcript/i },
   { id: 'tiny-screenshot', label: 'Screenshots too small to read', test: /screenshot|UI text lands|shrunk|unreadable|legib/i },
   { id: 'small-text', label: 'Text too small', test: /smallest text|too small|font size|tiny text/i },
@@ -112,6 +115,18 @@ export async function collectIncidents(since = new Date(Date.now() - 30 * 86_400
       else if ((m = text.match(/^Critic review: (.*)$/s))) add('eval', m[1]);
       else if (/^Director's review: revising/.test(text)) add('director', (lastText.get(e.step) ?? '').replace(/\bCHANGED\b\.?/g, '').trim() || "Director's review sent the storyboard back for changes.");
       else if ((m = text.match(/^Brand score \d+% — (.*)$/s))) for (const part of m[1].split(' · ')) add('brand', part);
+    }
+  }
+  // Published posts that did far worse than your usual: real audience evidence, not just our checks.
+  const perf = computePerformance(await readSnapshots());
+  for (const p of await listPosts()) {
+    for (const c of p.channels) {
+      const h = headline(perf, p.id, c.channel);
+      if (!h?.lift || h.lift > 0.5 || h.baselineN < MIN_BASELINE || !p.format) continue;
+      const at = c.sentAt ?? p.at ?? '';
+      if (at < since.toISOString()) continue;
+      const hookLine = c.caption.split('\n').find((l) => l.trim())?.slice(0, 120) ?? '';
+      incidents.push({ id: idOf('perf', p.id, c.channel), at, campaign: p.campaign ?? '', step: p.step ?? p.id, pack: p.format, source: 'eval', category: 'underperformed', text: `Underperformed: "${p.title}" on ${c.channel} did ${h.lift}× your usual at ${h.bucket} (hook: "${hookLine}").` });
     }
   }
   // Eval reports saved by tools/eval.ts.

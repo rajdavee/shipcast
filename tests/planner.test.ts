@@ -66,3 +66,18 @@ test('made deliverables attach the right files per channel, and the post becomes
   assert.ok(!q.channels[0].media[0].startsWith('/'), 'paths are relative to the Shipcast home');
   assert.deepEqual(await mediaFor(join(campaignDir(c.id), 'deliverables', 'd1'), 'youtube'), [], 'a carousel has no video for YouTube');
 });
+
+test('plan my month leans on what works: playbook wins in the prompt, top captions as style, experiments marked and kept', async () => {
+  const pb = { computedAt: '', channels: [{ channel: 'linkedin' as const, n: 20, ready: true, wins: [{ label: 'LinkedIn · PDF carousel: 1.7× your usual (13 posts, high confidence)' }], losses: [{ label: 'LinkedIn · Text only: 0.6× your usual (8 posts, medium confidence)' }], heat: [], bestSlots: [], narrative: ['Document carousels get saved and shared far more than plain text.'] }] } as any;
+  let prompt = '';
+  const ask = async (p: string) => ((prompt = p), JSON.stringify([{ slot: 0, title: 'Exp', format: 'social-post', caption: 'x' }, { slot: 1, title: 'Two', format: 'carousel', caption: 'y' }]));
+  const r = await planMonth({ from: '2026-12-07', to: '2026-12-14', ask, playbook: pb, rng: () => 0.01 });
+  assert.match(prompt, /## What works for this brand/);
+  assert.match(prompt, /\+ LinkedIn · PDF carousel: 1\.7× your usual/);
+  assert.match(prompt, /- LinkedIn · Text only/);
+  assert.match(prompt, /Why: Document carousels/);
+  assert.match(prompt, /\[EXPERIMENT: /, 'with no model history every option is untested, so slots become experiments');
+  const exp = r.created.filter((p) => p.experiment);
+  assert.ok(exp.length >= 1);
+  assert.ok(r.created.some((p) => p.channels[0].channel === 'linkedin' && p.experiment));
+});

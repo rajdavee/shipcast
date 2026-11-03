@@ -91,6 +91,8 @@ export interface Post {
   pillar?: string;
   /** Trend card it came from. */
   trend?: string;
+  /** Why this post deliberately tries something new (Plan my month keeps learning). */
+  experiment?: string;
   notes: string;
   createdAt: string;
   updatedAt: string;
@@ -98,6 +100,8 @@ export interface Post {
 
 export interface ContentPlan {
   tz: string;
+  /** Share of planned posts that deliberately test something new (0–0.5). */
+  explore?: number;
   pillars: { name: string; share: number; about?: string }[];
   /** Per channel: posts a week and preferred slots like "Tue 09:00". */
   cadence: Partial<Record<ChannelId, { perWeek: number; slots: string[] }>>;
@@ -242,6 +246,7 @@ export function savePost(input: Partial<Post> & { id?: string }, now = new Date(
       ...(merged.step ? { step: String(merged.step) } : {}),
       ...(merged.pillar ? { pillar: String(merged.pillar).slice(0, 60) } : {}),
       ...(merged.trend ? { trend: String(merged.trend) } : {}),
+      ...(merged.experiment ? { experiment: String(merged.experiment).slice(0, 300) } : {}),
       notes: String(merged.notes ?? '').slice(0, 4000),
       createdAt: old?.createdAt ?? now.toISOString(),
       updatedAt: now.toISOString(),
@@ -312,6 +317,7 @@ export async function savePlan(p: Partial<ContentPlan>): Promise<ContentPlan> {
   const cur = await readPlan();
   const next: ContentPlan = {
     tz: String(p.tz || cur.tz),
+    explore: Math.max(0, Math.min(0.5, Number(p.explore ?? cur.explore ?? 0.2) || 0)),
     pillars: (p.pillars ?? cur.pillars).map((x) => ({ name: String(x.name).slice(0, 40), share: Math.max(0, Math.min(100, Math.round(Number(x.share) || 0))), ...(x.about ? { about: String(x.about).slice(0, 200) } : {}) })).filter((x) => x.name).slice(0, 8),
     cadence: Object.fromEntries(
       Object.entries(p.cadence ?? cur.cadence)

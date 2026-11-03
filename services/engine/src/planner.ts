@@ -4,6 +4,8 @@ import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { channel, CALENDAR_CHANNELS, listPosts, localParts, readPlan, savePost, zonedToUtc, type ChannelId, type ContentPlan, type Post } from './calendar.ts';
 import { runClaude } from './claude.ts';
+import { computePerformance, headline, readSnapshots } from './metrics.ts';
+import { chooseForSlot, HOOK_TYPES, readPlaybook, type Playbook, type SlotChoice } from './playbook.ts';
 import { campaignDir, home } from './paths.ts';
 import { getPack } from './packs.ts';
 import { listCampaigns, readCampaign } from './store.ts';
@@ -60,7 +62,32 @@ export async function planProject(id?: string): Promise<Campaign | null> {
   return (await listCampaigns()).find((c) => !c.notes?.includes('[shipcast:golden]') && c.steps.some((s) => s.kind === 'brief' && s.status === 'done')) ?? null;
 }
 
-export async function planPrompt(slots: Slot[], plan: ContentPlan, project: Campaign | null): Promise<string> {
+/** Your best-performing captions per channel (lift ≥ 1.2), as style examples for the writer. */
+export async function winningCaptions(channels: ChannelId[], perChannel = 3): Promise<Partial<Record<ChannelId, { title: string; lift: number; caption: string }[]>>> {
+  const perf = computePerformance(await readSnapshots());
+  const out: Partial<Record<ChannelId, { title: string; lift: number; caption: string }[]>> = {};
+  const posts = await listPosts();
+  for (const ch of channels) {
+    const scored = posts
+      .flatMap((p) => {
+        const h = headline(perf, p.id, ch);
+        const c = p.channels.find((x) => x.channel === ch);
+        return h?.lift && h.lift >= 1.2 && c?.caption ? [{ title: p.title, lift: h.lift, caption: c.caption.slice(0, 500) }] : [];
+      })
+      .sort((a, b) => b.lift - a.lift)
+      .slice(0, perChannel);
+    if (scored.length) out[ch] = scored;
+  }
+  return out;
+}
+
+export interface PlanExtras {
+  playbook?: Playbook | null;
+  choices?: Map<number, SlotChoice>;
+  winners?: Awaited<ReturnType<typeof winningCaptions>>;
+}
+
+export async function planPrompt(slots: Slot[], plan: ContentPlan, project: Campaign | null, extras: PlanExtras = {}): Promise<string> {
   const brief = project ? await readFile(join(campaignDir(project.id), 'brief', 'brief.md'), 'utf8').catch(() => '') : '';
   const trends = (await readTrends()).cards.filter((c) => !c.archived).slice(0, 10);
   const packs = new Set(CALENDAR_CHANNELS.flatMap((c) => c.formats));
@@ -77,15 +104,39 @@ ${plan.pillars.map((p) => `- ${p.name} — ${p.share}%${p.about ? `: ${p.about}`
 ## What's working right now (Trending; use where it fits, cite the key)
 ${trends.map((t) => `- [${t.key}] ${t.title} (${t.platform}, ${t.strength}) — ${t.recipe.hookPattern}`).join('\n') || '- none yet'}
 
-## Slots to fill (one idea each)
-${slots.map((s) => `${s.i}. ${channel(s.channel)!.name} — ${DAYS[new Date(`${s.date}T12:00:00Z`).getUTCDay()]} ${s.date} ${s.time}`).join('\n')}
+${playbookBlock(slots, extras)}## Slots to fill (one idea each)
+${slots.map((s) => {
+    const c = extras.choices?.get(s.i);
+    const steer = c && (c.format || c.hookType) ? ` → ${[c.format && `format ${c.format}`, c.hookType && `hook: ${c.hookType}`].filter(Boolean).join(', ')}${c.experiment ? ` [EXPERIMENT: ${c.reason ?? 'testing something new'}]` : ''}` : '';
+    return `${s.i}. ${channel(s.channel)!.name} — ${DAYS[new Date(`${s.date}T12:00:00Z`).getUTCDay()]} ${s.date} ${s.time}${steer}`;
+  }).join('\n')}
 
 ## Formats per channel (pick one for each slot; best first)
 ${CALENDAR_CHANNELS.filter((c) => slots.some((s) => s.channel === c.id)).map((c) => `- ${c.name}: ${c.formats.filter((f) => known.includes(f)).join(', ')}`).join('\n')}
 
-Rules: every idea is specific to this product and audience (no generic tips); no two slots on the same day say the same thing — when one idea runs on two channels, adapt it to each; vary formats and hooks across the month; facts only from the brief; captions follow the channel's culture (LinkedIn: a hook line under 200 characters, short paragraphs, links go in the first comment, not the caption; Instagram: first line hooks before "more", 3–5 hashtags at the end); never invent customers, numbers or quotes.
+Rules: when a slot names a format and hook type, use them — they come from what works for this brand, and an EXPERIMENT deliberately tests something new, so commit to it rather than playing safe; every idea is specific to this product and audience (no generic tips); no two slots on the same day say the same thing — when one idea runs on two channels, adapt it to each; vary formats and hooks across the month; facts only from the brief; captions follow the channel's culture (LinkedIn: a hook line under 200 characters, short paragraphs, links go in the first comment, not the caption; Instagram: first line hooks before "more", 3–5 hashtags at the end); never invent customers, numbers or quotes.
 
 Reply with JSON only: [{"slot": <number>, "title": "≤ 70 chars", "pillar": "<pillar name>", "format": "<format id>", "hook": "the first line", "caption": "the full caption for that channel", "hashtags": ["#tag"], "firstComment": "LinkedIn/Instagram only: the link or extra detail the caption points to, else empty", "notes": "what to show / how to make it", "trend": "<trend key or empty>"}]`;
+}
+
+function playbookBlock(slots: Slot[], x: PlanExtras): string {
+  const chans = [...new Set(slots.map((s) => s.channel))];
+  const parts: string[] = [];
+  for (const ch of chans) {
+    const cp = x.playbook?.channels.find((c) => c.channel === ch && c.ready);
+    const wins = x.winners?.[ch] ?? [];
+    if (!cp && !wins.length) continue;
+    parts.push(
+      [
+        `### ${channel(ch)!.name}`,
+        ...(cp?.wins ?? []).map((f) => `+ ${f.label}`),
+        ...(cp?.losses ?? []).map((f) => `- ${f.label}`),
+        ...(cp?.narrative ?? []).map((n) => `Why: ${n}`),
+        ...wins.map((w) => `Top post (${w.lift}× your usual) — "${w.title}":\n> ${w.caption.replace(/\n+/g, ' / ')}`),
+      ].join('\n'),
+    );
+  }
+  return parts.length ? `## What works for this brand (from its own published posts)\nLean into the wins, avoid the losses, and write in the voice of the top posts — without copying them.\n\n${parts.join('\n\n')}\n\n` : '';
 }
 
 const ROLE = 'You are the content strategist inside Shipcast, a local marketing studio. Do not use tools. Reply with JSON only.';
@@ -105,14 +156,25 @@ async function ask(prompt: string, timeoutMs = 420_000): Promise<string> {
 }
 
 /** Fill a date range with drafts. Returns the created posts and how many slots got nothing usable. */
-export async function planMonth(opts: { from: string; to: string; project?: string; ask?: (p: string) => Promise<string> }): Promise<{ created: Post[]; skipped: number; slots: number }> {
+export async function planMonth(opts: { from: string; to: string; project?: string; ask?: (p: string) => Promise<string>; playbook?: Playbook | null; rng?: () => number }): Promise<{ created: Post[]; skipped: number; slots: number }> {
   const plan = await readPlan();
   const existing = await listPosts({ from: zonedToUtc(opts.from, '00:00', plan.tz), to: zonedToUtc(opts.to, '00:00', plan.tz) });
   const slots = planSlots(plan, opts.from, opts.to, existing);
   if (!slots.length) return { created: [], skipped: 0, slots: 0 };
   if (slots.length > 60) throw new Error(`${slots.length} slots is too many for one plan — plan up to a month at a time.`);
   const project = await planProject(opts.project);
-  const text = await (opts.ask ?? ask)(await planPrompt(slots, plan, project));
+  // Steer each slot from what works (Thompson sampling), keeping a share of deliberate experiments.
+  const playbook = opts.playbook !== undefined ? opts.playbook : await readPlaybook().catch(() => null);
+  const choices = new Map<number, SlotChoice>();
+  for (const s of slots) {
+    const cp = playbook?.channels.find((c) => c.channel === s.channel && c.ready);
+    if (!cp) continue;
+    const formats = [];
+    for (const f of channel(s.channel)!.formats) if (await getPack(f)) formats.push(f);
+    choices.set(s.i, await chooseForSlot({ channel: s.channel, candidates: { formats, hookTypes: HOOK_TYPES.filter((h) => h !== 'other') }, explore: plan.explore ?? 0.2, rng: opts.rng, model: cp.model ?? null }));
+  }
+  const winners = await winningCaptions([...new Set(slots.map((s) => s.channel))]).catch(() => ({}));
+  const text = await (opts.ask ?? ask)(await planPrompt(slots, plan, project, { playbook, choices, winners }));
   const m = text.match(/\[[\s\S]*\]/);
   let items: any[] = [];
   try {
@@ -125,7 +187,9 @@ export async function planMonth(opts: { from: string; to: string; project?: stri
     if (!s || seen.has(s.i) || typeof it.title !== 'string') continue;
     seen.add(s.i);
     const info = channel(s.channel)!;
-    const fmt = info.formats.includes(it.format) ? it.format : info.formats[0];
+    const choice = choices.get(s.i);
+    // An experiment keeps the format it was assigned, whatever the writer preferred.
+    const fmt = choice?.experiment && choice.format ? choice.format : info.formats.includes(it.format) ? it.format : (choice?.format ?? info.formats[0]);
     created.push(
       await savePost({
         title: it.title,
@@ -136,6 +200,7 @@ export async function planMonth(opts: { from: string; to: string; project?: stri
         format: fmt,
         ...(project ? { campaign: project.id } : {}),
         ...(typeof it.trend === 'string' && it.trend ? { trend: it.trend } : {}),
+        ...(choice?.experiment ? { experiment: choice.reason ?? 'Testing something new' } : {}),
         notes: [it.hook && `Hook: ${it.hook}`, it.notes].filter(Boolean).join('\n'),
         channels: [{ channel: s.channel, caption: String(it.caption ?? it.hook ?? ''), ...(info.firstComment && typeof it.firstComment === 'string' && it.firstComment.trim() ? { firstComment: it.firstComment.trim() } : {}), hashtags: Array.isArray(it.hashtags) ? it.hashtags.slice(0, info.hashtagsMax) : [], media: [], via: 'manual' }],
       }),

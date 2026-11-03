@@ -9,6 +9,11 @@ import { pipeline } from 'node:stream/promises';
 import {
   appendEvent,
   CALENDAR_CHANNELS,
+  criticCalibration,
+  moreLikeThis,
+  rankForYou,
+  remix,
+  suggestedSlots,
   addSnapshot,
   collectNow,
   home,
@@ -613,13 +618,30 @@ router.get('/api/metrics/forecast/:postId', async (_q, _r, p) => {
   const pb = await readPlaybook();
   return { post: post.id, forecasts: await Promise.all(post.channels.map(async (c) => ({ channel: c.channel, forecast: await forecastPost(post, c.channel, pb) }))) };
 });
-router.get('/api/metrics/calibration', async () => forecastCalibration());
+router.get('/api/metrics/calibration', async () => ({ ...(await forecastCalibration()), critic: await criticCalibration() }));
+router.get('/api/metrics/suggested-slots', async () => suggestedSlots(await readPlaybook()));
+router.post('/api/calendar/posts/:id/more', async (_q, _r, p) => {
+  try {
+    return await moreLikeThis(p.id);
+  } catch (e) {
+    throw new HttpError(404, (e as Error).message);
+  }
+});
+router.post('/api/calendar/posts/:id/remix', async (req, _r, p) => {
+  const { channels } = await readJson(req);
+  try {
+    return await remix(p.id, Array.isArray(channels) ? channels : undefined);
+  } catch (e) {
+    throw new HttpError(404, (e as Error).message);
+  }
+});
 
 // ── trend radar: cards the trends agent keeps fresh ────────────────────
 router.get('/api/trends', async (req) => {
   const all = new URL(req.url ?? '/', 'http://x').searchParams.get('archived') === '1';
   const feed = await readTrends();
-  return { refreshedAt: feed.refreshedAt ?? null, sources: feed.sources ?? {}, cards: rankCards(feed.cards.filter((c) => all || !c.archived)) };
+  // Cards whose recipe you already win with come first, each with why.
+  return { refreshedAt: feed.refreshedAt ?? null, sources: feed.sources ?? {}, cards: rankForYou(rankCards(feed.cards.filter((c) => all || !c.archived)), await readPlaybook().catch(() => null)) };
 });
 router.post('/api/trends/refresh', async () => updateJob('trends', { runNow: true }));
 
