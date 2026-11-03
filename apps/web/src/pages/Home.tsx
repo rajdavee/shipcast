@@ -2,13 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { looksLikeContent } from '../content.ts';
 import { api, detectSource, type Campaign, type SourceType, type Status } from '../api.ts';
 import { go, useLoad } from '../hooks.ts';
-import { DEFAULT_FORMATS, FORMATS } from '../formats.ts';
+import { DEFAULT_FORMATS, FORMAT_GROUPS, FORMATS } from '../formats.ts';
 import { CampaignCover } from '../components/CampaignCover.tsx';
 import { Brainstorm } from '../components/Brainstorm.tsx';
 import { PageHeader } from '../components/ui.tsx';
 
 const KIND: Record<SourceType, string> = { url: 'Website', github: 'GitHub repo', local: 'Folder on this computer', text: 'Description' };
 const PICK_KEY = 'shipcast.formats';
+const GROUP_KEY = 'shipcast.formatGroup';
 export const PREFILL_KEY = 'shipcast.prefill';
 const BRAIN_KEY = 'shipcast.brainstorm';
 const readBool = (k: string, d: boolean) => {
@@ -74,6 +75,14 @@ const PostMock = () => (
 export function Home({ status, services, campaigns }: { status: Status | null; services: { name: string; ok: boolean }[] | null; campaigns: Campaign[] | null }) {
   const [text, setText] = useState('');
   const [picks, setPicks] = useState<string[]>(loadPicks);
+  const [group, setGroup] = useState(() => {
+    try {
+      return localStorage.getItem(GROUP_KEY) ?? 'popular';
+    } catch {
+      return 'popular';
+    }
+  });
+  const [query, setQuery] = useState('');
   const tones = useLoad(() => api.tones());
   const [toneId, setToneId] = useState('');
   const [noteOpen, setNoteOpen] = useState(false);
@@ -327,8 +336,33 @@ export function Home({ status, services, campaigns }: { status: Status | null; s
             )}
           </div>
         )}
+        <div className="filter-bar fmt-bar">
+          <div className="seg" role="group" aria-label="Format groups">
+            {FORMAT_GROUPS.map((g) => {
+              const n = chosen.filter((id) => g.ids.includes(id)).length;
+              return (
+                <button key={g.id} aria-pressed={!query && group === g.id} onClick={() => { setQuery(''); setGroup(g.id); try { localStorage.setItem(GROUP_KEY, g.id); } catch {} }}>
+                  {g.label}{n ? <span className="chip-count">{n}</span> : null}
+                </button>
+              );
+            })}
+          </div>
+          <input className="input fmt-search" type="search" placeholder={`Search ${formats.length} formats`} value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search formats" />
+        </div>
+        {chosen.length > 0 && (
+          <div className="chips-row picked" aria-label="Selected formats">
+            {chosen.map((id) => (
+              <button key={id} className="chip-opt" aria-pressed="true" onClick={() => toggle(id)} aria-label={`Remove ${FORMATS.find((f) => f.id === id)?.title ?? id}`}>
+                {FORMATS.find((f) => f.id === id)?.title ?? id} <span aria-hidden="true">×</span>
+              </button>
+            ))}
+          </div>
+        )}
         <div className="tiles" role="group" aria-label="Formats">
-          {formats.map((f) => {
+          {(query.trim()
+            ? formats.filter((f) => `${f.title} ${f.line} ${f.id}`.toLowerCase().includes(query.trim().toLowerCase()))
+            : (FORMAT_GROUPS.find((g) => g.id === group) ?? FORMAT_GROUPS[0]).ids.map((id) => formats.find((f) => f.id === id)).filter((f): f is (typeof formats)[number] => !!f)
+          ).map((f) => {
             const on = chosen.includes(f.id);
             return (
               <button key={f.id} className="tile" aria-pressed={on} onClick={() => toggle(f.id)}>

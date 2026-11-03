@@ -37,6 +37,16 @@ export const FORMATS: { id: string; title: string; line: string; img?: string; r
 ];
 export const DEFAULT_FORMATS = ['infographic', 'carousel', 'copy-kit'];
 
+/** Groups on Create; "popular" is a short starting set so the first screen isn't 30+ tiles. */
+export const FORMAT_GROUPS: { id: string; label: string; ids: string[] }[] = [
+  { id: 'popular', label: 'Popular', ids: ['carousel', 'photo-carousel', 'copy-kit', 'infographic', 'reel', 'quote-cards', 'launch-film'] },
+  { id: 'social', label: 'Social', ids: ['carousel', 'photo-carousel', 'copy-kit', 'infographic', 'quote-cards', 'thumbnails', 'profile-kit', 'pins-endscreens'] },
+  { id: 'video', label: 'Video', ids: ['reel', 'launch-film', 'youtube-video', 'explainer-video', 'audiogram', 'ugc-ad', 'custom-video'] },
+  { id: 'docs', label: 'Docs & web', ids: ['presentation', 'document', 'blog-article', 'newsletter', 'email', 'landing', 'print'] },
+  { id: 'sales', label: 'Launch & sales', ids: ['product-hunt-kit', 'app-store-screens', 'ad-set', 'case-study', 'battlecard', 'press-kit', 'event-kit', 'release-notes'] },
+  { id: 'research', label: 'Research', ids: ['trend-brief', 'teardown'] },
+];
+
 /** Friendly one-liners (falls back to the pack's tagline). */
 export const PLAIN: Record<string, string> = Object.fromEntries(FORMATS.map((f) => [f.id, f.line]));
 PLAIN['feature-spotlight'] = 'A short silent clip that loops in the feed';
