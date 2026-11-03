@@ -3,6 +3,8 @@ import { api, type TrendCard } from '../api.ts';
 import { go, toast, useLoad } from '../hooks.ts';
 import { formatTitle } from '../formats.ts';
 import { PREFILL_KEY } from './Home.tsx';
+import { EmptyState, Loading, PageHeader } from '../components/ui.tsx';
+import { Nav } from '../components/icons.tsx';
 
 const PLATFORMS = ['all', 'linkedin', 'instagram', 'tiktok', 'youtube', 'x', 'newsletter', 'web'];
 const PLATFORM_NAME: Record<string, string> = { all: 'All', linkedin: 'LinkedIn', instagram: 'Instagram', tiktok: 'TikTok', youtube: 'YouTube', x: 'X', newsletter: 'Newsletter', web: 'Web', any: 'All platforms' };
@@ -29,7 +31,7 @@ export function Trending() {
   const [platform, setPlatform] = useState('all');
   const [risingOnly, setRisingOnly] = useState(false);
   const job = agents.data?.jobs.find((j) => j.id === 'trends');
-  if (!feed.data) return <main className="page"><p className="muted">Loading…</p></main>;
+  if (!feed.data) return <main className="page"><PageHeader title="Ideas" /><Loading /></main>;
   const cards = feed.data.cards.filter((c) => (platform === 'all' || c.platform === platform || c.platform === 'any') && (!risingOnly || c.strength === 'rising'));
 
   function makeOne(c: TrendCard) {
@@ -47,20 +49,26 @@ export function Trending() {
 
   return (
     <main className="page">
-      <div className="page-head" style={{ display: 'flex', gap: 16, alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap' }}>
-        <div>
-          <h1>Trending</h1>
-          <p className="muted">What's working in marketing right now — formats, hooks, topics and platform changes, each with evidence. Refreshed {ago(feed.data.refreshedAt)}{job?.enabled ? `; next ${job.running ? 'running now' : job.waiting ? `waiting (${job.waiting.toLowerCase()})` : 'on schedule'}` : ' (auto-refresh is off)'}.</p>
+      <PageHeader
+        title="Ideas"
+        description={<>What's working in marketing right now — formats, hooks, topics and platform changes, each with evidence. Refreshed {ago(feed.data.refreshedAt)}{job?.enabled ? `; next ${job.running ? 'running now' : job.waiting ? `waiting (${job.waiting.toLowerCase()})` : 'on schedule'}` : ' (auto-refresh is off)'}.</>}
+        actions={<button className="btn" disabled={job?.running || job?.runNow} onClick={refresh}>{job?.running ? 'Refreshing…' : job?.runNow ? 'Queued' : 'Refresh now'}</button>}
+      />
+      <div className="filter-bar">
+        <div className="seg" role="group" aria-label="Platform">
+          {PLATFORMS.map((p) => (
+            <button key={p} aria-pressed={platform === p} onClick={() => setPlatform(p)}>{platformName(p)}</button>
+          ))}
         </div>
-        <button className="btn ghost" disabled={job?.running || job?.runNow} onClick={refresh}>{job?.running ? 'Refreshing…' : job?.runNow ? 'Queued' : 'Refresh now'}</button>
+        <label className="switch"><input type="checkbox" checked={risingOnly} onChange={(e) => setRisingOnly(e.target.checked)} /> Rising only</label>
       </div>
-      <div className="chips" role="group" aria-label="Platform" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '14px 0' }}>
-        {PLATFORMS.map((p) => (
-          <button key={p} className={`btn ${platform === p ? 'primary' : 'ghost'}`} onClick={() => setPlatform(p)}>{platformName(p)}</button>
-        ))}
-        <label className="switch" style={{ marginLeft: 'auto' }}><input type="checkbox" checked={risingOnly} onChange={(e) => setRisingOnly(e.target.checked)} /> Rising only</label>
-      </div>
-      {!feed.data.cards.length && <p className="muted">No trends yet. The first refresh runs a few minutes after Shipcast starts (outside quiet hours), or press Refresh now.</p>}
+      {!feed.data.cards.length ? (
+        <EmptyState icon={<Nav.ideas />} title="No trends yet" action={<button className="btn primary" disabled={job?.running || job?.runNow} onClick={refresh}>{job?.runNow ? 'Queued' : 'Refresh now'}</button>}>
+          The first refresh runs a few minutes after Shipcast starts (outside quiet hours), or press Refresh now.
+        </EmptyState>
+      ) : !cards.length ? (
+        <EmptyState compact title="Nothing matches these filters">Try another platform{risingOnly ? ' or show steady trends too' : ''}.</EmptyState>
+      ) : null}
       <div className="trend-grid">
         {cards.map((c) => (
           <article className="trend-card" key={c.key}>

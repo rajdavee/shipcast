@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, type BrandScore, type ToneProfile, type ToneSliders } from '../api.ts';
 import { toast, useLoad } from '../hooks.ts';
+import { Loading, PageHeader } from '../components/ui.tsx';
 
 const SLIDERS: { key: keyof ToneSliders; lo: string; hi: string }[] = [
   { key: 'formalCasual', lo: 'Formal', hi: 'Casual' },
@@ -21,7 +22,7 @@ export function Voice() {
   const [samples, setSamples] = useState('');
   const current = tones.data?.find((t) => t.id === sel) ?? tones.data?.[0];
   useEffect(() => setDraft(current ? structuredClone(current) : null), [current?.id, current?.updatedAt]);
-  if (!tones.data || !draft) return <main className="page narrow"><p className="muted">Loading…</p></main>;
+  if (!tones.data || !draft) return <main className="page narrow"><PageHeader title="Brand" /><Loading /></main>;
   const set = (patch: Partial<ToneProfile>) => setDraft({ ...draft, ...patch });
 
   async function save() {
@@ -54,19 +55,17 @@ export function Voice() {
 
   return (
     <main className="page narrow voice-page">
-      <div className="camp-head">
-        <div>
-          <h1>Brand voice</h1>
-          <p>How your brand sounds. Every post, deck, PDF, ad, email and script follows the voice you pick, and each one is scored against it.</p>
-        </div>
-      </div>
+      <PageHeader
+        title="Brand"
+        description="How your brand sounds. Every post, deck, PDF, ad, email and script follows the voice you pick, and each one is scored against it."
+        actions={<button className="btn" onClick={() => { setSel('default'); setDraft({ ...structuredClone(tones.data!.find((t) => t.id === 'default')!), id: '', name: 'New voice', samples: [] }); }}>New voice</button>}
+      />
 
-      <section className="setup-section">
+      <section className="voice-tabs">
         <div className="seg" role="group" aria-label="Voices">
           {tones.data.map((t) => (
             <button key={t.id} aria-pressed={t.id === draft.id} onClick={() => setSel(t.id)}>{t.name}</button>
           ))}
-          <button onClick={() => { setSel('default'); setDraft({ ...structuredClone(tones.data!.find((t) => t.id === 'default')!), id: '', name: 'New voice', samples: [] }); }}>+ New voice</button>
         </div>
       </section>
 

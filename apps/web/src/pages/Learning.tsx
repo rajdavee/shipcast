@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { api, type Lesson } from '../api.ts';
 import { toast, useLoad } from '../hooks.ts';
 import { formatTitle } from '../formats.ts';
+import { EmptyState, Loading, PageHeader } from '../components/ui.tsx';
+import { Nav } from '../components/icons.tsx';
 
 const pct = (r?: { rate: number; runs: number }) => (r && r.runs ? `${Math.round(r.rate * 100)}% of ${r.runs} runs` : '—');
 const STATUS: Record<Lesson['status'], string> = { trial: 'On trial', kept: 'Kept — it works', retired: 'Retired — no effect', off: 'Off' };
@@ -15,7 +17,7 @@ export function Learning() {
   const quality = useLoad(() => api.quality(), [], 30000);
   const job = agents.data?.jobs.find((j) => j.id === 'learn');
   const golden = agents.data?.jobs.find((j) => j.id === 'golden');
-  if (!data.data) return <main className="page narrow"><p className="muted">Loading…</p></main>;
+  if (!data.data) return <main className="page narrow"><PageHeader title="Insights" /><Loading /></main>;
   const { lessons, packs, categories } = data.data;
   const label = (c: string) => categories.find((x) => x.id === c)?.label ?? c;
   const byPack = [...new Set(lessons.map((l) => l.pack))];
@@ -43,91 +45,104 @@ export function Learning() {
 
   return (
     <main className="page narrow">
-      <h1>Learning</h1>
-      <p className="muted">
+      <PageHeader
+        title="Insights"
+        description="Quality over time, and what Shipcast learned from its own runs."
+      />
+      <p className="intro">
         Shipcast reads its own quality checks, the creative director's notes, brand-voice slips, eval scores and the changes you ask for. Problems that keep coming back become short lessons for that format. Each lesson is on trial: after {10} more runs it's kept if the problem got rarer, and retired if it didn't.
       </p>
-      <div className="srow" style={{ margin: '14px 0 22px' }}>
-        <i className={`dot ${job?.running ? 'live' : job?.enabled ? 'ok' : ''}`} />
-        <div>
-          <h3>{job?.running ? 'Learning now…' : job?.enabled ? 'Learns on its own' : 'Learning is off'}</h3>
-          <p className="muted" style={{ fontSize: 13 }}>{job?.lastRun ? `Last run: ${job.lastResult?.summary ?? ''}` : 'Not run yet.'} {job?.waiting ? ` · ${job.waiting}` : ''}</p>
-        </div>
-        <div className="row-actions">
-          <a className="btn ghost" href="#/setup">Schedule</a>
-          <button className="btn primary" disabled={busy || job?.running || job?.runNow} onClick={learnNow}>{job?.runNow ? 'Queued' : 'Learn now'}</button>
-        </div>
-      </div>
-
-      <h2>Quality over time</h2>
-      <p className="muted" style={{ fontSize: 13 }}>
-        Scores out of 5 from the creative-director critic (eval runs and the nightly quality check{golden?.enabled ? '' : ' — off; switch it on in Setup → Background agents'}).
-      </p>
-      {quality.data && !Object.keys(quality.data.formats).length && <p className="muted">No scores yet.</p>}
-      <div className="rows" style={{ marginBottom: 22 }}>
-        {Object.entries(quality.data?.formats ?? {})
-          .sort((a, b) => a[0].localeCompare(b[0]))
-          .map(([p, xs]) => {
-            const last = xs.at(-1)!;
-            const prev = xs.at(-2);
-            const d = prev ? +(last.avg - prev.avg).toFixed(2) : 0;
-            return (
-              <div className="srow" key={p}>
-                <i className={`dot ${last.avg >= 4 ? 'ok' : last.avg < 3 ? 'bad' : ''}`} />
-                <div>
-                  <h3>{formatName(p)} · {last.avg.toFixed(2)}{prev ? <span className="muted" style={{ fontSize: 13 }}> {d > 0 ? `▲ ${d}` : d < 0 ? `▼ ${-d}` : '='}</span> : null}</h3>
-                  <p className="muted" style={{ fontSize: 13 }}>
-                    {xs.slice(-8).map((x) => x.avg.toFixed(1)).join(' → ')} · lowest last time: {last.low} · {new Date(last.at).toLocaleDateString()}
-                  </p>
-                </div>
-              </div>
-            );
-          })}
-      </div>
-
-      <h2>Lessons</h2>
-      {!lessons.length && <p className="muted">No lessons yet. They appear after the first learning run finds a problem that repeats.</p>}
-      {byPack.map((p) => (
-        <section key={p} style={{ marginBottom: 18 }}>
-          <h3>{formatName(p)}</h3>
-          <div className="rows">
-            {lessons.filter((l) => l.pack === p).map((l) => (
-              <div className="srow" key={l.id} style={{ opacity: l.status === 'off' || l.status === 'retired' ? 0.6 : 1 }}>
-                <i className={`dot ${l.status === 'kept' ? 'ok' : l.status === 'trial' ? 'live' : ''}`} />
-                <div>
-                  <h3 style={{ fontWeight: 600 }}>{l.rule}</h3>
-                  <p className="muted" style={{ fontSize: 13 }}>
-                    {STATUS[l.status]} · {label(l.category)} · before: {pct(l.baseline)}{l.after?.runs ? ` → since: ${pct(l.after)}` : ''}
-                  </p>
-                  {l.examples.length > 0 && (
-                    <details>
-                      <summary className="muted" style={{ fontSize: 13 }}>Why</summary>
-                      <ul style={{ fontSize: 13 }}>{l.examples.map((e, i) => <li key={i}>{e}</li>)}</ul>
-                    </details>
-                  )}
-                </div>
-                <div className="row-actions">
-                  {l.status !== 'retired' && <button className="btn ghost" onClick={() => toggle(l)}>{l.status === 'off' ? 'Turn on' : 'Turn off'}</button>}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      ))}
-
-      <h2 style={{ marginTop: 26 }}>What keeps going wrong (last 30 days)</h2>
-      {!worst.length && <p className="muted">Nothing yet.</p>}
       <div className="rows">
-        {worst.map((w) => (
-          <div className="srow" key={w.p}>
-            <i className="dot" />
-            <div>
-              <h3>{formatName(w.p)}</h3>
-              <p className="muted" style={{ fontSize: 13 }}>{w.runs} run{w.runs === 1 ? '' : 's'} · {w.top.map(([c, n]) => `${label(c)} ×${n}`).join(' · ')}</p>
-            </div>
+        <div className="srow">
+          <i className={`dot ${job?.running ? 'live' : job?.enabled ? 'ok' : ''}`} />
+          <div>
+            <h3>{job?.running ? 'Learning now…' : job?.enabled ? 'Learns on its own' : 'Learning is off'}</h3>
+            <p className="muted" style={{ fontSize: 13 }}>{job?.lastRun ? `Last run: ${job.lastResult?.summary ?? ''}` : 'Not run yet.'} {job?.waiting ? ` · ${job.waiting}` : ''}</p>
           </div>
-        ))}
+          <div className="row-actions">
+            <a className="btn ghost" href="#/settings/agents">Schedule</a>
+            <button className="btn primary" disabled={busy || job?.running || job?.runNow} onClick={learnNow}>{job?.runNow ? 'Queued' : 'Learn now'}</button>
+          </div>
+        </div>
       </div>
+
+      <section className="setup-section">
+        <h2>Quality over time</h2>
+        <p>
+          Scores out of 5 from the creative-director critic (eval runs and the nightly quality check{golden?.enabled ? '' : ' — off; switch it on in Settings → Background agents'}).
+        </p>
+        {quality.data && !Object.keys(quality.data.formats).length && <EmptyState compact icon={<Nav.insights />} title="No scores yet">Scores appear after an eval run or the nightly quality check.</EmptyState>}
+        <div className="rows">
+          {Object.entries(quality.data?.formats ?? {})
+            .sort((a, b) => a[0].localeCompare(b[0]))
+            .map(([p, xs]) => {
+              const last = xs.at(-1)!;
+              const prev = xs.at(-2);
+              const d = prev ? +(last.avg - prev.avg).toFixed(2) : 0;
+              return (
+                <div className="srow" key={p}>
+                  <i className={`dot ${last.avg >= 4 ? 'ok' : last.avg < 3 ? 'bad' : ''}`} />
+                  <div>
+                    <h3>{formatName(p)} · {last.avg.toFixed(2)}{prev ? <span className="muted" style={{ fontSize: 13 }}> {d > 0 ? `▲ ${d}` : d < 0 ? `▼ ${-d}` : '='}</span> : null}</h3>
+                    <p className="muted" style={{ fontSize: 13 }}>
+                      {xs.slice(-8).map((x) => x.avg.toFixed(1)).join(' → ')} · lowest last time: {last.low} · {new Date(last.at).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+        </div>
+      </section>
+
+      <section className="setup-section">
+        <h2>Lessons</h2>
+        <p>Short rules for one format, each on trial until it proves it helps.</p>
+        {!lessons.length && <EmptyState compact title="No lessons yet">They appear after the first learning run finds a problem that repeats.</EmptyState>}
+        {byPack.map((p) => (
+          <section key={p} className="sub-section">
+            <h3>{formatName(p)}</h3>
+            <div className="rows">
+              {lessons.filter((l) => l.pack === p).map((l) => (
+                <div className="srow" key={l.id} style={{ opacity: l.status === 'off' || l.status === 'retired' ? 0.6 : 1 }}>
+                  <i className={`dot ${l.status === 'kept' ? 'ok' : l.status === 'trial' ? 'live' : ''}`} />
+                  <div>
+                    <h3 style={{ fontWeight: 600 }}>{l.rule}</h3>
+                    <p className="muted" style={{ fontSize: 13 }}>
+                      {STATUS[l.status]} · {label(l.category)} · before: {pct(l.baseline)}{l.after?.runs ? ` → since: ${pct(l.after)}` : ''}
+                    </p>
+                    {l.examples.length > 0 && (
+                      <details>
+                        <summary className="muted" style={{ fontSize: 13 }}>Why</summary>
+                        <ul style={{ fontSize: 13 }}>{l.examples.map((e, i) => <li key={i}>{e}</li>)}</ul>
+                      </details>
+                    )}
+                  </div>
+                  <div className="row-actions">
+                    {l.status !== 'retired' && <button className="btn ghost" onClick={() => toggle(l)}>{l.status === 'off' ? 'Turn on' : 'Turn off'}</button>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        ))}
+      </section>
+
+      <section className="setup-section">
+        <h2>What keeps going wrong</h2>
+        <p>The most common problems per format over the last 30 days.</p>
+        {!worst.length && <EmptyState compact title="Nothing yet">Problems show up here once a few runs have been checked.</EmptyState>}
+        <div className="rows">
+          {worst.map((w) => (
+            <div className="srow" key={w.p}>
+              <i className="dot" />
+              <div>
+                <h3>{formatName(w.p)}</h3>
+                <p className="muted" style={{ fontSize: 13 }}>{w.runs} run{w.runs === 1 ? '' : 's'} · {w.top.map(([c, n]) => `${label(c)} ×${n}`).join(' · ')}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
     </main>
   );
 }

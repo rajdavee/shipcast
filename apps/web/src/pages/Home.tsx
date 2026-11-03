@@ -5,6 +5,7 @@ import { go, useLoad } from '../hooks.ts';
 import { DEFAULT_FORMATS, FORMATS } from '../formats.ts';
 import { CampaignCover } from '../components/CampaignCover.tsx';
 import { Brainstorm } from '../components/Brainstorm.tsx';
+import { PageHeader } from '../components/ui.tsx';
 
 const KIND: Record<SourceType, string> = { url: 'Website', github: 'GitHub repo', local: 'Folder on this computer', text: 'Description' };
 const PICK_KEY = 'shipcast.formats';
@@ -193,13 +194,10 @@ export function Home({ status, services, campaigns }: { status: Status | null; s
 
   return (
     <main className="page home">
-      <section className="hero">
-        <h1>Paste a link. Get the launch content.</h1>
-        <p>Shipcast studies your product, then designs the posts, videos and carousels — on your own computer, with your Claude account.</p>
-      </section>
+      <PageHeader hero title="Paste a link. Get the launch content." description="Shipcast studies your product, then designs the posts, videos and carousels — on your own computer, with your Claude account." />
 
       {status && !claudeReady ? (
-        <div className="banner center">Connect your Claude account to start — it's the only account Shipcast needs. <a href="#/setup">Connect Claude</a></div>
+        <div className="banner center">Connect your Claude account to start — it's the only account Shipcast needs. <a href="#/settings/connections">Connect Claude</a></div>
       ) : servicesDown.length ? (
         <div className="banner center">The renderers aren't running ({servicesDown.join(', ')}). Start them with <code>npm start</code>.</div>
       ) : null}
