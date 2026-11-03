@@ -1,10 +1,10 @@
 import { createServer, type Server } from 'node:http';
 import { existsSync, createWriteStream, realpathSync } from 'node:fs';
-import { readdir, readFile, writeFile as writeFileP } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm, symlink, writeFile as writeFileP } from 'node:fs/promises';
 import { mkdir } from 'node:fs/promises';
 import { join, resolve, sep, basename } from 'node:path';
 import { spawn } from 'node:child_process';
-import { homedir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { pipeline } from 'node:stream/promises';
 import {
   appendEvent,
@@ -108,6 +108,21 @@ import {
   DEFAULT_TONE,
   CHANNELS,
   type Channel,
+  connections,
+  disconnect,
+  kitTexts,
+  mediaFiles,
+  oauthFinish,
+  oauthStart,
+  OAUTH_PROVIDERS,
+  postizIntegrations,
+  PublishError,
+  queueSendNow,
+  redactSecrets,
+  saveClientKeys,
+  savePostiz,
+  updateChannel,
+  type OAuthProvider,
 } from '@shipcast/engine';
 import { HttpError, json, readJson, Router, sendFile } from './http.ts';
 import { loginState, startClaudeLogin, startGithubLogin } from './connect.ts';
@@ -259,6 +274,7 @@ router.put('/api/settings', async (req) => {
   if (typeof body.agentsPaused === 'boolean') patch.agentsPaused = body.agentsPaused;
   for (const k of ['agentsQuietStart', 'agentsQuietEnd'] as const) if (typeof body[k] === 'string' && /^\d{1,2}:\d{2}$/.test(body[k])) patch[k] = body[k];
   if (Number.isFinite(body.agentsMaxClaudeRunsPerDay)) patch.agentsMaxClaudeRunsPerDay = Math.min(50, Math.max(0, Math.round(Number(body.agentsMaxClaudeRunsPerDay))));
+  if (typeof body.publishingPaused === 'boolean') patch.publishingPaused = body.publishingPaused;
   return writeSettings(patch);
 });
 
@@ -301,7 +317,8 @@ async function checkedSave(body: Partial<Post>, id?: string) {
   if (body.status === 'scheduled') {
     const problems = scheduleProblems(merged);
     if (problems.length) throw new HttpError(400, problems.join(' '));
-    merged.channels = merged.channels.map((c) => ({ ...c, state: c.state === 'sent' ? 'sent' : 'pending', error: undefined }));
+    // Scheduling is what arms the publisher: only `pending` channels ever go out.
+    merged.channels = merged.channels.map((c) => (c.state === 'sent' || c.state === 'sending' ? c : { ...c, state: 'pending', error: undefined, attempts: undefined, retryAt: undefined }));
   }
   return savePost({ ...merged, ...(id ? { id } : { id: undefined }) });
 }
@@ -358,6 +375,114 @@ router.post('/api/calendar/import', async (req) => {
   if (typeof csv !== 'string' || !csv.trim()) throw new HttpError(400, 'send { csv: "<file contents>" }');
   const r = await importCsv(csv.slice(0, 2_000_000), (await readPlan()).tz);
   return { created: r.created.length, problems: r.problems };
+});
+
+// ── publishing: manual kits, direct LinkedIn/YouTube, the Postiz bridge ──
+async function mustPost(id: string): Promise<Post> {
+  const post = await getPost(id);
+  if (!post) throw new HttpError(404, 'post not found');
+  return post;
+}
+/** Provider and publishing errors reach the UI only after every stored secret is masked. */
+async function publishCall<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (e) {
+    if (e instanceof HttpError) throw e;
+    throw new HttpError(e instanceof PublishError ? 400 : 502, await redactSecrets((e as Error).message));
+  }
+}
+const oauthProvider = (p: string): OAuthProvider => {
+  if (!OAUTH_PROVIDERS.includes(p as OAuthProvider)) throw new HttpError(404, 'unknown provider');
+  return p as OAuthProvider;
+};
+router.get('/api/publish/connections', () => connections());
+for (const provider of OAUTH_PROVIDERS)
+  router.put(`/api/publish/${provider}`, async (req) => {
+    const b = await readJson(req);
+    await publishCall(() => saveClientKeys(provider, String(b.clientId ?? '').trim(), String(b.clientSecret ?? '').trim()));
+    return connections();
+  });
+router.put('/api/publish/postiz', async (req) => {
+  const b = await readJson(req);
+  const list = await publishCall(() => savePostiz(String(b.url ?? ''), String(b.apiKey ?? '')));
+  return { ...(await connections()), integrations: list };
+});
+router.get('/api/publish/postiz/integrations', () => publishCall(() => postizIntegrations()));
+router.get('/api/publish/:provider/connect', async (req, _r, p) => {
+  const provider = oauthProvider(p.provider);
+  // The redirect goes to this very server, on the port the browser reached it on.
+  return publishCall(() => oauthStart(provider, req.socket.localPort ?? 4317));
+});
+router.delete('/api/publish/:provider', async (_q, _r, p, url) => {
+  const provider = p.provider === 'postiz' ? 'postiz' : oauthProvider(p.provider);
+  await disconnect(provider, url.searchParams.get('keys') === '1');
+  return connections();
+});
+
+const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+const callbackPage = (title: string, text: string) =>
+  `<!doctype html><meta charset="utf-8"><title>${esc(title)}</title><body style="font:16px system-ui;margin:15vh auto;max-width:28rem;text-align:center;color:#222"><h1 style="font-size:22px">${esc(title)}</h1><p>${esc(text)}</p></body>`;
+router.get('/oauth/:provider/callback', async (_q, res, p, url) => {
+  const q = url.searchParams;
+  let status = 200;
+  let page: string;
+  try {
+    const provider = oauthProvider(p.provider);
+    if (q.get('error')) throw new PublishError(`Sign-in was cancelled (${(q.get('error_description') || q.get('error') || '').slice(0, 120)}).`);
+    const { account } = await oauthFinish(provider, q.get('state') ?? '', q.get('code') ?? '');
+    page = callbackPage('Connected — you can close this tab', `${provider === 'linkedin' ? 'LinkedIn' : 'YouTube'}${account ? ` (${account})` : ''} is connected to Shipcast.`);
+  } catch (e) {
+    status = 400;
+    page = callbackPage('Not connected', await redactSecrets((e as Error).message));
+  }
+  res.writeHead(status, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'", 'referrer-policy': 'no-referrer' });
+  res.end(page);
+  return undefined;
+});
+
+function findChannel(post: Post, ch: string) {
+  const c = post.channels.find((x) => x.channel === ch);
+  if (!c) throw new HttpError(404, `post has no ${ch} channel`);
+  return c;
+}
+router.post('/api/calendar/posts/:id/channels/:channel/sent', async (req, _r, p) => {
+  const post = await mustPost(p.id);
+  const c = findChannel(post, p.channel);
+  if (c.state === 'sending') throw new HttpError(409, 'It is being sent right now.');
+  const b = await readJson(req);
+  const link = typeof b.url === 'string' ? b.url.trim() : '';
+  if (link && !/^https?:\/\/\S+$/i.test(link)) throw new HttpError(400, 'url must be an http(s) link');
+  return updateChannel(post.id, c.channel, { state: 'sent', sentAt: new Date().toISOString(), error: undefined, retryAt: undefined, ...(link ? { url: link.slice(0, 1000) } : {}) }, c.account);
+});
+router.post('/api/calendar/posts/:id/send-now', async (_q, _r, p) => {
+  const post = await mustPost(p.id);
+  const next = await publishCall(() => queueSendNow(post));
+  return { post: next, note: 'Queued — the publisher picks it up within about 20 seconds.' };
+});
+
+// Post kit: the media plus ready-to-paste copy, one zip.
+router.get('/api/calendar/posts/:id/kit/:channel', async (_q, res, p) => {
+  const post = await mustPost(p.id);
+  const c = findChannel(post, p.channel);
+  const files = await publishCall(async () => mediaFiles(c));
+  const dir = await mkdtemp(join(tmpdir(), 'shipcast-kit-'));
+  try {
+    for (const [name, text] of Object.entries(kitTexts(post, c))) await writeFileP(join(dir, name), text);
+    // Numbered links keep the posting order and stop two files with the same name colliding.
+    for (const [i, f] of files.entries()) await symlink(f, join(dir, `${String(i + 1).padStart(2, '0')}-${basename(f)}`));
+  } catch (e) {
+    await rm(dir, { recursive: true, force: true });
+    throw e;
+  }
+  const slug = `${post.title.replace(/[^\w-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 50) || 'post'}-${c.channel}`;
+  const child = spawn('zip', ['-q', '-r', '-', '.'], { cwd: dir });
+  res.writeHead(200, { 'content-type': 'application/zip', 'content-disposition': `attachment; filename="${slug}-kit.zip"` });
+  child.stdout.pipe(res);
+  const clean = () => void rm(dir, { recursive: true, force: true });
+  child.on('close', clean);
+  child.on('error', () => (res.end(), clean()));
+  return undefined;
 });
 
 // ── trend radar: cards the trends agent keeps fresh ────────────────────
@@ -1128,7 +1253,8 @@ export function createApp({ serveWeb = true } = {}): Server {
         const host = new URL(origin).host;
         if (!LOCAL_HOSTS.test(host)) throw new HttpError(403, 'forbidden origin');
       }
-      if (url.pathname.startsWith('/api/')) {
+      // /oauth/* is only the providers' redirect back to this local server.
+      if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/oauth/')) {
         const m = router.match(req.method === 'HEAD' ? 'GET' : req.method!, url.pathname);
         if (!m) throw new HttpError(404, 'no such route');
         const out = await m.handler(req, res, m.params, url);
