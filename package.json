@@ -34,7 +34,7 @@
     "start": "node bin/shipcast.ts start",
     "worker": "node services/worker/src/main.ts",
     "doctor": "node bin/shipcast.ts doctor",
-    "test": "node --test \"tests/*.test.ts\"",
+    "test": "node --test --test-force-exit \"tests/*.test.ts\"",
     "typecheck": "tsc -p tsconfig.json --noEmit && npm run typecheck -w apps/web",
     "status": "node bin/shipcast.ts status",
     "service:render": "node services/render/src/main.ts",

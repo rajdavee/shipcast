@@ -48,10 +48,12 @@ class Session {
     if (process.env.SHIPCAST_DEBUG) process.stderr.write(`[cdp] → ${id} ${method}\n`);
     this.ws.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }));
     return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
-      setTimeout(() => {
+      // Cleared on reply: a pending timer would keep the process alive for up to 90 s after the last capture.
+      const timer = setTimeout(() => {
         if (this.pending.delete(id)) reject(new Error(`${method} timed out`));
       }, method === 'Page.printToPDF' || method === 'Page.captureScreenshot' ? 90_000 : 30_000);
+      const done = <F extends (x: any) => void>(f: F) => ((x: any) => (clearTimeout(timer), f(x))) as F;
+      this.pending.set(id, { resolve: done(resolve), reject: done(reject) });
     });
   }
   close() {
