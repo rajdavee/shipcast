@@ -80,7 +80,7 @@ export function audiogramScenes(h: Helpers): SceneDef[] {
         const n = vertical ? 29 : 37;
         const cover = String(f.cover ?? '').trim();
         const art = Math.round((vertical ? 210 : 190) * u);
-        const waveH = Math.round((vertical ? 150 : 140) * u);
+        const waveH = Math.round((vertical ? 300 : 140) * u);
         // Bars further from the centre show slightly older levels, so speech ripples outward; a fixed
         // envelope and per-bar jitter (seeded by index) keep it from reading as a pyramid.
         const env = Array.from({ length: n }, (_, k) => {
