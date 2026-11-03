@@ -42,3 +42,4 @@ export * from './critic.ts';
 export * from './golden.ts';
 export * from './longform.ts';
 export * from './kits.ts';
+export * from './calendar.ts';

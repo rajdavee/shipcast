@@ -8,6 +8,20 @@ import { homedir } from 'node:os';
 import { pipeline } from 'node:stream/promises';
 import {
   appendEvent,
+  CALENDAR_CHANNELS,
+  channelProblems,
+  deletePost,
+  getPost,
+  importCsv,
+  listPosts,
+  readPlan,
+  savePlan,
+  savePost,
+  scheduleProblems,
+  toCsv,
+  toIcs,
+  type Post,
+  type PostStatus,
   blockedReason,
   CATEGORIES,
   collectIncidents,
@@ -269,6 +283,53 @@ router.put('/api/agents/:id', async (req, _r, p) => {
     throw new HttpError(404, (e as Error).message);
   }
 });
+// ── content calendar: posts across channels, the plan, ICS and CSV ──────
+const calendarQuery = (req: { url?: string }) => new URL(req.url ?? '/', 'http://x').searchParams;
+router.get('/api/calendar/channels', () => CALENDAR_CHANNELS);
+router.get('/api/calendar/posts', (req) => {
+  const q = calendarQuery(req);
+  return listPosts({ from: q.get('from') ?? undefined, to: q.get('to') ?? undefined, channel: q.get('channel') ?? undefined, unscheduled: q.get('unscheduled') === '1', status: (q.get('status') ?? '').split(',').filter(Boolean) as PostStatus[] });
+});
+async function checkedSave(body: Partial<Post>, id?: string) {
+  const merged = { ...(id ? await getPost(id) : {}), ...body } as Post;
+  if (id && !(await getPost(id))) throw new HttpError(404, 'post not found');
+  if (body.status === 'scheduled') {
+    const problems = scheduleProblems(merged);
+    if (problems.length) throw new HttpError(400, problems.join(' '));
+    merged.channels = merged.channels.map((c) => ({ ...c, state: c.state === 'sent' ? 'sent' : 'pending', error: undefined }));
+  }
+  return savePost({ ...merged, ...(id ? { id } : { id: undefined }) });
+}
+router.post('/api/calendar/posts', async (req) => checkedSave(await readJson(req)));
+router.put('/api/calendar/posts/:id', async (req, _r, p) => checkedSave(await readJson(req), p.id));
+router.delete('/api/calendar/posts/:id', async (_q, _r, p) => {
+  if (!(await deletePost(p.id))) throw new HttpError(404, 'post not found');
+  return { ok: true };
+});
+router.get('/api/calendar/posts/:id/check', async (_q, _r, p) => {
+  const post = await getPost(p.id);
+  if (!post) throw new HttpError(404, 'post not found');
+  return { problems: scheduleProblems(post), channels: Object.fromEntries(post.channels.map((c) => [c.channel, channelProblems(c)])) };
+});
+router.get('/api/calendar/plan', () => readPlan());
+router.put('/api/calendar/plan', async (req) => savePlan(await readJson(req)));
+router.get('/api/calendar.ics', async (_q, res) => {
+  res.writeHead(200, { 'content-type': 'text/calendar; charset=utf-8', 'cache-control': 'no-store' });
+  res.end(toIcs(await listPosts()));
+  return undefined;
+});
+router.get('/api/calendar/export.csv', async (_q, res) => {
+  res.writeHead(200, { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': 'attachment; filename="shipcast-calendar.csv"' });
+  res.end(toCsv(await listPosts()));
+  return undefined;
+});
+router.post('/api/calendar/import', async (req) => {
+  const { csv } = await readJson(req);
+  if (typeof csv !== 'string' || !csv.trim()) throw new HttpError(400, 'send { csv: "<file contents>" }');
+  const r = await importCsv(csv.slice(0, 2_000_000), (await readPlan()).tz);
+  return { created: r.created.length, problems: r.problems };
+});
+
 // ── trend radar: cards the trends agent keeps fresh ────────────────────
 router.get('/api/trends', async (req) => {
   const all = new URL(req.url ?? '/', 'http://x').searchParams.get('archived') === '1';

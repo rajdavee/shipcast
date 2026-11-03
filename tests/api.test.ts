@@ -217,3 +217,26 @@ test('lessons: list with per-format stats, and switch one off', async () => {
   assert.equal((await api('/api/lessons/nope', { method: 'PUT', json: { status: 'off' } })).status, 404);
   assert.equal((await api('/api/lessons/nope', { method: 'PUT', json: { status: 'kept' } })).status, 400);
 });
+
+test('content calendar: create, refuse an unready schedule, schedule, ICS, CSV round trip', async () => {
+  assert.ok((await api('/api/calendar/channels')).body.some((c: any) => c.id === 'linkedin' && c.foldAt === 210));
+  const p = (await api('/api/calendar/posts', { method: 'POST', json: { title: 'Launch carousel', channels: [{ channel: 'instagram', caption: 'Swipe →', hashtags: [], media: [], via: 'manual' }] } })).body;
+  assert.equal(p.status, 'idea');
+  const when = new Date(Date.now() + 86_400_000).toISOString();
+  const refused = await api(`/api/calendar/posts/${p.id}`, { method: 'PUT', json: { at: when, status: 'scheduled' } });
+  assert.equal(refused.status, 400);
+  assert.match(refused.body.error, /Instagram: attach/);
+  const ok = await api(`/api/calendar/posts/${p.id}`, { method: 'PUT', json: { at: when, status: 'scheduled', channels: [{ channel: 'instagram', caption: 'Swipe →', hashtags: [], media: ['slides/1.png'], via: 'manual' }] } });
+  assert.equal(ok.status, 200);
+  assert.equal(ok.body.status, 'scheduled');
+  assert.equal(ok.body.channels[0].state, 'pending');
+  assert.deepEqual((await api(`/api/calendar/posts/${p.id}/check`)).body.problems, []);
+  const ics = await fetch(base + '/api/calendar.ics').then((r) => r.text());
+  assert.match(ics, /SUMMARY:\[Instagram\] Launch carousel/);
+  const csv = await fetch(base + '/api/calendar/export.csv').then((r) => r.text());
+  const imp = await api('/api/calendar/import', { method: 'POST', json: { csv } });
+  assert.equal(imp.body.created, 1);
+  assert.equal((await api(`/api/calendar/posts/${p.id}`, { method: 'DELETE' })).status, 200);
+  assert.equal((await api(`/api/calendar/posts/${p.id}`, { method: 'DELETE' })).status, 404);
+  assert.equal((await api('/api/calendar/plan', { method: 'PUT', json: { cadence: { linkedin: { perWeek: 2, slots: ['Tue 09:00'] } } } })).body.cadence.linkedin.perWeek, 2);
+});
