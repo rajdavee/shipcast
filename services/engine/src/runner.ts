@@ -595,6 +595,8 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
           /* no storyboard yet: the render loop reports it */
         }
       }
+      // Fix rounds for failed checks are capped at 2; the director's and critic's single revisions don't use them up.
+      let fixes = 0;
       for (let round = 0; ; round++) {
         await phase(round ? 'Applying fixes' : specKind === 'storyboard' ? 'Rendering the video' : specKind === 'infographic' ? 'Animating the infographic' : 'Rendering');
         await log({ step: step.id, type: 'log', text: round ? `Re-rendering after fixes (round ${round})…` : `Rendering ${SPEC_FILE[specKind]} with the ${specKind === 'storyboard' || specKind === 'infographic' ? 'render' : 'stills'} service…` });
@@ -644,7 +646,7 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
           }
           break;
         }
-        if (round >= 2 || renderOnly || !sessionId || canceled || timedOut || Date.now() > deadline) {
+        if (fixes >= 2 || renderOnly || !sessionId || canceled || timedOut || Date.now() > deadline) {
           // Keep whatever rendered; only fail if nothing did.
           if (r.summary === 'render failed' || r.summary === 'no spec' || r.summary === 'bad json' || r.summary === 'invalid storyboard') {
             ok = false;
@@ -652,6 +654,7 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
           }
           break;
         }
+        fixes++;
         const fix = await execClaude(`The render service checked your ${SPEC_FILE[specKind]} and found these problems:\n${r.feedback.map((f) => `- ${f}`).join('\n')}\n\nEdit out/${SPEC_FILE[specKind]} (or the file a problem names) to fix every one of them (shorter text, different layout, valid fields). Don't render anything yourself — just update the JSON.`, sessionId);
         if (!fix.result?.ok) break;
       }
