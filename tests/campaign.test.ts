@@ -188,7 +188,8 @@ test('hook variants only start from a finished piece that has a spec', async () 
 test('choosing a take swaps it into the spec and re-renders without Claude', async () => {
   const c = await api('/api/campaigns', { method: 'POST', json: { name: 'Takes', source: { type: 'url', value: 'example.com' }, deliverables: [{ pack: 'reel' }] } });
   const id = c.body.id;
-  const done = await waitFor(id, (x) => x.steps[1].status === 'done' || x.steps[1].status === 'failed', 30_000);
+  // CI runners are slow to fail a render with no render service; give it room.
+  const done = await waitFor(id, (x) => x.steps[1].status === 'done' || x.steps[1].status === 'failed', 90_000);
   const step = done.steps[1];
   const { writeFileSync, mkdirSync, readFileSync } = await import('node:fs');
   const out = join(home, 'campaigns', id, 'deliverables', step.id, 'out');

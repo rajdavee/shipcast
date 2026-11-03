@@ -306,6 +306,8 @@ export function createStillsService() {
             if (!pg) continue;
             try {
             await pg.eval('document.fonts.ready.then(() => true)');
+            // Lazy images below the fold haven't loaded yet; load them all before judging any as broken.
+            await pg.eval(`Promise.all([...document.images].map((i) => { i.loading = 'eager'; return i.complete ? 0 : new Promise((r) => { i.onload = i.onerror = r; setTimeout(r, 8000); }); })).then(() => true)`);
             const audit = await pg.eval<{ wide: boolean; broken: number; tiny: number }>(`(() => ({ wide: document.documentElement.scrollWidth > innerWidth + 2, broken: [...document.images].filter((i) => !i.complete || !i.naturalWidth).length, tiny: [...document.querySelectorAll('p,li,a,dd,summary')].filter((e) => e.offsetParent && parseFloat(getComputedStyle(e).fontSize) < 13).length }))()`);
             if (audit.wide) problems.push(`${view}: the page scrolls sideways — something is wider than the screen.`);
             if (audit.broken) problems.push(`${view}: ${audit.broken} image(s) didn't load — check the paths.`);
