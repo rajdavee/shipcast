@@ -42,6 +42,8 @@ export async function previews(dir: string): Promise<string[]> {
     ...pick(/^contact-sheet\.jpg$/),
     ...pick(/^(landing|.*)-desktop\.png$/),
     ...pick(/-mobile\.png$/),
+    // Long-form pieces are shared by their cover / hero image as much as read on the page.
+    ...pick(/^(linkedin-cover|hero)\.png$/),
     ...pick(/^(video|poster)\.jpg$/),
   ];
   // A video with no preview image: make a frame sheet from the file itself.

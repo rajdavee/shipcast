@@ -129,6 +129,7 @@ export async function catalogMarkdown(kind: SpecKind): Promise<string> {
       '- `{ "type": "stats", "stats": ["value | label", …≤3] }` — verified numbers only.',
       '- `{ "type": "cta", "headline", "body"?, "cta", "url" }` — the closing ask.',
       '- `{ "type": "image", "image", "alt", "url"? }` · `{ "type": "divider" }`',
+      '- Newsletter issues: `{ "type": "masthead", "title"?: "newsletter name", "issue": "Issue 12", "date": "3 Nov 2026", "tagline"? }` (first block) · `{ "type": "items", "heading"?, "items": ["Title | one or two lines | url?", 2–4] }` · `{ "type": "forward", "text"?, "url"?: "subscribe page" }` (the forward-to-a-friend line).',
       'Rich text: `*word*` accent · `**word**` bold. Images: paths relative to the brief folder; they are copied next to the HTML and zipped for upload. Zoom into the detail that proves the point by adding `#crop=x,y,w,h` (fractions of the image, e.g. `assets/screens/docket.png#crop=0.05,0.1,0.55,0.45`) — a whole screen shrunk into a box is unreadable.',
       'Checks after rendering: Gmail clipping (102 KB), subject and preheader length, link count, spam phrasing, phone width, footer address.',
     ].join('\n');
@@ -176,6 +177,7 @@ export async function catalogMarkdown(kind: SpecKind): Promise<string> {
     '',
     'Each item: `{ "type": "thumbnail"|"card", "layout": "<id>", "theme"?: "editorial|swiss|bold|midnight", "preset": "<preset id>", "name": "file.png", "fields": {…} }`',
     'Presets: `youtube-thumbnail` 1280×720 · `og-card` 1200×630 · `github-banner` 1280×640 · `x-image` 1600×900 · `instagram-post` 1080×1080 · `linkedin-image` 1080×1350 · `linkedin-landscape` 1200×627 · `story-image` 1080×1920 · `x-header` 1500×500 · `linkedin-banner` 1584×396 · `youtube-banner` 2560×1440 · `app-store-ios` 1290×2796 · `play-store` 1080×1920 · `producthunt-gallery` 1270×760 · `producthunt-thumb` 240×240',
+    'Articles and newsletters: `article-cover` 1920×1080 (LinkedIn article / newsletter cover) · `article-figure` 1600×1000 (in-article figure). In a figure the screenshot must stay readable at article width — crop to the part the paragraph talks about.',
     'File names may carry one folder (`ios/01-track.png`) to keep sets apart. Images that fail to load come back to you.',
     'App store screens (`app-screen`): the caption must stay on 2 lines at ≥ 6% of the canvas width — a caption that shrinks further comes back to you. The screenshot fills the phone\'s width and is cut at the bottom, so use a phone-shaped screenshot or crop a desktop one to a tall region about 1 wide by 2 high in pixels (for a 1440×900 capture: `#crop=x,0,0.29,1`). No real device art or store badges — the frame is generic.',
     'Quotes and people: `pull-quote`, `testimonial`, `quote-post` and `post-card` carry exact words from the brief or source only, attributed to the real person or post. With no real quote, write clearly placeholder words and set `"sample": "yes"` — the image is then labelled "Sample copy — not a real customer". Never invent a named customer, a rating or a platform logo.',

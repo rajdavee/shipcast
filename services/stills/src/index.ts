@@ -1,5 +1,6 @@
 import { copyFile, mkdir, writeFile, readFile, rename, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import { existsSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import { assertInHome, browser, writePptx, type PptxSlide, createService, FIT_SCRIPT, run, TIDY_PAGE_SCRIPT, getPreset, layoutAuditScript, loadBrand, normalizeBrand, presetForSize, resolveIcons, SERVICE_PORTS, type BrandKit, type LayoutAudit } from '@shipcast/engine';
@@ -13,6 +14,7 @@ import { AD_SIZES, DEFAULT_AD_SIZES, renderAd, type AdSpec } from './templates/a
 import { HIDE_TEXT_CSS, MEASURE_TEXT_SCRIPT, renderSlide, SLIDE_LAYOUTS, SLIDE_THEMES, slideIconNames, type SlidePage } from './templates/slides.ts';
 import { DOC_AUDIT_SCRIPT, DOC_LAYOUTS, DOC_THEMES, docIconNames, PAGE_SIZES, renderDocument, type DocPage } from './templates/document.ts';
 import { snapCropFile } from './crop.ts';
+import { renderArticle } from './templates/article.ts';
 
 export { snapCrop } from './crop.ts';
 export { CAROUSEL_LAYOUTS, THEMES, CARD_LAYOUTS, THUMBNAIL_LAYOUTS, DOC_LAYOUTS, DOC_THEMES, PAGE_SIZES, SLIDE_LAYOUTS, SLIDE_THEMES };
@@ -296,6 +298,43 @@ export function createStillsService() {
         return { index, previews, zip: join(outDir, 'landing.zip'), sections: r.sections.map((x) => x.type), problems };
       },
 
+      /** A blog / SEO article (front matter + markdown) → a standalone readable page and desktop/phone previews. */
+      article: async (input: { file: string; brandDir?: string; brand?: Partial<BrandKit>; outDir: string; theme?: string }, ctx) => {
+        const outDir = assertInHome(input.outDir, 'outDir');
+        const { brand, assetsDir } = await brandFrom(input);
+        const md = await readFile(assertInHome(input.file, 'file'), 'utf8');
+        // Figures are rendered into out/ by the graphics spec; screenshots from the brief resolve too.
+        const resolve = (p: string) => {
+          const local = join(outDir, p);
+          return assertInHome(p.startsWith('/') ? p : existsSync(local) || !assetsDir ? local : join(assetsDir, p), 'image');
+        };
+        const r = renderArticle(md, brand, resolve, { theme: input.theme });
+        const dir = join(outDir, 'article');
+        await rm(dir, { recursive: true, force: true });
+        await mkdir(join(dir, 'images'), { recursive: true });
+        const problems: string[] = [];
+        for (const im of r.images) await copyFile(im.src, join(dir, im.name)).catch(() => problems.push(`article.md: image ${im.src.split('/').slice(-2).join('/')} not found — reference figures by their out/ path (figures/01-….png).`));
+        const index = join(dir, 'index.html');
+        await writeFile(index, r.html);
+        const previews: Record<string, string> = {};
+        for (const [view, opts] of [['desktop', { width: 1280, height: 900, scale: 1 }], ['mobile', { width: 390, height: 844, scale: 2, mobile: true }]] as const) {
+          ctx.progress(view === 'desktop' ? 0.3 : 0.7, `${view} preview`);
+          const pg = await browser().open(pathToFileURL(index).href, { ...opts, settleMs: 300 });
+          try {
+            await pg.eval('document.fonts.ready.then(() => true)');
+            const audit = await pg.eval<{ wide: boolean; broken: number; tiny: number }>(`(() => ({ wide: document.documentElement.scrollWidth > innerWidth + 2, broken: [...document.images].filter((i) => !i.complete || !i.naturalWidth).length, tiny: [...document.querySelectorAll('article p,article li,figcaption')].filter((e) => e.offsetParent && parseFloat(getComputedStyle(e).fontSize) < 14).length }))()`);
+            if (audit.wide) problems.push(`article ${view}: the page scrolls sideways — something is wider than the screen.`);
+            if (audit.broken && !problems.some((p) => p.includes('not found'))) problems.push(`article ${view}: ${audit.broken} image(s) didn't load — check the paths in article.md.`);
+            if (audit.tiny) problems.push(`article ${view}: ${audit.tiny} text element(s) under 14px.`);
+            previews[view] = join(outDir, `article-${view}.png`);
+            await writeFile(previews[view], await pg.fullPage(16000));
+          } finally {
+            await pg.close();
+          }
+        }
+        return { index, previews, title: r.title, problems: [...new Set(problems)] };
+      },
+
       /** Marketing emails: inbox-safe HTML + plain text + images folder + zip, with desktop/phone previews and deliverability checks. */
       email: async (input: EmailSetSpec & { brandDir?: string; brand?: Partial<BrandKit>; outDir: string }, ctx) => {
         const outDir = assertInHome(input.outDir, 'outDir');
@@ -523,7 +562,8 @@ export function createStillsService() {
           const html = g.type === 'thumbnail' ? renderThumbnail(g.layout, g.fields ?? {}, rctx) : renderCard(g.layout, g.theme ?? 'editorial', g.fields ?? {}, rctx);
           // One folder level is allowed (ios/01-hero.png) so store sets stay apart; nothing can climb out of outDir.
           const name = String(g.name || `${g.layout}-${i + 1}.png`).replace(/[^\w./-]/g, '_').split('/').filter((x) => x && !/^\.+$/.test(x)).slice(-2).join('/') || `${g.layout}-${i + 1}.png`;
-          results.push({ ...(await capture(html, join(outDir, /\.(png|jpe?g)$/.test(name) ? name : `${name}.png`), width, height, safe)), preset: g.preset, layout: g.layout });
+          // Figures are read inside an article column (~720 px of a 1600 px canvas), not full-screen on a phone.
+          results.push({ ...(await capture(html, join(outDir, /\.(png|jpe?g)$/.test(name) ? name : `${name}.png`), width, height, safe, g.preset === 'article-figure' ? 0.016 : undefined)), preset: g.preset, layout: g.layout });
         }
         return { items: results };
       },

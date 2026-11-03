@@ -4,6 +4,7 @@ import { cp, mkdir, writeFile, rm } from 'node:fs/promises';
 import { catalogMarkdown, checkCopy, checkLaunchCopy, renderSpec, SPEC_FILE, type SpecKind } from './specs.ts';
 import { readFile, readdir, rename, stat } from 'node:fs/promises';
 import { shortsFromStoryboard } from './shorts.ts';
+import { renderExtras } from './longform.ts';
 import { recentPatterns, scenePattern, varietyFeedback } from './variety.ts';
 import { callService } from './service.ts';
 import { existsSync, readFileSync } from 'node:fs';
@@ -604,6 +605,8 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
         if ((pack?.id === 'document' || pack?.id === 'presentation' || pack?.id === 'ad-set' || pack?.id === 'email' || pack?.id === 'landing') && step.options.theme && step.options.theme !== 'auto') force.theme = step.options.theme;
         if (pack?.id === 'document' && step.options.size && step.options.size !== 'auto') force.size = step.options.size;
         const r = await renderSpec(specKind, cwd, join(dir, 'brief'), { force });
+        const extra = await renderExtras(pack?.id, cwd, join(dir, 'brief'));
+        if (extra.length) Object.assign(r, { ok: false, feedback: [...r.feedback, ...extra] });
         if (pack?.id === 'product-hunt-kit') {
           const copy = checkLaunchCopy(await readFile(join(cwd, 'out', 'launch-copy.md'), 'utf8').catch(() => null));
           if (copy.length) Object.assign(r, { ok: false, feedback: [...r.feedback, ...copy] });

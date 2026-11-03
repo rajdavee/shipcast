@@ -40,3 +40,4 @@ export * from './learn.ts';
 export * from './trends.ts';
 export * from './critic.ts';
 export * from './golden.ts';
+export * from './longform.ts';
