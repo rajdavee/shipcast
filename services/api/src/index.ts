@@ -20,6 +20,12 @@ import {
   importMetricsCsv,
   postPerformance,
   readSnapshots,
+  forecastCalibration,
+  forecastPost,
+  publicPlaybook,
+  readPlaybook,
+  recordForecast,
+  refreshPlaybook,
   heldByPostiz,
   postizWithdraw,
   planMonth,
@@ -350,7 +356,10 @@ async function checkedSave(body: Partial<Post>, id?: string) {
     // Scheduling is what arms the publisher: only `pending` channels ever go out.
     merged.channels = merged.channels.map((c) => (c.state === 'sent' || c.state === 'sending' ? c : { ...c, state: 'pending', error: undefined, attempts: undefined, retryAt: undefined }));
   }
-  return savePost({ ...merged, ...(id ? { id } : { id: undefined }) });
+  const saved = await savePost({ ...merged, ...(id ? { id } : { id: undefined }) });
+  // What the model expected at scheduling time, so it can be scored once the numbers are in. Never blocks the save.
+  if (body.status === 'scheduled') await recordForecast(saved).catch(() => {});
+  return saved;
 }
 router.post('/api/calendar/posts', async (req) => checkedSave(await readJson(req)));
 router.put('/api/calendar/posts/:id', async (req, _r, p) => checkedSave(await readJson(req), p.id));
@@ -593,6 +602,18 @@ router.post('/api/metrics/read-screenshot', async (req, _r, _p, url) => {
     if (temp) await rm(temp, { force: true });
   }
 });
+router.get('/api/metrics/playbook', async () => publicPlaybook(await readPlaybook()));
+router.post('/api/metrics/playbook/refresh', async (req) => {
+  const b = await readJson(req);
+  return publicPlaybook(await refreshPlaybook({ narrative: b?.narrative !== false }));
+});
+router.get('/api/metrics/forecast/:postId', async (_q, _r, p) => {
+  const post = await getPost(p.postId);
+  if (!post) throw new HttpError(404, 'post not found');
+  const pb = await readPlaybook();
+  return { post: post.id, forecasts: await Promise.all(post.channels.map(async (c) => ({ channel: c.channel, forecast: await forecastPost(post, c.channel, pb) }))) };
+});
+router.get('/api/metrics/calibration', async () => forecastCalibration());
 
 // ── trend radar: cards the trends agent keeps fresh ────────────────────
 router.get('/api/trends', async (req) => {
@@ -860,7 +881,7 @@ async function skillsView() {
 }
 router.get('/api/skills', () => skillsView());
 router.post('/api/skills/:id/install', async (req, _r, p) => {
-  const b = await readJson(req).catch(() => ({}));
+  const b = await readJson(req);
   const r = await installPackage(p.id, { acceptLicence: b?.acceptLicence === true });
   if (!r.ok) throw new HttpError(400, r.log);
   return { ...(await skillsView()), log: r.log };
@@ -1064,7 +1085,7 @@ router.get('/api/campaigns/:id/size', async (_q, _r, p) => campaignSize(await mu
 router.post('/api/campaigns/:id/cleanup', async (req, _r, p) => {
   const c = await mustCampaign(p.id);
   if (c.steps.some((s) => s.status === 'running')) throw new HttpError(409, 'wait for the running step to finish');
-  const b = await readJson(req).catch(() => ({}));
+  const b = await readJson(req);
   const r = await tidyCampaign(c, { app: !!b.app });
   await appendEvent(p.id, { step: 'brief', type: 'log', text: `Freed ${(r.freed / 1e9).toFixed(1)} GB` });
   return { ...r, ...(await campaignSize(c)) };
