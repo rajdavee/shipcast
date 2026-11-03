@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { api, type TrendCard } from '../api.ts';
 import { go, toast, useLoad } from '../hooks.ts';
-import { FORMATS } from '../formats.ts';
+import { formatTitle } from '../formats.ts';
 import { PREFILL_KEY } from './Home.tsx';
 
 const PLATFORMS = ['all', 'linkedin', 'instagram', 'tiktok', 'youtube', 'x', 'newsletter', 'web'];
+const PLATFORM_NAME: Record<string, string> = { all: 'All', linkedin: 'LinkedIn', instagram: 'Instagram', tiktok: 'TikTok', youtube: 'YouTube', x: 'X', newsletter: 'Newsletter', web: 'Web', any: 'All platforms' };
+const platformName = (p: string) => PLATFORM_NAME[p] ?? p[0].toUpperCase() + p.slice(1);
+const formatName = formatTitle;
 const KIND: Record<TrendCard['kind'], string> = { format: 'Format', hook: 'Hook', topic: 'Topic', tactic: 'Tactic', 'platform-change': 'Platform change' };
 const ago = (iso?: string | null) => {
   if (!iso) return 'never';
@@ -53,7 +56,7 @@ export function Trending() {
       </div>
       <div className="chips" role="group" aria-label="Platform" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '14px 0' }}>
         {PLATFORMS.map((p) => (
-          <button key={p} className={`btn ${platform === p ? 'primary' : 'ghost'}`} onClick={() => setPlatform(p)}>{p === 'all' ? 'All' : p === 'x' ? 'X' : p[0].toUpperCase() + p.slice(1)}</button>
+          <button key={p} className={`btn ${platform === p ? 'primary' : 'ghost'}`} onClick={() => setPlatform(p)}>{platformName(p)}</button>
         ))}
         <label className="switch" style={{ marginLeft: 'auto' }}><input type="checkbox" checked={risingOnly} onChange={(e) => setRisingOnly(e.target.checked)} /> Rising only</label>
       </div>
@@ -63,7 +66,7 @@ export function Trending() {
           <article className="trend-card" key={c.key}>
             <div className="trend-meta">
               <span className={`tag ${c.strength}`}>{c.strength === 'rising' ? '↑ Rising' : c.strength === 'fading' ? '↓ Fading' : 'Steady'}</span>
-              <span>{KIND[c.kind]} · {c.platform === 'any' ? 'All platforms' : c.platform}</span>
+              <span>{KIND[c.kind]} · {platformName(c.platform)}</span>
               <span className="muted">{c.seen > 1 ? `seen ${c.seen}× since ${new Date(c.firstSeen).toLocaleDateString()}` : 'new'}</span>
             </div>
             <h3>{c.title}</h3>
@@ -75,7 +78,7 @@ export function Trending() {
               ))}
             </ul>
             <div className="trend-foot">
-              <span className="muted">as {FORMATS.find((f) => f.id === c.recipe.pack)?.title ?? c.recipe.pack}</span>
+              <span className="muted">as {formatName(c.recipe.pack)}</span>
               <button className="btn primary" onClick={() => makeOne(c)}>Make one like this</button>
             </div>
           </article>

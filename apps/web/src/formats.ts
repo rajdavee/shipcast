@@ -81,3 +81,6 @@ export function relTime(iso: string): string {
   if (s < 86400) return `${Math.round(s / 3600)} h ago`;
   return new Date(iso).toLocaleDateString();
 }
+
+/** A format's display name; packs without a studio tile still read as words, not ids. */
+export const formatTitle = (id: string) => FORMATS.find((f) => f.id === id)?.title ?? id.replace(/-/g, ' ').replace(/^./, (c) => c.toUpperCase());

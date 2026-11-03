@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { api, type Lesson } from '../api.ts';
 import { toast, useLoad } from '../hooks.ts';
-import { FORMATS } from '../formats.ts';
+import { formatTitle } from '../formats.ts';
 
 const pct = (r?: { rate: number; runs: number }) => (r && r.runs ? `${Math.round(r.rate * 100)}% of ${r.runs} runs` : '—');
 const STATUS: Record<Lesson['status'], string> = { trial: 'On trial', kept: 'Kept — it works', retired: 'Retired — no effect', off: 'Off' };
-const formatName = (id: string) => FORMATS.find((f) => f.id === id)?.title ?? id;
+const formatName = formatTitle;
 
 /** What Shipcast learned from its own runs, and whether each lesson is paying off. */
 export function Learning() {
@@ -123,7 +123,7 @@ export function Learning() {
             <i className="dot" />
             <div>
               <h3>{formatName(w.p)}</h3>
-              <p className="muted" style={{ fontSize: 13 }}>{w.runs} runs · {w.top.map(([c, n]) => `${label(c)} ×${n}`).join(' · ')}</p>
+              <p className="muted" style={{ fontSize: 13 }}>{w.runs} run{w.runs === 1 ? '' : 's'} · {w.top.map(([c, n]) => `${label(c)} ×${n}`).join(' · ')}</p>
             </div>
           </div>
         ))}
