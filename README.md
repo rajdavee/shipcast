@@ -172,6 +172,12 @@ Copy is checked against platform limits (LinkedIn's "see more" fold, X's 280,
 YouTube's 60-character titles) and a list of AI clichés. Problems go back to
 Claude with the fix hint; you see what passed.
 
+## Plan and publish
+
+**Calendar** holds your whole content program: drag posts between days, keep a backlog of ideas, and press **Plan my month** to fill your posting slots with drafts that follow your content pillars and what's trending. Each post has its copy per channel with the platform's limits, a preview, and **Make it** — Shipcast makes the carousel, reel or document and attaches the files.
+
+Publishing is your choice per channel: a **post kit** and a reminder (always works), **direct** LinkedIn and YouTube with your own developer app keys, or your own **Postiz** instance for Instagram, TikTok, X and more. Nothing is posted unless you schedule it, and Settings → Publishing has a pause switch. Subscribe to the calendar from Google/Apple Calendar with the ICS link.
+
 ## Gets better on its own
 
 Shipcast runs a few background agents while you're not using it (Setup → Background agents). They wait until your own campaigns finish, stay out of quiet hours and use a small daily share of your Claude runs.

@@ -83,3 +83,16 @@ Unit: store (atomic writes, month files, status transitions, validation per chan
 
 ## Sources
 [Postiz vs Mixpost](https://openalternative.co/compare/mixpost/vs/postiz) · [Postiz Public API](https://docs.postiz.com/public-api) · [Mixpost repo](https://github.com/inovector/mixpost) · [Share on LinkedIn (self-serve)](https://learn.microsoft.com/en-us/linkedin/consumer/integrations/self-serve/share-on-linkedin) · [LinkedIn PDF carousel via API](https://opentweet.io/answers/can-you-post-a-linkedin-pdf-carousel-via-api) · [Instagram content publishing](https://developers.facebook.com/docs/instagram-platform/content-publishing) · [YouTube upload limits 2026](https://singhamandeep.com/?p=1574) · [Notion content calendar templates](https://www.notion.com/templates/collections/best-10-content-calendar-templates-for-ux-ui-designers)
+
+## Status (2026-11-03)
+
+| M | State |
+|---|---|
+| M1 store + API | Done — ten channels with limits, statuses, plan, ICS, CSV |
+| M2 app shell | Done — sidebar IA, ⌘K, tokens, light/dark, tabbed Settings, old routes aliased |
+| M3 calendar UI | Done — month/week/list, drag & drop, backlog, drawer with per-channel copy, checks, brand score, previews |
+| M4 plan + make | Done — live run: 10 drafts for two weeks in 43 s; Make it rendered a carousel and attached its PDF |
+| M5 publishing | Done — manual kits + reminders (verified live), direct LinkedIn/YouTube, Postiz bridge with withdraw-on-change, publisher loop with retries and pause |
+| M6 simplify | Done — Create grouped with search; pages restyled in the shell |
+
+Open: touch drag on phones (move via the drawer for now); Pinterest board picker for Postiz; LinkedIn company pages (needs Community Management API approval); engagement numbers back into the learning loop (v8).

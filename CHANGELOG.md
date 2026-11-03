@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — sprint v7: content calendar, and a calmer app
+
+- **Content calendar** — month, week and list views with drag to reschedule; an ideas backlog; every post with per-channel copy for ten channels (LinkedIn, Instagram, YouTube, X, TikTok, Threads, Facebook, Pinterest, newsletter, blog), each platform's limits checked as you type, the fold shown, first comments, brand score in the project's own voice, and realistic previews.
+- **Plan my month** — your cadence becomes exact slots; one call fills them with drafts balanced across your content pillars, using the product research and what's trending.
+- **Make it** — a post becomes a Shipcast piece; when it renders, the right files attach per channel (the PDF for a LinkedIn carousel, the slides for Instagram, the video for YouTube).
+- **Publishing** — manual post kits with a reminder at the time; direct LinkedIn (text, images, PDF carousels) and YouTube with your own developer apps; any other channel through your own Postiz instance (its public API — no Postiz code included). Retries, a pause switch, no late posts after the computer was off, and Postiz posts withdrawn when you move them.
+- **Subscribe and move data** — an ICS feed for your calendar app, CSV import and export.
+- **New app shell** — sidebar with Create, Calendar, Library, Ideas, Brand and Insights; Settings in tabs; ⌘K command palette; one design system with light and dark themes; Create groups its 34 formats with search.
+
 ## Unreleased — sprint v6: Shipcast that gets better on its own
 
 - **Background agents** — a new `agents` service runs scheduled jobs that wait for your own campaigns, stay out of quiet hours and share a daily cap of Claude runs; Setup → Background agents to switch them on or off, change how often they run, run now or pause.
