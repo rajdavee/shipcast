@@ -60,3 +60,16 @@ test('posts far below your usual become learning-loop evidence', async () => {
   assert.match(hit[0].text, /"The flop" on x did 0\.2× your usual at 3d/);
   assert.ok(await getPost(flop.id));
 });
+
+test('packs get the copy findings for their channel; nothing until there is data', async () => {
+  const { pulseBrief } = await import('@shipcast/engine');
+  const book = { computedAt: '', channels: [{ channel: 'linkedin', n: 20, ready: true, wins: [{ feature: 'hook', level: 'question', label: 'LinkedIn · question hook: 1.5× your usual (8 posts, medium confidence)' }, { feature: 'format', level: 'carousel', label: 'LinkedIn · Carousel: 1.8×' }], losses: [{ feature: 'hashtags', level: '6+', label: 'LinkedIn · 6+ hashtags: 0.6× your usual (5 posts, low confidence)' }], heat: [], bestSlots: [], narrative: ['Questions start conversations here.'] }] } as any;
+  const b = await pulseBrief('carousel', book);
+  assert.match(b, /What works for this brand on LinkedIn/);
+  assert.match(b, /\+ LinkedIn · question hook/);
+  assert.match(b, /- LinkedIn · 6\+ hashtags/);
+  assert.ok(!/Carousel: 1\.8/.test(b), 'format findings belong to planning, not to the writer of a fixed format');
+  assert.match(b, /Why: Questions start conversations/);
+  assert.equal(await pulseBrief('no-such-pack', book), '');
+  assert.equal(await pulseBrief('carousel', { computedAt: '', channels: [] } as any), '', 'no findings and no top posts yet');
+});

@@ -4,7 +4,9 @@ import { join } from 'node:path';
 import { CALENDAR_CHANNELS, channel, getPost, listPosts, readPlan, savePost, type ChannelId, type Post } from './calendar.ts';
 import { computePerformance, headline, readSnapshots } from './metrics.ts';
 import { campaignDir } from './paths.ts';
-import { formatMedia, spearman, type Playbook } from './playbook.ts';
+import { formatMedia, readPlaybook, spearman, type Playbook } from './playbook.ts';
+import { winningCaptions } from './planner.ts';
+import { PACK_CHANNEL } from './tone.ts';
 import type { TrendCard } from './trends.ts';
 
 /**
@@ -107,3 +109,29 @@ export async function criticCalibration(): Promise<{ n: number; rank: number | n
   return { n: rows.length, rank: rows.length >= 5 ? spearman(rows.map((r) => r.critic), rows.map((r) => r.lift)) : null, rows };
 }
 
+
+/** Copy-level findings (hooks, calls to action, length, hashtags…) are what a writer can act on directly. */
+const COPY_FEATURES = new Set(['hook', 'cta', 'captionLen', 'hashtags', 'firstComment', 'emoji', 'linkInCaption']);
+
+/**
+ * What works on this pack's channel, for its prompt: the playbook's copy findings and plain-English
+ * reasons, plus the brand's own best captions as style. '' until there's enough data.
+ */
+export async function pulseBrief(packId: string, pb?: Playbook | null): Promise<string> {
+  const ch = PACK_CHANNEL[packId] as ChannelId | undefined;
+  if (!ch || !channel(ch)) return '';
+  const book = pb !== undefined ? pb : await readPlaybook().catch(() => null);
+  const cp = book?.channels.find((c) => c.channel === ch && c.ready);
+  const winners = (await winningCaptions([ch], 2).catch((): Awaited<ReturnType<typeof winningCaptions>> => ({})))[ch] ?? [];
+  const wins = (cp?.wins ?? []).filter((f) => COPY_FEATURES.has(f.feature)).slice(0, 4);
+  const losses = (cp?.losses ?? []).filter((f) => COPY_FEATURES.has(f.feature)).slice(0, 3);
+  if (!wins.length && !losses.length && !winners.length) return '';
+  return [
+    `## What works for this brand on ${channel(ch)!.name} (from its own published posts)`,
+    'Use these when writing hooks, captions and hook variants. They are measured on this brand\'s audience; don\'t copy the example posts, write like them.',
+    ...wins.map((f) => `+ ${f.label}`),
+    ...losses.map((f) => `- ${f.label}`),
+    ...(cp?.narrative ?? []).slice(0, 3).map((n) => `Why: ${n}`),
+    ...winners.map((w) => `Top post (${w.lift}× usual) — "${w.title}":\n> ${w.caption.replace(/\n+/g, ' / ')}`),
+  ].join('\n');
+}

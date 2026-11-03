@@ -1,4 +1,5 @@
 import { lessonsBrief } from './learn.ts';
+import { pulseBrief } from './pulse.ts';
 import { criticSummary, criticWeakest, judge, previews } from './critic.ts';
 import { cp, mkdir, writeFile, rm } from 'node:fs/promises';
 import { catalogMarkdown, checkCopy, packChecks, renderSpecs, SPEC_FILE, type SpecKind } from './specs.ts';
@@ -333,7 +334,7 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
         variantKind = (await prepareVariants(campaign, step, cwd)).kind;
       }
       // Lessons the learning loop drew from earlier runs of this format (none for render-only or hidden helpers).
-      const lessons = await lessonsBrief(pack.id).catch(() => '');
+      const lessons = [await lessonsBrief(pack.id).catch(() => ''), await pulseBrief(pack.id).catch(() => '')].filter(Boolean).join('\n\n');
       prompt = packPrompt(campaign, pack, step, await campaignTone(campaign)) + hubNote + (lessons ? `\n\n${lessons}` : '');
       if (pack.context) {
         const earlier = campaign.steps.filter((s) => s.kind === 'pack' && s.status === 'done' && s.id !== step.id);
