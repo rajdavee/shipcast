@@ -485,6 +485,19 @@ export function postizAdapter(now: () => Date = () => new Date()): Adapter {
   };
 }
 
+/** Take back a post Postiz is holding (it deletes the whole group); 404 means it's already gone. */
+export async function postizWithdraw(id: string): Promise<void> {
+  const cfg = await postizConfig();
+  const r = await http(`${postizBase(cfg.url)}/posts/${encodeURIComponent(id)}`, { method: 'DELETE', headers: { authorization: cfg.key }, signal: AbortSignal.timeout(30_000) });
+  if (!r.ok && r.status !== 404) throw await failure('Postiz', r, 'withdraw');
+}
+
+/**
+ * Channels Postiz is holding for a time that hasn't come yet. When the post is moved, unscheduled or
+ * deleted they are withdrawn there first, so Postiz never posts the old version at the old time.
+ */
+export const heldByPostiz = (p: Post, now = Date.now()) => p.channels.filter((c) => c.via === 'postiz' && c.state === 'sent' && c.remoteId && p.at && Date.parse(p.at) > now);
+
 export function adapterFor(c: PostChannel, now?: () => Date): Adapter | undefined {
   if (c.via === 'postiz') return postizAdapter(now);
   if (c.via === 'direct' && c.channel === 'linkedin') return linkedinAdapter;

@@ -598,3 +598,30 @@ test('API: mark sent, send now, post kit zip, publishingPaused setting', async (
   assert.equal((await api('/api/settings')).body.publishingPaused, true);
   await api('/api/settings', { method: 'PUT', json: { publishingPaused: false } });
 });
+
+test('a post Postiz is holding is withdrawn there when it is moved or deleted, then handed over again', async () => {
+  use(...postizRoutes(), [/^DELETE http:\/\/localhost:4007\/api\/public\/v1\/posts\/pz-held$/, () => jsonRes({ id: 'pz-held' })]);
+  assert.equal((await api('/api/publish/postiz', { method: 'PUT', json: { url: 'http://localhost:4007', apiKey: POSTIZ_KEY } })).status, 200);
+  const at = new Date(Date.now() + 3 * 86_400_000).toISOString();
+  const p = await savePost({ title: 'held', at, status: 'scheduled', channels: [{ channel: 'x', caption: 'hi', hashtags: [], media: [], via: 'postiz', state: 'pending' }] });
+  await E.updateChannel(p.id, 'x', { state: 'sent', remoteId: 'pz-held', note: 'Handed to Postiz' });
+  const later = new Date(Date.now() + 4 * 86_400_000).toISOString();
+  const moved = await api(`/api/calendar/posts/${p.id}`, { method: 'PUT', json: { at: later } });
+  assert.equal(moved.status, 200);
+  assert.ok(calls.some((c) => c.method === 'DELETE' && c.url.endsWith('/posts/pz-held')), 'withdrawn from Postiz');
+  const after = (await getPost(p.id))!;
+  assert.equal(after.channels[0].state, 'pending', 'armed again for the new time');
+  assert.equal(after.channels[0].remoteId, undefined);
+  assert.equal(after.at, later);
+  // Held again, then deleted: withdrawn first.
+  await E.updateChannel(p.id, 'x', { state: 'sent', remoteId: 'pz-held' });
+  calls = [];
+  assert.equal((await api(`/api/calendar/posts/${p.id}`, { method: 'DELETE' })).status, 200);
+  assert.ok(calls.some((c) => c.method === 'DELETE' && c.url.endsWith('/posts/pz-held')));
+  // A refusal from Postiz stops the change instead of leaving two versions out there.
+  const q = await savePost({ title: 'held 2', at, status: 'scheduled', channels: [{ channel: 'x', caption: 'hi', hashtags: [], media: [], via: 'postiz', state: 'pending' }] });
+  await E.updateChannel(q.id, 'x', { state: 'sent', remoteId: 'pz-other' });
+  use(...postizRoutes(), [/^DELETE .*\/posts\/pz-other$/, () => jsonRes({ message: 'boom' }, 500)]);
+  assert.equal((await api(`/api/calendar/posts/${q.id}`, { method: 'PUT', json: { at: later } })).status, 502);
+  assert.equal((await getPost(q.id))!.at, at, 'unchanged');
+});

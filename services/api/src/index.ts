@@ -9,6 +9,8 @@ import { pipeline } from 'node:stream/promises';
 import {
   appendEvent,
   CALENDAR_CHANNELS,
+  heldByPostiz,
+  postizWithdraw,
   planMonth,
   planProject,
   syncMadePosts,
@@ -311,9 +313,23 @@ router.get('/api/calendar/posts', async (req) => {
   await syncMadePosts().catch(() => 0);
   return listPosts({ from: q.get('from') ?? undefined, to: q.get('to') ?? undefined, channel: q.get('channel') ?? undefined, unscheduled: q.get('unscheduled') === '1', status: (q.get('status') ?? '').split(',').filter(Boolean) as PostStatus[] });
 });
+/** Moving, unscheduling or deleting a post Postiz already holds: withdraw it there and arm the channel again. */
+async function withdrawFromPostiz(old: Post, why: string) {
+  for (const c of heldByPostiz(old)) {
+    try {
+      await postizWithdraw(c.remoteId!);
+    } catch (e) {
+      throw new HttpError(502, `Couldn't take the post back from Postiz (${(e as Error).message}) — change it there or try again.`);
+    }
+    await updateChannel(old.id, c.channel, { state: 'pending', remoteId: undefined, sentAt: undefined, url: undefined, note: why });
+  }
+}
+
 async function checkedSave(body: Partial<Post>, id?: string) {
+  const old = id ? await getPost(id) : undefined;
+  if (id && !old) throw new HttpError(404, 'post not found');
+  if (old && heldByPostiz(old).length && ((body.at !== undefined && body.at !== old.at) || (body.status && body.status !== old.status))) await withdrawFromPostiz(old, 'Withdrawn from Postiz after a change; it goes again at the new time.');
   const merged = { ...(id ? await getPost(id) : {}), ...body } as Post;
-  if (id && !(await getPost(id))) throw new HttpError(404, 'post not found');
   if (body.status === 'scheduled') {
     const problems = scheduleProblems(merged);
     if (problems.length) throw new HttpError(400, problems.join(' '));
@@ -325,6 +341,8 @@ async function checkedSave(body: Partial<Post>, id?: string) {
 router.post('/api/calendar/posts', async (req) => checkedSave(await readJson(req)));
 router.put('/api/calendar/posts/:id', async (req, _r, p) => checkedSave(await readJson(req), p.id));
 router.delete('/api/calendar/posts/:id', async (_q, _r, p) => {
+  const old = await getPost(p.id);
+  if (old) await withdrawFromPostiz(old, 'Withdrawn from Postiz before deleting.');
   if (!(await deletePost(p.id))) throw new HttpError(404, 'post not found');
   return { ok: true };
 });
