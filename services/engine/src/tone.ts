@@ -355,6 +355,7 @@ export const PACK_CHANNEL: Record<string, Channel> = {
   email: 'email',
   newsletter: 'email',
   'blog-article': 'web',
+  audiogram: 'linkedin',
   presentation: 'deck',
   document: 'print',
   print: 'print',

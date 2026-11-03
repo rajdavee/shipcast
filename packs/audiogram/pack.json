@@ -1,0 +1,22 @@
+{
+  "id": "audiogram",
+  "name": "Audiogram / Founder Clip",
+  "tagline": "A 30–90 s spoken clip — a founder voiceover or a podcast excerpt from your files — with a waveform driven by the real audio, big karaoke captions, the speaker's lower-third and your logo, in 9:16 and 1:1.",
+  "category": "video",
+  "order": 12,
+  "estimate": "5–9 min",
+  "accent": "#be185d",
+  "spec": "storyboard",
+  "options": [
+    { "key": "format", "label": "Sizes", "type": "select", "choices": ["both", "vertical", "square"], "default": "both" },
+    { "key": "audio", "label": "Audio file (optional)", "type": "text", "default": "", "placeholder": "e.g. assets/podcast-ep12.mp3 — otherwise a voiceover of the script" },
+    { "key": "speaker", "label": "Speaker", "type": "text", "default": "", "placeholder": "e.g. Maya Chen, Founder" },
+    { "key": "seconds", "label": "Length (seconds)", "type": "number", "default": "45", "min": 30, "max": 90 },
+    { "key": "style", "label": "Waveform", "type": "select", "choices": ["bars", "wave"], "default": "bars" }
+  ],
+  "outputs": ["video.mp4", "video.jpg", "video.srt", "square-video/video.mp4", "square-video/video.jpg", "storyboard.json", "*.md"],
+  "skills": [],
+  "tools": ["ffmpeg", "chrome"],
+  "roles": ["copy", "humanize"],
+  "timeoutMinutes": 40
+}

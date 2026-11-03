@@ -583,7 +583,8 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
     let criticked = false;
     if (ok && specKind && !canceled && !timedOut) {
       // Variety guard: a near-copy of a recent video gets one rewrite before it renders.
-      if (specKind === 'storyboard' && !renderOnly && sessionId && !canceled && !timedOut) {
+      // Audiograms are one scene by design: nothing to vary.
+      if (specKind === 'storyboard' && pack?.id !== 'audiogram' && !renderOnly && sessionId && !canceled && !timedOut) {
         try {
           const sb = JSON.parse(await readFile(join(cwd, 'out', SPEC_FILE.storyboard), 'utf8'));
           const fb = varietyFeedback(scenePattern(sb), await recentPatterns(step.id));
@@ -600,6 +601,7 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
         await log({ step: step.id, type: 'log', text: round ? `Re-rendering after fixes (round ${round})…` : `Rendering ${SPEC_FILE[specKind]} with the ${specKind === 'storyboard' || specKind === 'infographic' ? 'render' : 'stills'} service…` });
         const force: Record<string, unknown> = {};
         if (pack?.id === 'carousel' || pack?.id === 'photo-carousel') force.motion = step.options.motion === 'no' ? null : 'chill';
+        if (pack?.id === 'audiogram') force.sizes = step.options.format === 'vertical' ? ['vertical'] : step.options.format === 'square' ? ['square-video'] : ['vertical', 'square-video'];
         if (pack?.id === 'photo-carousel') force.sizes = step.options.platform === 'tiktok' ? ['tiktok-photo'] : step.options.platform === 'instagram' ? ['instagram-carousel'] : ['tiktok-photo', 'instagram-carousel'];
         // Choices made in the format options win over what the model wrote.
         if ((pack?.id === 'document' || pack?.id === 'presentation' || pack?.id === 'ad-set' || pack?.id === 'email' || pack?.id === 'landing') && step.options.theme && step.options.theme !== 'auto') force.theme = step.options.theme;

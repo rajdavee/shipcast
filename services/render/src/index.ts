@@ -37,6 +37,7 @@ const deps = {
   broll: (query: string, seconds: number, orientation: 'landscape' | 'portrait' | 'square') => findBroll(query, seconds, orientation),
   music: (mood: string, seconds: number, sfx: unknown[], out: string, energy?: { at: number; level: number }[]) => callService('media', 'music', { mood, seconds, sfx, out, energy }),
   mix: (voice: string | null, music: string | null, out: string, seconds: number, gainDb?: number) => callService('media', 'mix', { voice, music, out, seconds, ...(gainDb !== undefined ? { musicGainDb: gainDb } : {}) }),
+  transcribe: (file: string) => callService('media', 'transcribe', { file }),
 };
 
 /** Render with HyperFrames; when parallel capture times out under load, retry once with a single worker. */
@@ -155,7 +156,7 @@ const ts = (sec: number) => {
 /** Fingerprint of the scene engine, so cached chapters re-render when the engine changes. */
 const ENGINE_REV = (() => {
   const h = createHash('sha256');
-  for (const f of ['compile.ts', 'scenes.ts', 'scenes-explainer.ts', 'captions.ts']) {
+  for (const f of ['compile.ts', 'scenes.ts', 'scenes-explainer.ts', 'captions.ts', 'audiogram.ts']) {
     try {
       h.update(readFileSync(new URL(`./${f}`, import.meta.url)));
     } catch {}

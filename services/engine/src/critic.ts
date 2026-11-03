@@ -37,8 +37,11 @@ export async function previews(dir: string): Promise<string[]> {
   const out = join(dir, 'out');
   const files = (await readdir(out).catch(() => [] as string[])).map((f) => join(out, f));
   const pick = (re: RegExp) => files.filter((f) => re.test(basename(f)));
+  // The same video in other sizes (audiograms: out/square-video/): judge each size's frame sheet too.
+  const sized = (await readdir(out, { withFileTypes: true }).catch(() => [])).filter((d) => d.isDirectory() && existsSync(join(out, d.name, 'video.sheet.jpg'))).map((d) => join(out, d.name, 'video.sheet.jpg'));
   const ordered = [
     ...pick(/\.sheet\.(jpg|png)$/),
+    ...sized,
     ...pick(/^contact-sheet\.jpg$/),
     ...pick(/^(landing|.*)-desktop\.png$/),
     ...pick(/-mobile\.png$/),
