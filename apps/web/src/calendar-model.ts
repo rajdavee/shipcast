@@ -52,6 +52,8 @@ export interface Post {
   step?: string;
   pillar?: string;
   trend?: string;
+  /** Why this post deliberately tries something new (set by Plan my month). */
+  experiment?: string;
   notes: string;
   createdAt: string;
   updatedAt: string;
@@ -59,6 +61,8 @@ export interface Post {
 
 export interface ContentPlan {
   tz: string;
+  /** Share of planned posts that deliberately test something new (0–0.5). */
+  explore?: number;
   pillars: { name: string; share: number; about?: string }[];
   cadence: Partial<Record<ChannelId, { perWeek: number; slots: string[] }>>;
 }
