@@ -457,7 +457,7 @@ export function createStillsService() {
         let page = await open().catch(async () => (await browser().restart(), open()));
         try {
           await page.eval('document.fonts.ready.then(() => true)');
-          const audit = await page.eval<{ page: number; overflow: number; wide: boolean; brokenImages: number; fill: number; tiny: number }[]>(DOC_AUDIT_SCRIPT);
+          const audit = await page.eval<{ page: number; overflow: number; wide: boolean; brokenImages: number; fill: number; tiny: number; small: number }[]>(DOC_AUDIT_SCRIPT);
           ctx.progress(0.3, 'printing the PDF');
           const pdf = join(outDir, `${base}.pdf`);
           await writeFile(pdf, await page.pdf());
@@ -477,6 +477,7 @@ export function createStillsService() {
             ...(a.wide ? [`page ${a.page} has a heading or table wider than the page`] : []),
             ...(a.brokenImages ? [`page ${a.page} has ${a.brokenImages} image(s) that didn't load — check the paths`] : []),
             ...(a.tiny ? [`page ${a.page} shows a full screenshot shrunk below a third of its size — its UI can't be read; crop it to the part that matters with #crop=x,y,w,h`] : []),
+            ...(a.small ? [`page ${a.page} has ${a.small} text element(s) under 8 pt — too small to read in print; cut words instead of shrinking them`] : []),
             ...(a.fill < 0.55 && input.pages.length > 1 ? [`page ${a.page} (${input.pages[a.page - 1]?.layout}) is only ${Math.round(a.fill * 100)}% full — add substance (a paragraph, an image, a chart) or merge it with a neighbouring page`] : []),
           ]);
           return { pdf, html: htmlFile, pages: previews, sheet, width: sz.width, height: sz.height, audit, problems };

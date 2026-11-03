@@ -67,7 +67,7 @@ test('marketing-material packs load, validate and point at a Shipcast skill that
   const { join } = await import('node:path');
   const { PLUGIN_DIR } = await import('@shipcast/engine');
   const packs = await loadPacks(true);
-  const want: Record<string, string> = { 'photo-carousel': 'deck', 'quote-cards': 'graphics', 'app-store-screens': 'graphics', 'product-hunt-kit': 'graphics', 'profile-kit': 'graphics' };
+  const want: Record<string, string> = { 'photo-carousel': 'deck', 'quote-cards': 'graphics', 'app-store-screens': 'graphics', 'product-hunt-kit': 'graphics', 'profile-kit': 'graphics', battlecard: 'document' };
   for (const [id, spec] of Object.entries(want)) {
     const p = packs.find((x) => x.id === id);
     assert.ok(p, `${id} is bundled`);
@@ -76,6 +76,8 @@ test('marketing-material packs load, validate and point at a Shipcast skill that
     const skill = p!.prompt.match(/shipcast:([\w-]+)/)?.[1];
     assert.ok(skill && existsSync(join(PLUGIN_DIR, 'skills', skill, 'SKILL.md')), `${id} → ${skill}`);
   }
+  // Two-spec formats: the battlecard's public page renders in the same run.
+  assert.deepEqual(packs.find((x) => x.id === 'battlecard')!.also, ['landing']);
   const photo = packs.find((x) => x.id === 'photo-carousel')!;
   assert.deepEqual((photo.options.find((o) => o.key === 'platform') as { choices?: string[] })?.choices, ['both', 'tiktok', 'instagram']);
   assert.ok(photo.outputs.includes('tiktok-photo/slides/*.png'));

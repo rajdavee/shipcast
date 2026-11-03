@@ -123,6 +123,8 @@ export interface Pack {
   pipeline?: 'captions' | 'shorts' | 'hub' | 'export';
   /** Spec formats: Claude writes this JSON spec and a service renders it. */
   spec?: 'deck' | 'graphics' | 'storyboard' | 'infographic';
+  /** Further specs the same run writes and renders (a battlecard's public page, a case study's social cards). */
+  also?: ('graphics' | 'document' | 'landing' | 'slides' | 'deck')[];
   /** The workflow dispatches sub-agents (HyperFrames does, per frame). */
   subagents?: boolean;
   /** Sort order in the UI (lower first). */

@@ -66,6 +66,19 @@ test('profile kit check wants every surface and one design system', async () => 
   assert.match(bad, /x\.png carries a screenshot/);
 });
 
+test('comparison check: sourced competitor claims, honest cells, nothing unverified or disparaging in public, no logos', async () => {
+  const { checkComparison } = await import('@shipcast/engine');
+  const card = { layout: 'battlecard', fields: { competitor: 'Acme', theirPitch: 'All-in-one invoicing [1].', weWin: ['Faster setup [2]'], theyWin: ['More integrations [1]'], sources: ['[1] acme.example — Nov 2026', '[2] our docs'] } };
+  const page = { sections: [{ type: 'hero' }, { type: 'versus', us: 'Us', them: 'Acme', rows: ['Self-hosting | yes | no | Cloud only [1]', 'Integrations | partial | yes'], sources: ['[1] acme.example/docs'] }, { type: 'choose' }, { type: 'faq' }, { type: 'cta' }] };
+  assert.deepEqual(checkComparison({ pages: [card] }, page), []);
+  const bad = checkComparison(
+    { pages: [{ ...card, fields: { ...card.fields, theirPitch: 'A clunky, outdated tool.', theyWin: [], weWin: ['Cheaper [3]'] } }] },
+    { sections: [...page.sections.filter((s) => s.type !== 'choose'), { type: 'logos', items: ['Acme'] }, { type: 'media', image: 'assets/acme-logo.png', body: 'Their export is slow (to verify)' }].map((s) => (s.type === 'versus' ? { ...s, rows: ['Exports | ✓ | Slow | [4]'] } : s)) },
+  ).join(' | ');
+  for (const re of [/where they win/, /their pitch.*source/, /cites \[3\]/, /"choose" section/, /cells must be yes, no or partial/, /cites \[4\]/, /drop the logos section/, /competitor's logo/, /"to verify" on the public page/, /"clunky"/, /"outdated"/]) assert.match(bad, re);
+  assert.ok(checkComparison({ pages: [card] }, null).some((p) => /landing\.json was not written/.test(p)));
+});
+
 test('music is deterministic, the requested length, and not silent', () => {
   const a = makeMusic({ mood: 'tech', seconds: 6, seed: 3 });
   const b = makeMusic({ mood: 'tech', seconds: 6, seed: 3 });

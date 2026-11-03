@@ -108,6 +108,8 @@ export async function catalogMarkdown(kind: SpecKind): Promise<string> {
       '- `stats` — `heading?`, `stats`: ["value | label | source", ≤ 4] — verified only',
       '- `testimonials` — `heading?`, `items`: ["quote | name | role, company", ≤ 3] — real people only',
       '- `comparison` — `heading`, `leftTitle`, `left`, `rightTitle`, `right`',
+      '- `versus` — `eyebrow?`, `heading`, `sub?`, `us`, `them` (names in text — never a logo), `rows`: ["feature | yes|no|partial | yes|no|partial | note with [n] source", 4–10], `sources`: ["[1] title — URL, date checked"] — an honest table: include rows they win',
+      '- `choose` — `heading?` ("Who should pick which"), `us`, `them`, `usFor`: [3–4], `themFor`: [3–4] — fair to both',
       '- `pricing` — `heading`, `sub?`, `url`, `cta?`, `tiers`: ["*name | price | note | feature; feature | button text"] (leading * = recommended) — real prices only',
       '- `faq` — `heading?`, `items`: ["question | answer", 4–8] — answer real objections',
       '- `cta` — `heading`, `sub?`, `cta`, `url`, `note?`',
@@ -330,6 +332,25 @@ export async function renderSpec(kind: SpecKind, cwd: string, briefDir: string, 
   }
 }
 
+const FAILED = new Set(['render failed', 'no spec', 'bad json', 'invalid storyboard']);
+
+/**
+ * Formats made of two specs (a battlecard PDF plus its public page, a case
+ * study plus its social cards) render each one; problems name the file they
+ * belong to. Format options only steer the main spec.
+ */
+export async function renderSpecs(kinds: SpecKind[], cwd: string, briefDir: string, opts: { handle?: string; force?: Record<string, unknown> } = {}): Promise<SpecResult> {
+  if (kinds.length === 1) return renderSpec(kinds[0], cwd, briefDir, opts);
+  const rs = [];
+  for (const [i, k] of kinds.entries()) rs.push({ k, r: await renderSpec(k, cwd, briefDir, i ? { handle: opts.handle } : opts) });
+  const failed = rs.find((x) => FAILED.has(x.r.summary));
+  return {
+    ok: rs.every((x) => x.r.ok),
+    feedback: rs.flatMap((x, i) => (i ? x.r.feedback.map((f) => (f.includes(SPEC_FILE[x.k]) ? f : `${SPEC_FILE[x.k]}: ${f}`)) : x.r.feedback)),
+    summary: failed ? failed.r.summary : rs.map((x) => x.r.summary).join(' + '),
+  };
+}
+
 /** Phrases that read as generic AI marketing copy (research §G). */
 export const BANNED_PHRASES = [
   'excited to announce', 'excited to share', 'thrilled to', 'game-changer', 'game changer', 'revolutionize', 'revolutionary', 'unlock', 'supercharge',
@@ -378,6 +399,54 @@ export function checkProfileKit(spec: any): string[] {
   return out.slice(0, 12);
 }
 
+/** Words that turn a comparison into an attack; the rule is plain, checkable differences only. */
+export const DISPARAGING = ['terrible', 'awful', 'garbage', 'scam', 'worst', 'clunky', 'bloated', 'overpriced', 'rip-off', 'ripoff', 'sucks', 'useless', 'nightmare', 'inferior', 'outdated', 'dinosaur', 'shady', 'pathetic', 'joke', 'crap', 'incompetent', 'lazy', 'mediocre', 'amateur'];
+
+const texts = (v: unknown): string[] => (typeof v === 'string' ? [v] : Array.isArray(v) ? v.flatMap(texts) : v && typeof v === 'object' ? Object.values(v).flatMap(texts) : []);
+const refs = (s: string) => [...s.matchAll(/\[(\d+)\]/g)].map((m) => m[1]);
+
+/**
+ * Battlecard (document.json) + public comparison page (landing.json): every
+ * competitor claim cites a source, nothing unverified reaches the public page,
+ * no disparaging words and no one else's marks.
+ */
+export function checkComparison(doc: any, landing: any): string[] {
+  const out: string[] = [];
+  const card = (doc?.pages ?? []).find((p: any) => p?.layout === 'battlecard')?.fields;
+  if (!card) out.push('document.json: add a battlecard page (layout battlecard).');
+  else {
+    if (!texts(card.theyWin).length) out.push('document.json: "where they win" is empty — every competitor wins somewhere; say where, honestly.');
+    const have = new Set(texts(card.sources).flatMap(refs));
+    if (!have.size) out.push('document.json: the battlecard lists no sources — number them ("[1] title — URL, date checked").');
+    if (!refs(String(card.theirPitch ?? '')).length) out.push('document.json: "their pitch" needs a [n] source (their own site or docs).');
+    const missing = [...new Set(texts([card.theirPitch, card.weWin, card.theyWin, card.objections, card.proof, card.pricing]).flatMap(refs))].filter((n) => !have.has(n));
+    if (have.size && missing.length) out.push(`document.json: the battlecard cites [${missing.join('], [')}] but the sources don't list ${missing.length > 1 ? 'them' : 'it'}.`);
+  }
+  const secs: any[] = Array.isArray(landing?.sections) ? landing.sections : [];
+  if (!landing) out.push('landing.json was not written — the public comparison page is part of this format.');
+  else for (const t of ['hero', 'versus', 'choose', 'faq', 'cta']) if (!secs.some((s) => s?.type === t)) out.push(`landing.json: the comparison page needs a "${t}" section.`);
+  const vs = secs.find((s) => s?.type === 'versus');
+  if (vs) {
+    const src = new Set(texts(vs.sources).flatMap(refs));
+    if (!src.size) out.push('landing.json: the comparison table has no sources — list them in "sources" ("[1] title — URL") and cite them in the row notes.');
+    for (const row of texts(vs.rows)) {
+      const [feature, a, b, note] = row.split('|').map((x) => x.trim());
+      if ([a, b].some((c) => !/^(yes|no|partial|partly|✓|✔|✗|✕|×|~|◐)$/i.test(c ?? ''))) out.push(`landing.json: row "${feature}" — cells must be yes, no or partial; put the detail in the note.`);
+      const bad = refs(note ?? '').filter((n) => !src.has(n));
+      if (bad.length) out.push(`landing.json: row "${feature}" cites [${bad.join('], [')}], which "sources" doesn't list.`);
+    }
+  }
+  if (secs.some((s) => s?.type === 'logos')) out.push('landing.json: drop the logos section — a comparison page names the competitor in text only, never their logo.');
+  const comp = String(card?.competitor ?? vs?.them ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+  const imgs = [...texts(secs.map((s) => s?.image)), ...texts((doc?.pages ?? []).map((p: any) => p?.fields?.image))];
+  if (comp.length > 2 && imgs.some((p) => p.toLowerCase().replace(/[^a-z0-9]+/g, '').includes(comp))) out.push("Don't show the competitor's logo or screenshots — name them in text only.");
+  const pub = texts(secs).join(' ').toLowerCase();
+  for (const w of ['to verify', 'unverified', 'tbd', 'citation needed']) if (pub.includes(w)) out.push(`landing.json: "${w}" on the public page — leave unverified claims out of it and list them in NOTES.md.`);
+  const all = `${pub} ${texts(card).join(' ').toLowerCase()}`;
+  for (const w of DISPARAGING) if (new RegExp(`\\b${w}\\b`).test(all)) out.push(`Uses "${w}" about a competitor — describe the difference plainly, without disparaging words.`);
+  return out.slice(0, 14);
+}
+
 /** Format-specific checks that need more than one spec or a copy file; run after every render round. */
 export async function packChecks(packId: string, outDir: string): Promise<string[]> {
   const json = async (f: string) => JSON.parse(await readFile(join(outDir, f), 'utf8').catch(() => 'null'));
@@ -385,6 +454,7 @@ export async function packChecks(packId: string, outDir: string): Promise<string
   try {
     if (packId === 'product-hunt-kit') return checkLaunchCopy(await text('launch-copy.md'));
     if (packId === 'profile-kit') return checkProfileKit(await json('graphics.json'));
+    if (packId === 'battlecard') return checkComparison(await json('document.json'), await json('landing.json'));
   } catch (e) {
     return [`A spec is not valid JSON: ${(e as Error).message}`];
   }

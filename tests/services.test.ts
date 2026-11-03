@@ -231,6 +231,44 @@ test('safe-area audit flags content outside the YouTube strip, under a profile p
   assert.equal((await check('av3', 'profile-avatar', `<img src="${logo}" style="position:absolute;left:0;top:0;width:400px;height:400px">`)).length, 1, 'a full-bleed square mark loses its corners');
 });
 
+test('battlecard: a dense one-page PDF at Letter and A4 that fits, plus an honest comparison page', { skip: !hasChrome && 'no Chrome' }, async () => {
+  const fields = {
+    competitor: 'a launch agency', updated: 'Nov 2026 · Marketing',
+    theirPitch: 'A team of designers and editors that plans and produces launch assets by hand, with rounds of review [1].',
+    ourPitch: 'Paste a link and get the whole launch set the same afternoon — made on your own machine and re-made in minutes when the product changes.',
+    weWin: ['Speed: a full asset set in one sitting, not a multi-week brief', 'Cost: runs on the plan you already have', 'Changes: edit a spec and re-render in minutes', 'Privacy: files stay on your machine'],
+    theyWin: ['Original brand strategy and naming', 'Live-action shoots with real people', 'Hands-on account management'],
+    objections: ['Will it look generic? | Every piece is checked for overflow, safe zones and legibility and uses your brand kit.', 'We already pay an agency. | Keep them for strategy; use Shipcast for everyday assets.', 'Is it hard to set up? | One command installs it.'],
+    proof: ['Open source under MIT [2]', 'Over 30 formats from one brief [2]'],
+    pricing: 'Free and open source; it uses your existing Claude Code plan. Ask the buyer for their current agency spend rather than quoting a number.',
+    sources: ['[1] Buyer interviews — Oct 2026', '[2] github.com/rajdavee/shipcast README — Nov 2026'],
+  };
+  for (const size of ['letter', 'a4']) {
+    const job = await run('document', { brand: shipcast, size, theme: 'clean', outDir: join(home, `bc-${size}`), pages: [{ layout: 'battlecard', fields }] });
+    assert.equal(job.status, 'done', job.error);
+    assert.deepEqual(job.output.problems, [], size);
+  }
+  const { checkComparison } = await import('@shipcast/engine');
+  const landing = {
+    title: 'Shipcast vs a launch agency', theme: 'light',
+    sections: [
+      { type: 'hero', headline: 'Shipcast vs a launch agency', sub: 'Where each one fits — honestly.', cta: 'Try Shipcast', url: 'https://github.com/rajdavee/shipcast' },
+      { type: 'versus', heading: 'Side by side', us: 'Shipcast', them: 'A launch agency', rows: ['Assets the same day | yes | no | Agencies work in weekly rounds [1]', 'Brand strategy | no | yes', 'Re-render after a change | yes | partial | Usually a change request [1]'], sources: ['[1] Buyer interviews, Oct 2026'] },
+      { type: 'choose', us: 'Shipcast', them: 'an agency', usFor: ['Small teams shipping often'], themFor: ['Rebrands and naming'] },
+      { type: 'faq', items: ['Can I use both? | Yes.'] },
+      { type: 'cta', heading: 'Make your launch set today', cta: 'Get started', url: 'https://github.com/rajdavee/shipcast' },
+    ],
+  };
+  assert.deepEqual(checkComparison({ pages: [{ layout: 'battlecard', fields }] }, landing), []);
+  const out = join(home, 'versus');
+  const page = await run('landing', { brand: { name: 'Shipcast', colors: shipcast.colors }, outDir: out, ...landing });
+  assert.equal(page.status, 'done', page.error);
+  assert.deepEqual(page.output.problems, []);
+  const html = (await import('node:fs')).readFileSync(join(out, 'landing', 'index.html'), 'utf8');
+  assert.match(html, /class="v-yes"[\s\S]*class="v-no"[\s\S]*class="v-partial"/);
+  assert.ok(!/<img/.test(html.split('<main>')[1]), 'no logos or pictures of the competitor');
+});
+
 test('stills audit catches text that overflows', { skip: !hasChrome && 'no Chrome' }, async () => {
   const f = join(home, 'bad.html');
   writeFileSync(f, '<html><body style="margin:0"><div style="width:200px;overflow:hidden;white-space:nowrap;font-size:40px">This headline is far too long for its box</div></body></html>');

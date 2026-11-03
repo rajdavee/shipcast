@@ -9,7 +9,7 @@ import { esc, iconTag, list, rich } from './common.ts';
  */
 
 export interface LandingSection {
-  type: 'hero' | 'logos' | 'features' | 'how' | 'stats' | 'testimonials' | 'comparison' | 'pricing' | 'faq' | 'cta' | 'media';
+  type: 'hero' | 'logos' | 'features' | 'how' | 'stats' | 'testimonials' | 'comparison' | 'versus' | 'choose' | 'pricing' | 'faq' | 'cta' | 'media';
   [k: string]: any;
 }
 
@@ -27,6 +27,20 @@ const split = (s: string) => s.split('|').map((x) => x.trim());
 function icon(name: string, icons: Record<string, string | null>) {
   const uri = icons[name];
   return uri ? iconTag(uri, 'ic') : `<span class="ic mono" aria-hidden="true">${esc(name.slice(0, 1).toUpperCase())}</span>`;
+}
+
+/** Comparison cells: yes / no / partial (or ✓ ✗ ~), with readable words for screen readers and plain-text copy. */
+export function verdict(v: unknown): 'yes' | 'no' | 'partial' | null {
+  const t = String(v ?? '').trim().toLowerCase();
+  if (/^(yes|✓|✔|y|true)$/.test(t)) return 'yes';
+  if (/^(no|✗|✕|×|x|n|false)$/.test(t)) return 'no';
+  if (/^(partial|partly|~|◐|some|limited)$/.test(t)) return 'partial';
+  return null;
+}
+function cell(v: unknown): string {
+  const k = verdict(v);
+  if (!k) return `<td>${rich(v)}</td>`;
+  return `<td class="v-${k}"><span aria-hidden="true">${{ yes: '✓', no: '✗', partial: '◐' }[k]}</span><span class="sr">${{ yes: 'Yes', no: 'No', partial: 'Partly' }[k]}</span></td>`;
 }
 
 function section(s: LandingSection, img: (p: string) => string, icons: Record<string, string | null>): string {
@@ -49,6 +63,11 @@ function section(s: LandingSection, img: (p: string) => string, icons: Record<st
       return `<section class="quotes"><div class="wrap">${head(s.eyebrow, s.heading)}<div class="grid g${Math.min(3, Math.max(1, list(s.items).length))}">${list(s.items).map((x) => { const [q, n, r] = split(x); return `<figure class="card quote"><blockquote>“${rich(q)}”</blockquote><figcaption><b>${esc(n ?? '')}</b>${r ? `<span>${esc(r)}</span>` : ''}</figcaption></figure>`; }).join('')}</div></div></section>`;
     case 'comparison':
       return `<section class="compare"><div class="wrap">${head(s.eyebrow, s.heading)}<div class="vs"><div class="side old"><h3>${rich(s.leftTitle ?? 'Before')}</h3><ul>${list(s.left).map((x) => `<li>${rich(x)}</li>`).join('')}</ul></div><div class="side new"><h3>${rich(s.rightTitle ?? 'After')}</h3><ul>${list(s.right).map((x) => `<li>${rich(x)}</li>`).join('')}</ul></div></div></div></section>`;
+    case 'versus':
+      // Names only, never marks: a comparison page shows no one else's logo.
+      return `<section class="versus" id="compare"><div class="wrap">${head(s.eyebrow, s.heading, s.sub)}<div class="vt-wrap"><table class="vt"><thead><tr><th scope="col"></th><th scope="col" class="us">${esc(s.us ?? 'Us')}</th><th scope="col">${esc(s.them ?? 'Them')}</th></tr></thead><tbody>${list(s.rows).map((x) => { const [f, a, b, note] = split(x); return `<tr><th scope="row">${rich(f)}${note ? `<small>${rich(note)}</small>` : ''}</th>${cell(a)}${cell(b)}</tr>`; }).join('')}</tbody></table></div>${list(s.sources).length ? `<p class="vt-src">${list(s.sources).map(esc).join(' · ')}</p>` : ''}</div></section>`;
+    case 'choose':
+      return `<section class="choose"><div class="wrap">${head(s.eyebrow, s.heading ?? 'Who should pick which', s.sub)}<div class="grid g2"><article class="card pick us"><h3>Pick ${esc(s.us ?? 'us')} if…</h3><ul class="checks">${list(s.usFor).map((x) => `<li>${rich(x)}</li>`).join('')}</ul></article><article class="card pick"><h3>Pick ${esc(s.them ?? 'them')} if…</h3><ul class="checks">${list(s.themFor).map((x) => `<li>${rich(x)}</li>`).join('')}</ul></article></div></div></section>`;
     case 'pricing':
       return `<section class="pricing" id="pricing"><div class="wrap">${head(s.eyebrow, s.heading, s.sub)}<div class="grid g${Math.min(4, Math.max(2, list(s.tiers).length))}">${list(s.tiers).map((x) => { const hot = x.startsWith('*'); const [n, p, note, feats, cta] = split(x.replace(/^\*/, '')); return `<article class="card tier ${hot ? 'hot' : ''}">${hot ? '<span class="badge">Most popular</span>' : ''}<h3>${esc(n)}</h3><p class="price">${esc(p ?? '')}</p>${note ? `<p class="muted">${esc(note)}</p>` : ''}<ul class="checks">${(feats ?? '').split(';').map((y) => y.trim()).filter(Boolean).map((y) => `<li>${rich(y)}</li>`).join('')}</ul><a class="btn ${hot ? '' : 'ghost'}" href="${esc(s.url ?? '#')}">${esc(cta || s.cta || 'Get started')}</a></article>`; }).join('')}</div></div></section>`;
     case 'faq':
@@ -97,6 +116,14 @@ em{font-style:normal;color:var(--accent)}mark{background:color-mix(in srgb,var(-
 .vs{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:36px}.side{border-radius:20px;padding:32px}.side.old{background:color-mix(in srgb,var(--fg) 5%,transparent);color:var(--muted)}.side.new{background:var(--brand-primary);color:var(--brand-on-primary)}.side ul{margin:12px 0 0;padding-left:20px;display:grid;gap:8px}
 .tier{display:flex;flex-direction:column;gap:6px;position:relative}.tier .price{font:800 40px/1.1 var(--font-display);letter-spacing:-.03em;color:var(--fg);margin:6px 0}.tier .btn{margin-top:auto;justify-content:center}.tier .checks{margin-bottom:24px}
 .tier.hot{border:2px solid var(--brand-primary)}.badge{position:absolute;top:-13px;left:24px;background:var(--brand-primary);color:var(--brand-on-primary);font:700 12px/1 var(--font-body);padding:7px 12px;border-radius:999px}
+.vt-wrap{overflow-x:auto;margin-top:36px;border:1px solid var(--rule);border-radius:20px}
+.vt{width:100%;border-collapse:collapse;font-size:16px}.vt th,.vt td{padding:16px 20px;border-bottom:1px solid var(--rule);text-align:left;vertical-align:top}.vt tr:last-child>*{border-bottom:0}
+.vt thead th{font:800 17px/1.2 var(--font-display);background:var(--card)}.vt thead th.us{color:var(--accent)}
+.vt td{text-align:center;width:22%;font-size:20px;font-weight:800}.vt td.v-yes{color:var(--accent)}.vt td.v-no{color:var(--muted)}.vt td.v-partial{color:var(--fg)}
+.vt tbody th{font-weight:600}.vt tbody th small{display:block;font-weight:400;font-size:14px;color:var(--muted);margin-top:4px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.vt-src{font-size:14px;color:var(--muted);margin-top:14px}
+.pick.us{border:2px solid var(--brand-primary)}.pick h3{font-size:22px}
 details{border-bottom:1px solid var(--rule);padding:20px 0}summary{cursor:pointer;font:700 19px/1.35 var(--font-display);list-style:none}summary::-webkit-details-marker{display:none}summary::after{content:"+";float:right;color:var(--accent)}details[open] summary::after{content:"–"}details p{color:var(--muted);margin:12px 0 0}
 .final{background:var(--hero-bg);color:var(--hero-fg)}.final em{color:inherit;text-decoration:underline;text-decoration-thickness:.08em;text-underline-offset:.1em}.final .lede{color:inherit;opacity:.85}.final .btn{background:var(--hero-fg);color:var(--hero-bg);border-color:var(--hero-fg)}
 footer{padding:40px 0;color:var(--muted);font-size:14px;border-top:1px solid var(--rule)}
