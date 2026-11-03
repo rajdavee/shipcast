@@ -296,8 +296,15 @@ export function createStillsService() {
         const previews: Record<string, string> = {};
         for (const [view, opts] of [['desktop', { width: 1440, height: 900, scale: 1 }], ['mobile', { width: 390, height: 844, scale: 2, mobile: true }]] as const) {
           ctx.progress(view === 'desktop' ? 0.3 : 0.7, `${view} preview`);
-          const pg = await browser().open(pathToFileURL(index).href, { ...opts, settleMs: 300 });
-          try {
+          // One retry on a fresh browser if Chrome drops mid-capture, like every other capture here.
+          for (let attempt = 0; attempt < 2; attempt++) {
+            const pg = await browser().open(pathToFileURL(index).href, { ...opts, settleMs: 300 }).catch(async (e) => {
+              if (attempt || !/DevTools|timed out|closed|Target/i.test(String((e as Error).message))) throw e;
+              await browser().restart();
+              return null;
+            });
+            if (!pg) continue;
+            try {
             await pg.eval('document.fonts.ready.then(() => true)');
             const audit = await pg.eval<{ wide: boolean; broken: number; tiny: number }>(`(() => ({ wide: document.documentElement.scrollWidth > innerWidth + 2, broken: [...document.images].filter((i) => !i.complete || !i.naturalWidth).length, tiny: [...document.querySelectorAll('p,li,a,dd,summary')].filter((e) => e.offsetParent && parseFloat(getComputedStyle(e).fontSize) < 13).length }))()`);
             if (audit.wide) problems.push(`${view}: the page scrolls sideways — something is wider than the screen.`);
@@ -305,8 +312,13 @@ export function createStillsService() {
             if (view === 'mobile' && audit.tiny) problems.push(`mobile: ${audit.tiny} text element(s) under 13px.`);
             previews[view] = join(outDir, `landing-${view}.png`);
             await writeFile(previews[view], await pg.fullPage(16000));
+            break;
+          } catch (e) {
+            if (attempt || !/DevTools|timed out|closed|Target/i.test(String((e as Error).message))) throw e;
+            await browser().restart();
           } finally {
-            await pg.close();
+            await pg.close().catch(() => {});
+          }
           }
         }
         await rm(join(outDir, 'landing.zip'), { force: true });
