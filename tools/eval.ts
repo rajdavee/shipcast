@@ -20,9 +20,11 @@ import { campaignDir, readCampaign, getPack, saveEval, previews, judge, RUBRIC, 
 const args = process.argv.slice(2);
 const outIdx = args.indexOf('--out');
 const outFile = outIdx >= 0 ? args[outIdx + 1] : 'eval-report.md';
-const ids = args.filter((a, i) => !a.startsWith('--') && i !== outIdx + 1);
+const onlyIdx = args.indexOf('--only');
+const only = onlyIdx >= 0 ? new Set(args[onlyIdx + 1].split(',')) : null;
+const ids = args.filter((a, i) => !a.startsWith('--') && i !== outIdx + 1 && i !== onlyIdx + 1);
 if (!ids.length) {
-  console.error('usage: node tools/eval.ts <campaignId> … [--out eval-report.md]');
+  console.error('usage: node tools/eval.ts <campaignId> … [--out eval-report.md] [--only pack,pack]');
   process.exit(64);
 }
 
@@ -36,7 +38,7 @@ for (const id of ids) {
   for (const s of c.steps) {
     if (s.kind !== 'pack' || s.status !== 'done' || !s.pack) continue;
     const pack = await getPack(s.pack);
-    if (!pack || ['campaign-hub', 'campaign-plan', 'app-run', 'app-capture'].includes(pack.id)) continue;
+    if (!pack || ['campaign-hub', 'campaign-plan', 'app-run', 'app-capture'].includes(pack.id) || (only && !only.has(pack.id))) continue;
     const imgs = await previews(join(campaignDir(id), 'deliverables', s.id));
     if (!imgs.length) continue;
     const title = s.options._title ?? pack.name;
