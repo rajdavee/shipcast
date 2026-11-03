@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { api, type HubPackage, type SkillsView } from '../api.ts';
 import { toast, useLoad } from '../hooks.ts';
+import { Loading } from '../components/ui.tsx';
 
 const AREAS: [string, string][] = [
   ['motion', 'Motion & video'],
@@ -41,18 +42,12 @@ export function Skills() {
     }
   };
 
-  if (!view) return <main className="page"><p className="muted">Loading…</p></main>;
+  if (!view) return <Loading />;
   const byArea = AREAS.map(([a, label]) => ({ a, label, items: view.packages.filter((p) => p.area === a) })).filter((g) => g.items.length);
 
   return (
-    <main className="page">
-      <div className="camp-head">
-        <div>
-          <h1>Skills</h1>
-          <p>The best Claude skills from the community, mixed per job. Installed from their own repos at a pinned version, into Shipcast only — your own Claude setup stays untouched.</p>
-        </div>
-      </div>
-
+    <>
+      <p className="tab-intro">The best Claude skills from the community, mixed per job. Installed from their own repos at a pinned version, into Shipcast only — your own Claude setup stays untouched.</p>
 
       <form
         className="add-skill"
@@ -95,7 +90,7 @@ export function Skills() {
             ))}
         </div>
       </details>
-    </main>
+    </>
   );
 }
 

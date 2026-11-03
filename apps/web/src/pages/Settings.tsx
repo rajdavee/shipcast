@@ -1,19 +1,43 @@
 import { useEffect, useState } from 'react';
 import { api, type AgentsState, type LoginState, type Settings, type Status, type StockProvider } from '../api.ts';
-import { toast, useLoad } from '../hooks.ts';
+import { toast, useLoad, type SettingsTab } from '../hooks.ts';
+import { PageHeader } from '../components/ui.tsx';
+import { Skills } from './Skills.tsx';
 
 const NAMES: Record<string, string> = { render: 'Video renderer', stills: 'Image & PDF renderer', media: 'Voice, captions & music', qa: 'Quality checks' };
 
-export function Setup({ status, onChange }: { status: Status | null; onChange: () => void }) {
+const TABS: [SettingsTab, string][] = [
+  ['connections', 'Connections'],
+  ['generation', 'Generation'],
+  ['agents', 'Agents'],
+  ['skills', 'Skills'],
+];
+
+/** Everything that used to be Setup and Skills, one tab per concern; the tab lives in the hash (#/settings/agents). */
+export function Settings({ tab, status, onChange }: { tab: SettingsTab; status: Status | null; onChange: () => void }) {
+  return (
+    <main className="page settings-page">
+      <PageHeader title="Settings" description="Shipcast never asks for passwords. It uses the Claude Code and GitHub apps already signed in on this computer; optional keys stay here too." />
+      <nav className="tabs" aria-label="Settings sections">
+        {TABS.map(([id, label]) => (
+          <a key={id} href={`#/settings/${id}`} aria-current={tab === id ? 'page' : undefined}>{label}</a>
+        ))}
+      </nav>
+      <div className="tab-panel">
+        {tab === 'generation' ? <Generation /> : tab === 'agents' ? <AgentsSection /> : tab === 'skills' ? <Skills /> : <Connections status={status} onChange={onChange} />}
+      </div>
+    </main>
+  );
+}
+
+function Connections({ status, onChange }: { status: Status | null; onChange: () => void }) {
   const checks = useLoad(() => api.doctor());
   const services = useLoad(() => api.services(), [], 5000);
-  const [settings, setSettings] = useState<Settings | null>(null);
   const [claudeLogin, setClaudeLogin] = useState<LoginState | null>(null);
   const [ghLogin, setGhLogin] = useState<LoginState | null>(null);
   const [fixing, setFixing] = useState<string | null>(null);
   const [fixLog, setFixLog] = useState<string | null>(null);
 
-  useEffect(() => void api.settings().then(setSettings), []);
   useEffect(() => {
     if (!claudeLogin?.running && !ghLogin?.running) return;
     const t = setInterval(async () => {
@@ -26,10 +50,6 @@ export function Setup({ status, onChange }: { status: Status | null; onChange: (
     return () => clearInterval(t);
   }, [claudeLogin?.running, ghLogin?.running]);
 
-  const save = async (patch: Partial<Settings>) => {
-    setSettings(await api.saveSettings(patch));
-    toast('Saved');
-  };
   async function fix(id: string, label: string) {
     setFixing(id);
     setFixLog(null);
@@ -51,14 +71,7 @@ export function Setup({ status, onChange }: { status: Status | null; onChange: (
   const tools = (checks.data ?? []).filter((k) => !['claude', 'gh', 'node'].includes(k.id));
 
   return (
-    <main className="page narrow">
-      <div className="camp-head">
-        <div>
-          <h1>Setup</h1>
-          <p>Shipcast never asks for API keys or passwords. It uses the Claude Code and GitHub apps already signed in on this computer.</p>
-        </div>
-      </div>
-
+    <>
       <section className="setup-section">
         <h2>Accounts</h2>
         <p>Claude does the thinking. GitHub is only needed for private repos and pull-request videos.</p>
@@ -108,7 +121,6 @@ export function Setup({ status, onChange }: { status: Status | null; onChange: (
 
       <BrollSection />
       <EnginesSection />
-      <AgentsSection />
 
       <section className="setup-section">
         <h2>On this computer</h2>
@@ -141,11 +153,24 @@ export function Setup({ status, onChange }: { status: Status | null; onChange: (
         </div>
         {fixLog && <div className="doc" style={{ marginTop: 12 }}><pre>{fixLog}</pre></div>}
       </section>
+    </>
+  );
+}
 
+/** Model, reviews, time limits and spending caps: how each piece gets made. */
+function Generation() {
+  const [settings, setSettings] = useState<Settings | null>(null);
+  useEffect(() => void api.settings().then(setSettings), []);
+  const save = async (patch: Partial<Settings>) => {
+    setSettings(await api.saveSettings(patch));
+    toast('Saved');
+  };
+  return (
+    <>
       {settings && (
         <section className="setup-section">
           <h2>Preferences</h2>
-          <p>Stored in ~/.shipcast/settings.json.</p>
+          <p>How Claude directs your content. Stored in ~/.shipcast/settings.json.</p>
           <div className="rows">
             <div className="srow">
               <span />
@@ -205,7 +230,12 @@ export function Setup({ status, onChange }: { status: Status | null; onChange: (
           </div>
         </section>
       )}
-    </main>
+      <section className="setup-section">
+        <h2>Spending caps</h2>
+        <p>Only used when a media engine is connected in Connections.</p>
+        <GenBudget />
+      </section>
+    </>
   );
 }
 
@@ -279,7 +309,7 @@ function VoiceSection() {
             </form>
           )}
           {d?.connected && (d.voices?.length ?? 0) > 0 && (
-            <div className="device-code" style={{ background: 'var(--bg-2)' }}>
+            <div className="device-code" style={{ background: 'var(--surface-2)' }}>
               <label className="field" style={{ minWidth: 240 }}>
                 <span>Voice</span>
                 <select className="select" value={d.voice ?? ''} onChange={(e) => save({ voice: e.target.value }, 'Voice saved')}>
@@ -381,7 +411,6 @@ function EnginesSection() {
           );
         })}
       </div>
-      <GenBudget />
     </section>
   );
 }
@@ -396,7 +425,7 @@ function GenBudget() {
     toast('Saved');
   };
   return (
-    <div className="rows" style={{ marginTop: 14 }}>
+    <div className="rows">
       <div className="srow">
         <i className="dot ok" />
         <div>

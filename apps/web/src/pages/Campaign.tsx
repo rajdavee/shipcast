@@ -4,6 +4,7 @@ import { go, toast, useLoad } from '../hooks.ts';
 import { FORMATS, PLAIN, isStudio, relTime, shape } from '../formats.ts';
 import { Lightbox } from '../components/Lightbox.tsx';
 import { OptionInput } from '../components/OptionInput.tsx';
+import { EmptyState, Loading, PageHeader } from '../components/ui.tsx';
 
 /** Live campaign state + event log over one SSE connection. */
 function useCampaign(id: string) {
@@ -214,13 +215,10 @@ export function Campaign({ id }: { id: string }) {
   if (gone)
     return (
       <main className="page narrow">
-        <div className="empty">
-          <h3>This project was deleted</h3>
-          <a className="btn" href="#/library">Back to your projects</a>
-        </div>
+        <EmptyState title="This project was deleted" action={<a className="btn" href="#/library">Back to your projects</a>}>Its files were removed from this computer.</EmptyState>
       </main>
     );
-  if (!campaign) return <main className="page"><p className="muted">Loading…</p></main>;
+  if (!campaign) return <main className="page"><Loading /></main>;
 
   const brief = campaign.steps.find((s) => s.kind === 'brief')!;
   const items = campaign.steps.filter((s) => s.kind === 'pack');
@@ -251,13 +249,11 @@ export function Campaign({ id }: { id: string }) {
 
   return (
     <main className="page">
-      <a className="back" href="#/library">← Projects</a>
-      <div className="camp-head">
-        <div>
-          <h1>{campaign.name}</h1>
-          <p>{campaign.source.type === 'text' ? 'From your description' : campaign.source.value.replace(/^https?:\/\//, '')} · {relTime(campaign.createdAt)}</p>
-        </div>
-        <div className="actions">
+      <PageHeader
+        back={{ href: '#/library', label: 'Library' }}
+        title={campaign.name}
+        description={<span className="source">{campaign.source.type === 'text' ? 'From your description' : campaign.source.value.replace(/^https?:\/\//, '')} · {relTime(campaign.createdAt)}</span>}
+        actions={<>
           {ready > 0 && <a className="btn primary" href={`/api/campaigns/${id}/export`}>Download all</a>}
           <details className="menu">
             <summary className="btn ghost icon-btn" aria-label="More actions">⋯</summary>
@@ -309,8 +305,8 @@ export function Campaign({ id }: { id: string }) {
               </button>
             </div>
           </details>
-        </div>
-      </div>
+        </>}
+      />
 
       <p className="summary" aria-live="polite">{live && <i className="dot live" />}{summary}</p>
 
