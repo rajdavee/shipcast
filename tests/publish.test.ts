@@ -512,7 +512,7 @@ test('API: connections and keys, connect URL, callback pages — never a secret 
     const u = new URL(go.body.url);
     assert.equal(u.searchParams.get('redirect_uri'), `${base}/oauth/youtube/callback`);
     assert.equal(u.searchParams.get('access_type'), 'offline');
-    assert.equal(u.searchParams.get('scope'), 'https://www.googleapis.com/auth/youtube.upload');
+    assert.equal(u.searchParams.get('scope'), 'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/yt-analytics.readonly');
     assert.equal((await api('/api/publish/nope/connect')).status, 404);
 
     // A forged callback is refused with a page, not a stack.
