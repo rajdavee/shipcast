@@ -72,6 +72,8 @@ export const PRESETS: PlatformPreset[] = [
   { id: 'play-store', label: 'Google Play phone screenshot', kind: 'image', width: 1080, height: 1920, safe: box(64), notes: 'PNG or JPEG, no transparency, 9:16; at least 4 for promotion in recommendations.' },
   { id: 'producthunt-gallery', label: 'Product Hunt gallery image', kind: 'image', width: 1270, height: 760, maxBytes: 3 * MB, safe: box(48), notes: 'The first image is the one shown in shares and the launch page header.' },
   { id: 'producthunt-thumb', label: 'Product Hunt thumbnail', kind: 'image', width: 240, height: 240, maxBytes: 3 * MB, safe: box(16), notes: 'Shown at 80 px and smaller in lists.' },
+  { id: 'article-cover', label: 'Article / newsletter cover (16:9)', kind: 'image', width: 1920, height: 1080, maxBytes: 8 * MB, safe: { top: 100, right: 140, bottom: 100, left: 140 }, notes: 'LinkedIn article and newsletter cover; feeds crop it toward 1.91:1, so keep words in the middle band.' },
+  { id: 'article-figure', label: 'In-article figure', kind: 'image', width: 1600, height: 1000, safe: box(48), notes: 'Shown about 720 px wide on desktop and 350 px on phones.' },
   { id: 'og-card', label: 'Link preview (OG)', kind: 'image', width: 1200, height: 630, safe: { top: 65, right: 100, bottom: 65, left: 100 } },
   { id: 'x-image', label: 'X image (16:9)', kind: 'image', width: 1600, height: 900, maxBytes: 5 * MB, safe: box(60) },
   { id: 'story-image', label: 'Story card', kind: 'image', width: 1080, height: 1920, safe: { top: 270, right: 65, bottom: 380, left: 65 } },

@@ -53,6 +53,7 @@ export async function catalogMarkdown(kind: SpecKind): Promise<string> {
       `Caption styles: ${Object.entries(c.captions).map(([k, v]) => `\`${k}\` — ${v}`).join('; ')}`,
       'Voices: `af_heart` `af_nova` `af_sky` (US female) · `am_adam` `am_michael` (US male) · `bf_emma` `bf_isabella` (UK female) · `bm_george` (UK male)',
       'Transitions (how a scene enters): `cut` `flash` `wipe` `fade` `zoom` `blur` (a motion-blurred whip — the slickest UI-to-UI cut) `push` (the next scene slides the last one away) — wipes/zooms/blurs/pushes get a whoosh, flashes an impact.',
+      'Several sizes at once: `"sizes": ["vertical", "square-video"]` renders the first into out/ (video.mp4) and each other size into out/<preset>/ — same scenes, re-laid out per canvas.',
       'Music: `{"mood": "uplifting|tech|chill|energetic|cinematic|playful"}` (original score generated per video, cuts land on the beat), `{"file": "<absolute path>"}` for a user track, or `null` for none. Default: uplifting.',
       '',
       '## Scenes',
@@ -132,6 +133,7 @@ export async function catalogMarkdown(kind: SpecKind): Promise<string> {
       '- `{ "type": "stats", "stats": ["value | label", …≤3] }` — verified numbers only.',
       '- `{ "type": "cta", "headline", "body"?, "cta", "url" }` — the closing ask.',
       '- `{ "type": "image", "image", "alt", "url"? }` · `{ "type": "divider" }`',
+      '- Newsletter issues: `{ "type": "masthead", "title"?: "newsletter name", "issue": "Issue 12", "date": "3 Nov 2026", "tagline"? }` (first block) · `{ "type": "items", "heading"?, "items": ["Title | one or two lines | url?", 2–4] }` · `{ "type": "forward", "text"?, "url"?: "subscribe page" }` (the forward-to-a-friend line).',
       'Rich text: `*word*` accent · `**word**` bold. Images: paths relative to the brief folder; they are copied next to the HTML and zipped for upload. Zoom into the detail that proves the point by adding `#crop=x,y,w,h` (fractions of the image, e.g. `assets/screens/docket.png#crop=0.05,0.1,0.55,0.45`) — a whole screen shrunk into a box is unreadable.',
       'Checks after rendering: Gmail clipping (102 KB), subject and preheader length, link count, spam phrasing, phone width, footer address.',
     ].join('\n');
@@ -180,6 +182,7 @@ export async function catalogMarkdown(kind: SpecKind): Promise<string> {
     'Each item: `{ "type": "thumbnail"|"card", "layout": "<id>", "theme"?: "editorial|swiss|bold|midnight", "preset": "<preset id>", "name": "file.png", "fields": {…} }`',
     'Presets: `youtube-thumbnail` 1280×720 · `og-card` 1200×630 · `github-banner` 1280×640 · `x-image` 1600×900 · `instagram-post` 1080×1080 · `linkedin-image` 1080×1350 · `linkedin-landscape` 1200×627 · `story-image` 1080×1920 · `x-header` 1500×500 · `linkedin-banner` 1584×396 · `linkedin-company-banner` 1128×191 · `youtube-banner` 2560×1440 · `facebook-cover` 851×315 · `profile-avatar` 400×400 · `app-store-ios` 1290×2796 · `play-store` 1080×1920 · `producthunt-gallery` 1270×760 · `producthunt-thumb` 240×240',
     'Profile banners (`profile-banner`, `profile-avatar`): each preset has its own safe area and the audit flags text, logos and images outside it — youtube-banner keeps everything in the centre 1546×423; x-header and linkedin-banner keep clear of the profile photo at the bottom-left, linkedin-company-banner of the page logo; facebook-cover of the sides phones crop; profile-avatar keeps everything inside the inscribed circle. The layouts place content correctly — problems come from copy that is too long.',
+    'Articles and newsletters: `article-cover` 1920×1080 (LinkedIn article / newsletter cover) · `article-figure` 1600×1000 (in-article figure). In a figure the screenshot must stay readable at article width — crop to the part the paragraph talks about.',
     'File names may carry one folder (`ios/01-track.png`) to keep sets apart. Images that fail to load come back to you.',
     'App store screens (`app-screen`): the caption must stay on 2 lines at ≥ 6% of the canvas width — a caption that shrinks further comes back to you. The screenshot fills the phone\'s width and is cut at the bottom, so use a phone-shaped screenshot or crop a desktop one to a tall region about 1 wide by 2 high in pixels (for a 1440×900 capture: `#crop=x,0,0.29,1`). No real device art or store badges — the frame is generic.',
     'Quotes and people: `pull-quote`, `testimonial`, `quote-post` and `post-card` carry exact words from the brief or source only, attributed to the real person or post. With no real quote, write clearly placeholder words and set `"sample": "yes"` — the image is then labelled "Sample copy — not a real customer". Never invent a named customer, a rating or a platform logo.',
@@ -317,8 +320,17 @@ export async function renderSpec(kind: SpecKind, cwd: string, briefDir: string, 
       const fb = (r.qa?.issues ?? []).filter((i: any) => i.severity === 'error').map((i: any) => `${i.message}${i.fix ? ` Fix: ${i.fix}` : ''}`);
       return { ok: !fb.length, feedback: fb, summary: `animated infographic (${r.duration.toFixed(1)}s loop, GIF + MP4 + PNG)` };
     }
+    // Several sizes (audiograms: vertical + square): the first is the main video in out/, the rest render into out/<preset>/.
+    const sizes: string[] = Array.isArray(spec.sizes) ? spec.sizes.map(String).filter((x: string) => /^[\w-]+$/.test(x)) : [];
+    if (sizes.length) spec.preset = sizes[0];
     const v = await callService('render', 'validate', { storyboard: spec });
     if (v.errors.length) return { ok: false, feedback: v.errors, summary: 'invalid storyboard' };
+    const extra: string[] = [];
+    for (const size of sizes.slice(1)) {
+      const rs = await callService('render', 'render', { storyboard: { ...spec, preset: size, sizes: undefined }, outDir: join(out, size), brandDir: briefDir, name: 'video' });
+      await run('rm', ['-rf', join(out, size, 'project')]);
+      extra.push(...(rs.qa?.issues ?? []).filter((i: any) => i.severity === 'error').map((i: any) => `${size} version: ${i.message}${i.fix ? ` Fix: ${i.fix}` : ''}`));
+    }
     const r = await callService('render', 'render', { storyboard: spec, outDir: out, brandDir: briefDir, name: 'video' });
     await writeFile(join(out, 'qa.json'), JSON.stringify(r.qa, null, 2));
     // Long-form: drop the real chapter timestamps into the YouTube description.
@@ -326,8 +338,8 @@ export async function renderSpec(kind: SpecKind, cwd: string, briefDir: string, 
       const d = await readFile(join(out, 'description.md'), 'utf8');
       await writeFile(join(out, 'description.md'), d.includes('{{timestamps}}') ? d.replace('{{timestamps}}', r.timestamps) : `${d.trimEnd()}\n\n${r.timestamps}\n`);
     }
-    const fb = (r.qa?.issues ?? []).filter((i: any) => i.severity === 'error').map((i: any) => `${i.message}${i.fix ? ` Fix: ${i.fix}` : ''}`);
-    return { ok: !fb.length, feedback: fb, summary: `${r.duration.toFixed(1)}s video, QA ${r.qa?.pass ? 'passed' : 'flagged issues'}` };
+    const fb = [...(r.qa?.issues ?? []).filter((i: any) => i.severity === 'error').map((i: any) => `${i.message}${i.fix ? ` Fix: ${i.fix}` : ''}`), ...extra];
+    return { ok: !fb.length, feedback: fb, summary: `${r.duration.toFixed(1)}s video${sizes.length > 1 ? ` × ${sizes.length} sizes` : ''}, QA ${r.qa?.pass && !extra.length ? 'passed' : 'flagged issues'}` };
   } catch (e) {
     return { ok: false, feedback: [(e as Error).message.slice(0, 1500)], summary: 'render failed' };
   }

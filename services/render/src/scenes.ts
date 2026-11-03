@@ -1,5 +1,6 @@
 import { pathToFileURL } from 'node:url';
 import { explainerScenes } from './scenes-explainer.ts';
+import { audiogramScenes } from './audiogram.ts';
 import { contrastRatio, ensureContrast, luminance, onColor, type BrandKit, type SafeZone } from '@shipcast/engine';
 
 /** Mix a colour toward white until it reads (≥ 3:1, WCAG large text) on a dark ground. */
@@ -38,6 +39,8 @@ export interface SceneCtx {
   icons?: Record<string, string | null>;
   /** Spoken word times in this scene (seconds from scene start), for lip-sync and reveals. */
   talk?: { text: string; start: number; end: number }[];
+  /** Loudness per frame (0–1, LEVEL_FPS) of this scene's audio from scene start, for meters. */
+  levels?: number[];
 }
 
 export interface SceneDef {
@@ -901,6 +904,7 @@ tl.fromTo("${S} .stage",{scale:1},{scale:1.04,duration:${c.duration},ease:"none"
 ];
 
 SCENES.push(...explainerScenes({ frame, bg, words, fit, img, headCss, has, wordIn, list, esc, readableOnDark }));
+SCENES.push(...audiogramScenes({ frame, bg, words, fit, img, headCss, has, wordIn, esc }));
 
 export function getScene(id: string): SceneDef {
   const s = SCENES.find((x) => x.id === id);

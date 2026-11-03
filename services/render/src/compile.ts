@@ -7,6 +7,7 @@ import { getScene, type SceneCtx } from './scenes.ts';
 import { parseSteps } from './scenes-explainer.ts';
 import { MOODS, type Mood } from '@shipcast/media';
 import { buildCaptions, CAPTION_STYLES, type CaptionStyle, type Word } from './captions.ts';
+import { audioLevels, LEVEL_FPS } from './audiogram.ts';
 
 export type Transition = 'cut' | 'flash' | 'wipe' | 'fade' | 'zoom' | 'blur' | 'push';
 
@@ -55,6 +56,8 @@ export interface CompileDeps {
   broll?: (query: string, seconds: number, orientation: 'landscape' | 'portrait' | 'square') => Promise<{ file: string; credit: string; url: string } | null>;
   /** media.mix — voice over music, mastered. */
   mix: (voice: string | null, music: string | null, out: string, seconds: number, gainDb?: number) => Promise<{ file: string }>;
+  /** media.transcribe — word timings for an audiogram's own audio file. */
+  transcribe?: (file: string) => Promise<{ words: Word[] }>;
 }
 
 export interface Compiled {
@@ -98,6 +101,9 @@ export function validateStoryboard(s: Storyboard): string[] {
       try {
         const def = getScene(sc.scene);
         for (const f of def.fields) if (!f.optional && (sc.fields?.[f.id] === undefined || sc.fields?.[f.id] === '')) errs.push(`scene ${i + 1} (${sc.scene}): missing field "${f.id}"`);
+        // An audiogram's meter and captions need real speech: a voiceover line or an audio file.
+        if (sc.scene === 'audiogram' && !sc.fields?.audio && !(s.voice && sc.vo?.trim())) errs.push(`scene ${i + 1} (audiogram): needs a "vo" line (with voice on) or an "audio" file`);
+        if (sc.scene === 'audiogram' && (sc.vo ?? '').split(/\s+/).filter(Boolean).length > 260) errs.push(`scene ${i + 1} (audiogram): the vo line runs past 90 seconds — cut it to ≤ 220 words`);
         if (sc.scene === 'walkthrough' && sc.fields?.steps !== undefined) {
           const lines = (Array.isArray(sc.fields.steps) ? sc.fields.steps : String(sc.fields.steps).split('\n')).map(String).filter((x) => x.trim());
           if (!parseSteps(lines, (v) => v as string[]).length) errs.push(`scene ${i + 1} (walkthrough): steps need "x,y,w,h | LABEL | caption" with four 0–1 numbers`);
@@ -164,6 +170,23 @@ export async function compileStoryboard(story: Storyboard, opts: { dir: string; 
     }
   }
 
+  // Audiograms over a recording: cut the segment, transcribe it and treat it as the scene's voice.
+  for (const [i, sc] of story.scenes.entries()) {
+    if (sc.scene !== 'audiogram' || !sc.fields?.audio || voiced[i]) continue;
+    const a = String(sc.fields.audio);
+    const src = a.startsWith('/') ? a : join(opts.brandDir ?? '', a);
+    if (!existsSync(src)) throw new Error(`scene ${i + 1} (audiogram): audio file "${a}" not found in the brief`);
+    const from = Math.max(0, Number(sc.fields.from) || 0);
+    const whole = (await probe(src).catch(() => null))?.duration ?? 0;
+    const len = Math.min(90, Math.max(1, (Number(sc.fields.to) > from ? Number(sc.fields.to) : whole || from + 90) - from));
+    const out = join(dir, 'assets', `aud-${i + 1}.wav`);
+    progress(0.05 + (0.35 * i) / story.scenes.length, `transcribing clip ${i + 1}`);
+    const r = await run('ffmpeg', ['-y', '-v', 'error', '-ss', String(from), '-t', String(len), '-i', src, '-vn', '-ac', '1', '-ar', '48000', out], { timeoutMs: 300_000 });
+    if (r.code !== 0) throw new Error(`scene ${i + 1} (audiogram): could not read "${a}": ${r.stderr.slice(-200)}`);
+    const words = opts.deps.transcribe ? (await opts.deps.transcribe(out).catch(() => ({ words: [] as Word[] }))).words : [];
+    voiced[i] = { file: out, duration: (await probe(out).catch(() => null))?.duration ?? len, words };
+  }
+
   // A recording can't play past its own end: cap those scenes at the clip's remaining length.
   const clipCap: Record<number, number> = {};
   for (const [i, sc] of story.scenes.entries()) {
@@ -194,7 +217,7 @@ export async function compileStoryboard(story: Storyboard, opts: { dir: string; 
 
   // Edit rhythm: punch in on the words that carry the line (numbers, *accented* words, the strongest
   // word of a long line) — at most two per scene, never on scenes with their own camera or slam.
-  const NO_PUNCH = new Set(['product', 'walkthrough', 'recording', 'part', 'scroll', 'kinetic', 'logos', 'stack3d', 'chapter', 'outro', 'logo-sting']);
+  const NO_PUNCH = new Set(['audiogram', 'product', 'walkthrough', 'recording', 'part', 'scroll', 'kinetic', 'logos', 'stack3d', 'chapter', 'outro', 'logo-sting']);
   const punchesFor = (e: (typeof timeline)[number]): number[] => {
     const v = voiced[e.i];
     if (!v?.words.length || !e.sc.scene || NO_PUNCH.has(e.sc.scene)) return [];
@@ -338,8 +361,11 @@ export async function compileStoryboard(story: Storyboard, opts: { dir: string; 
     const f = e.sc.fields as Record<string, unknown> | undefined;
     if (f) for (const k of ['title', 'headline', 'caption']) if (typeof f[k] === 'string' && LABEL.test(f[k] as string) && (f[k] as string).replace(LABEL, '').trim()) f[k] = (f[k] as string).replace(LABEL, '');
   }
+  // Audiogram meters: the scene's own audio, measured per frame, shifted by the voice lead-in.
+  const levels: Record<number, number[]> = {};
+  for (const e of timeline) if (e.sc.scene === 'audiogram' && voiced[e.i]) levels[e.i] = [...Array(Math.round(VO_LEAD * LEVEL_FPS)).fill(0), ...(await audioLevels(voiced[e.i].file, join(dir, 'assets', `levels-${e.i + 1}.raw`)))];
   for (const e of timeline) {
-    const sctx: SceneCtx = { id: e.id, width, height, duration: e.duration, safe: preset.safe, brand: fallbackBrand, assetsDir: opts.brandDir, asset, icons, talk: voiced[e.i]?.words.map((w) => ({ text: w.text, start: +(w.start + VO_LEAD).toFixed(3), end: +(w.end + VO_LEAD).toFixed(3) })), captionBand: e.sc.scene === 'product' || e.sc.scene === 'scroll' ? 0 : captionBand };
+    const sctx: SceneCtx = { id: e.id, width, height, duration: e.duration, safe: preset.safe, brand: fallbackBrand, assetsDir: opts.brandDir, asset, icons, talk: voiced[e.i]?.words.map((w) => ({ text: w.text, start: +(w.start + VO_LEAD).toFixed(3), end: +(w.end + VO_LEAD).toFixed(3) })), captionBand: e.sc.scene === 'product' || e.sc.scene === 'scroll' ? 0 : captionBand, levels: levels[e.i] };
     if (e.sc.scene) {
       const part = getScene(e.sc.scene).build((e.sc.fields ?? {}) as Record<string, any>, sctx);
       await writeFile(join(dir, 'compositions', `${e.id}.html`), subcomp(e.id, width, height, part, punchesFor(e)));

@@ -19,7 +19,11 @@ export type EmailBlock =
   | { type: 'stats'; stats: string[] }
   | { type: 'cta'; headline: string; body?: string; cta: string; url: string }
   | { type: 'image'; image: string; alt: string; url?: string }
-  | { type: 'divider' };
+  | { type: 'divider' }
+  // Newsletter issues: masthead, short items and the forward line.
+  | { type: 'masthead'; title?: string; issue: string; date: string; tagline?: string }
+  | { type: 'items'; heading?: string; items: string[] }
+  | { type: 'forward'; text?: string; url?: string };
 
 export interface EmailSpec {
   name: string;
@@ -158,6 +162,20 @@ ${b.cta ? (set.theme === 'brand' ? button(b.cta, b.url ?? '', { ...c, btnBg: c.h
       if (b.url) link();
       const im = `<img src="${imgRef(b.image)}" width="520" alt="${esc(b.alt)}" style="display:block;width:100%;max-width:520px;height:auto;border-radius:12px;border:1px solid ${c.rule}">`;
       rows.push(`<tr><td style="${pad};padding-top:24px">${b.url ? `<a href="${esc(b.url)}">${im}</a>` : im}</td></tr>`);
+    } else if (b.type === 'masthead') {
+      const name = b.title || brand.name;
+      text.push(`${textOf(name)} — ${textOf(b.issue)} · ${textOf(b.date)}`, b.tagline ? textOf(b.tagline) : '', '');
+      rows.push(`<tr><td style="${pad};padding-top:28px;padding-bottom:4px;border-bottom:1px solid ${c.rule}"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td valign="bottom" style="font-family:${display};font-size:22px;line-height:1.2;font-weight:800;color:${c.fg};padding-bottom:14px">${inline(name, c.accent)}${b.tagline ? `<div style="font-family:${font};font-size:13px;font-weight:normal;color:${c.muted};padding-top:4px">${inline(b.tagline, c.accent)}</div>` : ''}</td><td align="right" valign="bottom" style="font-family:${font};font-size:13px;line-height:1.4;color:${c.muted};padding-bottom:14px;white-space:nowrap"><strong style="color:${c.accent}">${esc(b.issue)}</strong><br>${esc(b.date)}</td></tr></table></td></tr>`);
+    } else if (b.type === 'items') {
+      const its = (Array.isArray(b.items) ? b.items : []).map((x) => String(x).split('|').map((y) => y.trim()));
+      text.push(b.heading ? textOf(b.heading) : '', ...its.map(([t, d, u]) => `- ${textOf(t)}${d ? `: ${textOf(d)}` : ''}${u ? ` (${u})` : ''}`), '');
+      links += its.filter(([, , u]) => u).length;
+      rows.push(`<tr><td style="${pad};padding-top:28px;font-family:${font};color:${c.fg}">${b.heading ? `<h2 style="margin:0 0 6px 0;font-family:${display};font-size:20px;line-height:1.25;color:${c.fg}">${inline(b.heading, c.accent)}</h2>` : ''}<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${its.map(([t, d, u], n) => `<tr><td valign="top" width="34" style="padding:14px 0 0 0;font-family:${display};font-size:15px;font-weight:800;color:${c.accent}">${String(n + 1).padStart(2, '0')}</td><td style="padding:14px 0 12px 0;border-bottom:${n < its.length - 1 ? `1px solid ${c.rule}` : '0'};font-family:${font};font-size:15px;line-height:1.55;color:${c.fg}"><strong style="font-family:${display};font-size:16px">${u ? `<a href="${esc(u)}" style="color:${c.fg};text-decoration:none">${inline(t, c.accent)} &rarr;</a>` : inline(t, c.accent)}</strong>${d ? `<br><span style="color:${c.muted}">${inline(d, c.accent)}</span>` : ''}</td></tr>`).join('')}</table></td></tr>`);
+    } else if (b.type === 'forward') {
+      const line = b.text || `Know someone who'd like this? Forward it to them.`;
+      text.push(textOf(line), b.url ? `Forwarded this? Subscribe: ${b.url}` : '', '');
+      // The subscribe link is housekeeping like unsubscribe, not a competing call to action: not counted.
+      rows.push(`<tr><td style="${pad};padding-top:28px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td align="center" style="background:${c.bg};border-radius:12px;padding:16px 20px;font-family:${font};font-size:14px;line-height:1.55;color:${c.muted}">&#9993;&nbsp; ${inline(line, c.accent)}${b.url ? `<br>Forwarded this? <a href="${esc(b.url)}" style="color:${c.accent};font-weight:bold;text-decoration:none">Subscribe here</a>.` : ''}</td></tr></table></td></tr>`);
     } else if (b.type === 'divider') {
       rows.push(`<tr><td style="${pad};padding-top:28px"><div style="height:1px;background:${c.rule};line-height:1px;font-size:0">&nbsp;</div></td></tr>`);
     }
