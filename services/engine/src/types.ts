@@ -168,4 +168,6 @@ export interface Settings {
   agentsQuietStart: string;
   agentsQuietEnd: string;
   agentsMaxClaudeRunsPerDay: number;
+  /** Stops the publisher sending anything (scheduled posts wait; nothing is lost). */
+  publishingPaused: boolean;
 }

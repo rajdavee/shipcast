@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { home } from './paths.ts';
 
@@ -65,6 +65,14 @@ export interface PostChannel {
   url?: string;
   error?: string;
   sentAt?: string;
+  /** The publisher's bookkeeping: tries so far, when the next may start, when the last one did. */
+  attempts?: number;
+  retryAt?: string;
+  lastAttemptAt?: string;
+  /** The platform's (or Postiz's) id for what was sent. */
+  remoteId?: string;
+  /** Something to know about a send that went through (e.g. YouTube kept the upload private). */
+  note?: string;
 }
 
 export interface Post {
@@ -119,10 +127,35 @@ async function writeAtomic(file: string, data: unknown) {
   await rename(tmp, file);
 }
 
-// One writer at a time: the UI, the planner and the publisher can all touch posts.
+// One writer at a time: the UI, the planner and the publisher can all touch
+// posts, and the api and agents services are separate processes — so an
+// in-process queue plus a mkdir lock (atomic) with stale-lock recovery.
 let chain: Promise<unknown> = Promise.resolve();
+async function withFileLock<T>(fn: () => Promise<T>): Promise<T> {
+  const lock = join(dir(), '.lock');
+  await mkdir(dir(), { recursive: true });
+  for (let i = 0; ; i++) {
+    try {
+      await mkdir(lock);
+      break;
+    } catch {
+      if (i > 200) {
+        const s = await stat(lock).catch(() => null);
+        if (s && Date.now() - s.mtimeMs > 10_000) await rm(lock, { recursive: true, force: true });
+        i = 0;
+      }
+      await new Promise((r) => setTimeout(r, 10));
+    }
+  }
+  try {
+    return await fn();
+  } finally {
+    await rm(lock, { recursive: true, force: true });
+  }
+}
 function serial<T>(fn: () => Promise<T>): Promise<T> {
-  const next = chain.then(fn, fn);
+  const run = () => withFileLock(fn);
+  const next = chain.then(run, run);
   chain = next.catch(() => {});
   return next;
 }
@@ -168,7 +201,23 @@ function cleanChannel(c: Partial<PostChannel>): PostChannel | null {
     ...(c.url ? { url: String(c.url) } : {}),
     ...(c.error ? { error: String(c.error).slice(0, 500) } : {}),
     ...(c.sentAt ? { sentAt: c.sentAt } : {}),
+    ...(Number(c.attempts) > 0 ? { attempts: Math.min(10, Math.round(Number(c.attempts))) } : {}),
+    ...(c.retryAt ? { retryAt: String(c.retryAt) } : {}),
+    ...(c.lastAttemptAt ? { lastAttemptAt: String(c.lastAttemptAt) } : {}),
+    ...(c.remoteId ? { remoteId: String(c.remoteId).slice(0, 200) } : {}),
+    ...(c.note ? { note: String(c.note).slice(0, 500) } : {}),
   };
+}
+
+const PUBLISHER_FIELDS = ['state', 'url', 'error', 'sentAt', 'attempts', 'retryAt', 'lastAttemptAt', 'remoteId', 'note'] as const;
+/** A channel that went out (or is going out) keeps its publisher record whatever an editor sends back — a stale copy must never make it go out twice. */
+function keepSent(c: PostChannel, old?: Post): PostChannel {
+  const prev = old?.channels.find((x) => x.channel === c.channel && x.account === c.account);
+  if (!prev || (prev.state !== 'sent' && prev.state !== 'sending')) return c;
+  const out: PostChannel = { ...c };
+  for (const k of PUBLISHER_FIELDS) delete out[k];
+  for (const k of PUBLISHER_FIELDS) if (prev[k] !== undefined) (out as unknown as Record<string, unknown>)[k] = prev[k];
+  return out;
 }
 
 const STATUSES: PostStatus[] = ['idea', 'draft', 'ready', 'scheduled', 'published', 'failed'];
@@ -187,7 +236,7 @@ export function savePost(input: Partial<Post> & { id?: string }, now = new Date(
       status: STATUSES.includes(merged.status as PostStatus) ? (merged.status as PostStatus) : merged.at ? 'draft' : 'idea',
       ...(at && !Number.isNaN(at.getTime()) ? { at: at.toISOString() } : {}),
       tz: String(merged.tz || DEFAULT_PLAN.tz),
-      channels: (merged.channels ?? []).map(cleanChannel).filter((c): c is PostChannel => !!c).filter((c, i, a) => a.findIndex((x) => x.channel === c.channel && x.account === c.account) === i),
+      channels: (merged.channels ?? []).map(cleanChannel).filter((c): c is PostChannel => !!c).map((c) => keepSent(c, old)).filter((c, i, a) => a.findIndex((x) => x.channel === c.channel && x.account === c.account) === i),
       ...(merged.format ? { format: String(merged.format) } : {}),
       ...(merged.campaign ? { campaign: String(merged.campaign) } : {}),
       ...(merged.step ? { step: String(merged.step) } : {}),
@@ -214,21 +263,41 @@ export function deletePost(id: string): Promise<boolean> {
   });
 }
 
-/** Update one channel of a post in place (the publisher's bookkeeping). */
-export function updateChannel(id: string, ch: ChannelId, patch: Partial<PostChannel>): Promise<Post> {
+/** Update one channel of a post in place (the publisher's bookkeeping). `undefined` in the patch clears a field. */
+export function updateChannel(id: string, ch: ChannelId, patch: Partial<PostChannel>, account?: string): Promise<Post> {
   return serial(async () => {
     const all = await readAll();
     const p = all.find((x) => x.id === id);
     if (!p) throw new Error('post not found');
-    const c = p.channels.find((x) => x.channel === ch);
+    const c = p.channels.find((x) => x.channel === ch && (account === undefined || x.account === account));
     if (!c) throw new Error(`post has no ${ch} channel`);
     Object.assign(c, patch);
+    for (const [k, v] of Object.entries(patch)) if (v === undefined) delete (c as unknown as Record<string, unknown>)[k];
     // The post is published once every channel is; failed if any failed and none is still going.
     if (p.channels.every((x) => x.state === 'sent')) p.status = 'published';
     else if (p.channels.some((x) => x.state === 'failed') && !p.channels.some((x) => x.state === 'pending' || x.state === 'sending' || x.state === 'due')) p.status = 'failed';
     p.updatedAt = new Date().toISOString();
     await writeAtomic(postsFile(), all);
     return p;
+  });
+}
+
+/**
+ * Take a channel for sending: only when the post is still scheduled and the
+ * channel still pending, checked and flipped to `sending` in one locked step
+ * so two publishers (or two ticks) can never both send it.
+ */
+export function claimChannel(id: string, ch: ChannelId, account: string | undefined, now = new Date()): Promise<{ post: Post; channel: PostChannel } | null> {
+  return serial(async () => {
+    const all = await readAll();
+    const p = all.find((x) => x.id === id);
+    const c = p?.channels.find((x) => x.channel === ch && x.account === account);
+    if (!p || !c || p.status !== 'scheduled' || c.state !== 'pending') return null;
+    c.state = 'sending';
+    c.lastAttemptAt = now.toISOString();
+    p.updatedAt = now.toISOString();
+    await writeAtomic(postsFile(), all);
+    return { post: structuredClone(p), channel: structuredClone(c) };
   });
 }
 
