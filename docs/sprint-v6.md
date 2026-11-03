@@ -119,3 +119,18 @@ Each format: pack + SKILL.md + catalog + audits + a preview tile + one golden br
 - **Lessons that overfit** — measured and auto-retired; capped at 8 per pack; human toggle.
 - **Trend noise / stale data** — evidence required on every card; decay; dates always shown.
 - **Source terms** — public endpoints only, cached, rate-limited; no login scraping; links not content.
+
+## Status (2026-11-03)
+
+| M | State |
+|---|---|
+| M1 agents service | Done — scheduler, quiet hours, daily cap, foreground priority, Setup controls |
+| M2 learning loop | Done — 17 incident categories, measured lessons, Learning page; first live run: 220 incidents → 6 lessons |
+| M3 trend radar | Done — HN, Google Trends, YouTube, Reddit feeds (polite, best-effort; JSON needs OAuth now) + web-search synthesis; Trending page |
+| M4 quality in the loop | Done — critic pass for every non-video format, settled-frame review sheets, empty-scene check, UI-text legibility audit, crop snapping, caption echo |
+| M5/M6 formats | Done — 14 new formats (photo carousel, quote cards, app-store screens, Product Hunt kit, profile kit, battlecard, case study, newsletter, blog article, audiogram, press kit, event kit, release notes, pins & end screen) |
+| Golden set | Done, off by default — rotating nightly check feeding Quality over time |
+
+Eval on the 7 formats run live: 2.9/5 (bar 4.0). Limits: 1x source screenshots in the test project, honest placeholders, no generated imagery until a fal key is connected.
+
+Open: verify Reddit feeds live once the rate limit clears; tune the end-screen and profile-photo keep-out zones against current platform layouts; golden briefs per new format.
