@@ -245,3 +245,11 @@ test('the critic finds previews for per-size slide sets and loose cards', async 
   for (const f of ['card-1-square.png', 'card-1-wide.png', 'card-2-square.png', 'brand-score.json']) writeFileSync(join(b, 'out', f), 'x');
   assert.deepEqual((await previews(b)).map((f) => f.split('/out/')[1]), ['card-1-square.png', 'card-2-square.png']);
 });
+
+test('inline code in backticks renders as code, not literal ticks', async () => {
+  const { rich } = await import('../services/stills/src/templates/common.ts');
+  const h = rich('Run `npm start` then *ship*');
+  assert.ok(!h.includes('`'));
+  assert.match(h, /<code[^>]*>npm start<\/code>/);
+  assert.match(h, /<em>ship<\/em>/);
+});

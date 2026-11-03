@@ -48,10 +48,12 @@ export const esc = (s: unknown) =>
 
 /**
  * Inline rich text: `*word*` → accent emphasis, `**word**` → strong,
- * `==word==` → highlighter mark, `\n` → line break. Everything else escaped.
+ * `==word==` → highlighter mark, `` `cmd` `` → inline code, `\n` → line break. Everything else escaped.
  */
 export function rich(s: unknown): string {
   return esc(s)
+    // Commands and file names arrive in markdown backticks; show them as code, never as literal ticks.
+    .replace(/`([^`\n]+)`/g, '<code style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.92em">$1</code>')
     .replace(/==(.+?)==/g, '<mark>$1</mark>')
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')

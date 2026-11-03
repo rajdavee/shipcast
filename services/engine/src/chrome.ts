@@ -303,7 +303,7 @@ export function layoutAuditScript(safe: SafeZone, width: number, height: number,
       if (ui >= minUi) return null;
       const name = tag ? 'the cropped screenshot' : decodeURIComponent(src.split('/').pop() || '').slice(0, 60);
       const keep = Math.max(5, Math.min(95, Math.round((100 * ui) / minUi)));
-      return name + ': its UI text lands at about ' + Math.round(ui) + 'px on the canvas (needs ' + minUi + 'px). Crop to roughly ' + keep + '% of the width it shows now (the button, chart or result that proves the point) with #crop=x,y,w,h.';
+      return name + ': its UI text lands at about ' + Math.floor(ui) + 'px on the canvas (needs ' + minUi + 'px). Crop to roughly ' + keep + '% of the width it shows now (the button, chart or result that proves the point) with #crop=x,y,w,h.';
     }).filter(Boolean);
     // Templates mark text that must stay big (data-min-font); auto-fit shrinking it below that means the copy is too long.
     out.small = [...document.querySelectorAll('[data-min-font]')].filter((el) => parseFloat(getComputedStyle(el).fontSize) < Number(el.dataset.minFont)).map((el) => label(el) + ' ' + Math.round(parseFloat(getComputedStyle(el).fontSize)) + 'px');
