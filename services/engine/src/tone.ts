@@ -353,6 +353,8 @@ export const PACK_CHANNEL: Record<string, Channel> = {
   'product-tour': 'youtube',
   'launch-film': 'youtube',
   email: 'email',
+  newsletter: 'email',
+  'blog-article': 'web',
   presentation: 'deck',
   document: 'print',
   print: 'print',

@@ -8,7 +8,7 @@ import type { AddressInfo } from 'node:net';
 // Newsletter issues and blog / SEO articles: deterministic copy checks, plus real renders when Chrome is here.
 const home = mkdtempSync(join(tmpdir(), 'shipcast-longform-'));
 process.env.SHIPCAST_HOME = home;
-const { findChrome, browser, checkArticle, checkNewsletter, parseFrontMatter, mentions, previews } = await import('@shipcast/engine');
+const { findChrome, browser, checkArticle, checkNewsletter, parseFrontMatter, mentions, previews, loadPacks, validatePack, PLUGIN_DIR, PACK_CHANNEL } = await import('@shipcast/engine');
 const { createStillsService } = await import('@shipcast/stills');
 
 const hasChrome = !!findChrome();
@@ -40,8 +40,21 @@ function article(n = 15, fm: Record<string, string> = {}): string {
     keywords: '[local-first marketing, product launch kit, social carousel, launch video]',
     ...fm,
   };
-  return `---\n${Object.entries(front).map(([k, v]) => `${k}: ${v}`).join('\n')}\nfaq:\n  - "Does it need an API key? | No — it runs on the Claude Code login you already have."\n  - "Where do files go? | Into a folder on your machine; nothing is uploaded."\n  - "Which formats? | Videos, carousels, decks, emails, landing pages and posts."\n---\n\n# How a launch campaign generator builds a whole kit from one link\n\nA launch campaign generator takes one product link and returns everything launch week needs. ${para(0)}\n\n${Array.from({ length: n }, (_, i) => `${i % 4 === 0 ? `## ${i === 0 ? 'What the launch campaign generator makes' : `Part ${i / 4 + 1} of the workflow`}\n\n` : ''}${i === 2 ? '### A closer look\n\n' : ''}${para(i + 1)}${i === 1 ? ' See the [Node.js release schedule](https://nodejs.org/en/about/previous-releases) for the runtime it needs.' : ''}\n\n${i === 3 ? '![The studio home screen](figures/01-studio.png)\n\n' : ''}`).join('')}`;
+  return `---\n${Object.entries(front).map(([k, v]) => `${k}: ${v}`).join('\n')}\nfaq:\n  - "Does it need an API key? | No — it runs on the login you already have."\n  - "Where do files go? | Into a folder on your machine; nothing is uploaded."\n  - "Which formats? | Videos, carousels, decks, emails, landing pages and posts."\n---\n\n# How a launch campaign generator builds a whole kit from one link\n\nA launch campaign generator takes one product link and returns everything launch week needs. ${para(0)}\n\n${Array.from({ length: n }, (_, i) => `${i % 4 === 0 ? `## ${i === 0 ? 'What the launch campaign generator makes' : `Part ${i / 4 + 1} of the workflow`}\n\n` : ''}${i === 2 ? '### A closer look\n\n' : ''}${para(i + 1)}${i === 1 ? ' See the [Node.js release schedule](https://nodejs.org/en/about/previous-releases) for the runtime it needs.' : ''}\n\n${i === 3 ? '![The studio home screen](figures/01-studio.png)\n\n' : ''}`).join('')}`;
 }
+
+test('newsletter and blog-article packs load, validate and point at their Shipcast skills', async () => {
+  const packs = await loadPacks(true);
+  for (const [id, spec] of Object.entries({ newsletter: 'email', 'blog-article': 'graphics' })) {
+    const p = packs.find((x) => x.id === id);
+    assert.ok(p, `${id} is bundled`);
+    assert.deepEqual(validatePack(p!, id), []);
+    assert.equal(p!.spec, spec);
+    const skill = p!.prompt.match(/shipcast:([\w-]+)/)?.[1];
+    assert.ok(skill && existsSync(join(PLUGIN_DIR, 'skills', skill, 'SKILL.md')), `${id} → ${skill}`);
+    assert.ok(PACK_CHANNEL[id], `${id} has a brand-voice channel`);
+  }
+});
 
 test('front matter parses scalars, inline lists and dash lists', () => {
   const { data, body } = parseFrontMatter('---\ntitle: "Hello: world"\nkeywords: [a, b , c]\nfaq:\n  - "Q? | A"\n  - Q2? | A2\n---\n# Body\n');

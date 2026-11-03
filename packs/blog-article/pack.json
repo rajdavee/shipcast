@@ -1,0 +1,21 @@
+{
+  "id": "blog-article",
+  "name": "Blog / SEO Article",
+  "tagline": "A 1,200–2,000-word article that answers one search — front matter for search (title, meta description, slug, keywords, FAQ), a 1200×630 hero, figures cut from real screenshots and a desktop and phone preview — checked for the on-page SEO basics.",
+  "category": "copy",
+  "order": 11,
+  "estimate": "6–10 min",
+  "accent": "#b45309",
+  "spec": "graphics",
+  "options": [
+    { "key": "keyword", "label": "Primary keyword", "type": "text", "default": "", "placeholder": "e.g. launch video maker (optional — otherwise picked from the brief)" },
+    { "key": "angle", "label": "Article type", "type": "select", "choices": ["how-to", "guide", "comparison", "listicle", "explainer"], "default": "how-to" },
+    { "key": "figures", "label": "Figures", "type": "number", "default": "3", "min": 1, "max": 6 },
+    { "key": "theme", "label": "Image theme", "type": "select", "choices": ["auto", "editorial", "swiss", "bold", "midnight"], "default": "auto" }
+  ],
+  "outputs": ["article.md", "article/**/*", "article-desktop.png", "article-mobile.png", "hero.png", "figures/*.png", "graphics.json", "*.md"],
+  "skills": [],
+  "tools": ["chrome"],
+  "roles": ["copy", "humanize"],
+  "timeoutMinutes": 40
+}

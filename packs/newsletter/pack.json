@@ -1,0 +1,22 @@
+{
+  "id": "newsletter",
+  "name": "Newsletter Issue",
+  "tagline": "One issue of your recurring newsletter — inbox-safe HTML with a masthead, lead story, short items, one ask and a forward line — plus the LinkedIn newsletter version with a 1920×1080 cover.",
+  "category": "copy",
+  "order": 10,
+  "estimate": "4–7 min",
+  "accent": "#0f766e",
+  "spec": "email",
+  "options": [
+    { "key": "newsletterName", "label": "Newsletter name", "type": "text", "default": "", "placeholder": "e.g. Shipcast Notes (default: the brand name)" },
+    { "key": "issue", "label": "Issue number", "type": "text", "default": "", "placeholder": "e.g. 12 (default: 1)" },
+    { "key": "date", "label": "Issue date", "type": "text", "default": "", "placeholder": "e.g. 3 Nov 2026 (default: today)" },
+    { "key": "topic", "label": "This issue's one idea", "type": "text", "default": "", "placeholder": "optional — otherwise the strongest story in the brief" },
+    { "key": "theme", "label": "Theme", "type": "select", "choices": ["auto", "light", "brand", "dark"], "default": "auto" }
+  ],
+  "outputs": ["emails/**/*", "*.zip", "*-desktop.png", "*-mobile.png", "linkedin-cover.png", "linkedin-article.md", "email.json", "graphics.json", "emails.md", "*.md"],
+  "skills": [],
+  "tools": ["chrome"],
+  "roles": ["copy", "humanize"],
+  "timeoutMinutes": 30
+}

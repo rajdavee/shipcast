@@ -14,6 +14,8 @@ export const FORMATS: { id: string; title: string; line: string; img?: string; r
   { id: 'landing', title: 'Landing page', line: 'Responsive page + section snippets for any site builder', img: '/formats/landing.jpg', ratio: 4 / 5 },
   { id: 'print', title: 'Print', line: 'Posters, flyers and roll-ups with bleed and crop marks', img: '/formats/print.jpg', ratio: 0.707 },
   { id: 'email', title: 'Email', line: 'Launch email, newsletter or sequence — HTML + text', img: '/formats/email.jpg', ratio: 4 / 5 },
+  { id: 'newsletter', title: 'Newsletter issue', line: 'One issue as inbox-safe HTML and a LinkedIn newsletter article', img: '/formats/newsletter.jpg', ratio: 4 / 5 },
+  { id: 'blog-article', title: 'Blog / SEO article', line: 'A 1,200–2,000-word article with hero, figures and SEO checks', img: '/formats/blog-article.jpg', ratio: 4 / 5 },
   { id: 'document', title: 'PDF document', line: 'One-pager, case study, ebook or whitepaper', img: '/formats/document.jpg', ratio: 0.707 },
   { id: 'ugc-ad', title: 'UGC ad', line: 'Creator-style ad with a labelled AI presenter', ratio: 9 / 16 },
   { id: 'reel', title: 'Reel', line: 'Vertical video with captions', img: '/formats/reel.jpg', ratio: 9 / 16 },
