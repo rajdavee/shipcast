@@ -9,6 +9,12 @@ import { pipeline } from 'node:stream/promises';
 import {
   appendEvent,
   CALENDAR_CHANNELS,
+  addSnapshot,
+  computePerformance,
+  deleteSnapshot,
+  importMetricsCsv,
+  postPerformance,
+  readSnapshots,
   heldByPostiz,
   postizWithdraw,
   planMonth,
@@ -519,6 +525,31 @@ router.get('/api/calendar/posts/:id/kit/:channel', async (_q, res, p) => {
   child.on('error', () => (res.end(), clean()));
   return undefined;
 });
+
+// ── pulse: numbers after a post went out ──────────────────────────────
+router.get('/api/metrics/posts/:id', async (_q, _r, p) => {
+  if (!(await getPost(p.id))) throw new HttpError(404, 'post not found');
+  return postPerformance(p.id);
+});
+router.post('/api/metrics/snapshots', async (req) => {
+  const b = await readJson(req);
+  if (typeof b.post !== 'string' || typeof b.channel !== 'string') throw new HttpError(400, 'post and channel are required');
+  try {
+    return await addSnapshot({ ...b, source: ['manual', 'screenshot'].includes(b.source) ? b.source : 'manual' });
+  } catch (e) {
+    throw new HttpError(400, (e as Error).message);
+  }
+});
+router.delete('/api/metrics/snapshots/:id', async (_q, _r, p) => {
+  if (!(await deleteSnapshot(p.id))) throw new HttpError(404, 'snapshot not found');
+  return { ok: true };
+});
+router.post('/api/metrics/import', async (req) => {
+  const { csv, channel: ch } = await readJson(req);
+  if (typeof csv !== 'string' || !csv.trim()) throw new HttpError(400, 'send { csv: "<file contents>" }');
+  return importMetricsCsv(csv.slice(0, 5_000_000), CALENDAR_CHANNELS.some((c) => c.id === ch) ? ch : undefined);
+});
+router.get('/api/metrics/performance', async () => computePerformance(await readSnapshots()));
 
 // ── trend radar: cards the trends agent keeps fresh ────────────────────
 router.get('/api/trends', async (req) => {

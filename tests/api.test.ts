@@ -274,3 +274,16 @@ test('brand score can use a project\'s own voice', async () => {
   assert.equal(r.status, 200);
   assert.ok(typeof r.body.score === 'number' && r.body.score < 100);
 });
+
+test('pulse API: record numbers, read performance, import, delete', async () => {
+  const p = (await api('/api/calendar/posts', { method: 'POST', json: { title: 'Pulse', at: '2026-10-01T03:30:00.000Z', channels: [{ channel: 'linkedin', caption: 'x', hashtags: [], media: [], via: 'manual' }] } })).body;
+  assert.equal((await api('/api/metrics/snapshots', { method: 'POST', json: { post: p.id } })).status, 400);
+  const s = await api('/api/metrics/snapshots', { method: 'POST', json: { post: p.id, channel: 'linkedin', impressions: '2.4K', likes: 80, source: 'youtube' } });
+  assert.equal(s.status, 200);
+  assert.equal(s.body.source, 'manual', 'only manual or screenshot can be claimed from the UI');
+  const perf = (await api(`/api/metrics/posts/${p.id}`)).body;
+  assert.equal(perf.snapshots[0].impressions, 2400);
+  assert.ok(Array.isArray((await api('/api/metrics/performance')).body));
+  assert.equal((await api('/api/metrics/import', { method: 'POST', json: { csv: 'post_id,impressions\n' + p.id + ',3000' } })).body.saved, 1);
+  assert.equal((await api(`/api/metrics/snapshots/${s.body.id}`, { method: 'DELETE' })).status, 200);
+});
