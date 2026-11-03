@@ -255,3 +255,15 @@ test('make it: a calendar post becomes a deliverable in its project', async () =
   assert.equal(step.options._title, 'Carousel: 5 launch mistakes');
   assert.equal((await api('/api/calendar/plan-month', { method: 'POST', json: { from: 'soon' } })).status, 400);
 });
+
+test('a trend card becomes a backlog idea with its recipe', async () => {
+  assert.equal((await api('/api/calendar/from-trend', { method: 'POST', json: { key: 'nope' } })).status, 404);
+  const { mkdirSync, writeFileSync } = await import('node:fs');
+  mkdirSync(join(home, 'trends'), { recursive: true });
+  writeFileSync(join(home, 'trends', 'cards.json'), JSON.stringify({ cards: [{ key: 'pdf-carousels', kind: 'format', platform: 'linkedin', title: 'PDF carousels lead LinkedIn', what: 'Document posts win.', evidence: [{ url: 'https://x.test' }], strength: 'rising', recipe: { pack: 'carousel', angle: 'teach', hookPattern: 'The {n} mistakes…', structure: ['hook', 'list', 'cta'] }, firstSeen: '', lastSeen: '', seen: 1, missed: 0 }] }));
+  const r = await api('/api/calendar/from-trend', { method: 'POST', json: { key: 'pdf-carousels' } });
+  assert.equal(r.body.status, 'idea');
+  assert.equal(r.body.format, 'carousel');
+  assert.equal(r.body.channels[0].channel, 'linkedin');
+  assert.match(r.body.notes, /Hook pattern: The \{n\} mistakes/);
+});

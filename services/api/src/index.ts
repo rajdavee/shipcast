@@ -317,6 +317,22 @@ router.get('/api/calendar/posts/:id/check', async (_q, _r, p) => {
   return { problems: scheduleProblems(post), channels: Object.fromEntries(post.channels.map((c) => [c.channel, channelProblems(c)])) };
 });
 router.get('/api/calendar/plan', () => readPlan());
+// A trend card becomes an idea in the backlog, carrying its recipe.
+router.post('/api/calendar/from-trend', async (req) => {
+  const { key, channel: ch } = await readJson(req);
+  const card = (await readTrends()).cards.find((c) => c.key === key);
+  if (!card) throw new HttpError(404, 'trend not found');
+  const target = ([ch, card.platform, 'linkedin'] as string[]).find((x) => CALENDAR_CHANNELS.some((c) => c.id === x))!;
+  return savePost({
+    title: card.title.slice(0, 120),
+    status: 'idea',
+    format: card.recipe.pack,
+    trend: card.key,
+    notes: [card.what, card.recipe.angle && `Angle: ${card.recipe.angle}`, card.recipe.hookPattern && `Hook pattern: ${card.recipe.hookPattern}`, card.recipe.structure.length ? `Structure: ${card.recipe.structure.join(' → ')}` : ''].filter(Boolean).join('\n'),
+    channels: [{ channel: target as any, caption: '', hashtags: [], media: [], via: 'manual' }],
+  });
+});
+
 router.post('/api/calendar/plan-month', async (req) => {
   const b = await readJson(req);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(b.from ?? '') || !/^\d{4}-\d{2}-\d{2}$/.test(b.to ?? '')) throw new HttpError(400, 'from and to must be YYYY-MM-DD');
