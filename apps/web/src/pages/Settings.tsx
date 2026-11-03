@@ -9,7 +9,7 @@ const NAMES: Record<string, string> = { render: 'Video renderer', stills: 'Image
 const TABS: [SettingsTab, string][] = [
   ['connections', 'Connections'],
   ['generation', 'Generation'],
-  ['agents', 'Background agents'],
+  ['agents', 'Agents'],
   ['skills', 'Skills'],
 ];
 

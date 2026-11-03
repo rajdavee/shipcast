@@ -71,9 +71,13 @@ export function useTheme() {
 const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 /** Keep Tab inside `ref` while active, and hand focus back to whatever had it on close. */
 export function useFocusTrap(ref: RefObject<HTMLElement | null>, active: boolean) {
+  // Read during render: by the time effects run, autoFocus inside the trap has already moved focus.
+  const saved = useRef<HTMLElement | null>(null);
+  if (!active) saved.current = null;
+  else if (!saved.current) saved.current = document.activeElement as HTMLElement | null;
   useEffect(() => {
     if (!active) return;
-    const before = document.activeElement as HTMLElement | null;
+    const before = saved.current;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Tab' || !ref.current) return;
       const els = [...ref.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => el.offsetParent !== null);

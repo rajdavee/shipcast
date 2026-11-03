@@ -99,7 +99,7 @@ code { font-family: var(--mono); font-size: 0.86em; background: var(--surface-2)
 ::selection { background: var(--accent-soft); }
 
 /* ── shell ─────────────────────────────────────────── */
-.shell { display: grid; grid-template-columns: var(--side-w) minmax(0, 1fr); min-height: 100vh; }
+.shell { display: grid; grid-template-columns: var(--side-w) minmax(0, 1fr); align-content: start; min-height: 100vh; }
 .main { min-width: 0; }
 .side {
   position: sticky; top: 0; height: 100vh; overflow-y: auto; overflow-x: hidden; z-index: 40;

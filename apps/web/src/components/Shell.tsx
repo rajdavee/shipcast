@@ -61,7 +61,7 @@ export function Shell({ place, status, onSearch, children }: { place: string; st
   useEffect(() => setDrawer(false), [place]);
   useEffect(() => {
     if (!drawer) return;
-    side.current?.querySelector<HTMLElement>('a[aria-current="page"], a')?.focus();
+    (side.current?.querySelector<HTMLElement>('.side-link[aria-current="page"]') ?? side.current?.querySelector<HTMLElement>('.side-link'))?.focus();
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setDrawer(false);
     addEventListener('keydown', onKey);
     return () => removeEventListener('keydown', onKey);

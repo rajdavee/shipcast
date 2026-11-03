@@ -90,7 +90,7 @@ export function Palette({ items, onClose }: { items: Command[]; onClose: () => v
             autoFocus
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search places, projects and actions…"
+            placeholder="Search Shipcast…"
             role="combobox"
             aria-expanded="true"
             aria-controls="palette-list"
