@@ -1,5 +1,5 @@
 import { basename } from 'node:path';
-import { brandCss, fontLinks, type BrandKit } from '@shipcast/engine';
+import { brandCss, fontLinks, PLACEHOLDER_NAME, type BrandKit } from '@shipcast/engine';
 import { esc, iconTag, list, rich } from './common.ts';
 
 /**
@@ -9,7 +9,7 @@ import { esc, iconTag, list, rich } from './common.ts';
  */
 
 export interface LandingSection {
-  type: 'hero' | 'logos' | 'features' | 'how' | 'stats' | 'testimonials' | 'comparison' | 'versus' | 'choose' | 'pricing' | 'faq' | 'cta' | 'media';
+  type: 'hero' | 'logos' | 'features' | 'how' | 'stats' | 'testimonials' | 'comparison' | 'versus' | 'choose' | 'pricing' | 'faq' | 'cta' | 'media' | 'event' | 'speakers' | 'agenda';
   [k: string]: any;
 }
 
@@ -43,6 +43,8 @@ function cell(v: unknown): string {
   return `<td class="v-${k}"><span aria-hidden="true">${{ yes: '✓', no: '✗', partial: '◐' }[k]}</span><span class="sr">${{ yes: 'Yes', no: 'No', partial: 'Partly' }[k]}</span></td>`;
 }
 
+const initials = (n: string) => n.replace(/[^\p{L}\s]/gu, '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '?';
+
 function section(s: LandingSection, img: (p: string) => string, icons: Record<string, string | null>): string {
   const head = (k?: string, h?: string, sub?: string) => `${k ? `<p class="eyebrow">${esc(k)}</p>` : ''}${h ? `<h2>${rich(h)}</h2>` : ''}${sub ? `<p class="lede">${rich(sub)}</p>` : ''}`;
   switch (s.type) {
@@ -72,6 +74,13 @@ function section(s: LandingSection, img: (p: string) => string, icons: Record<st
       return `<section class="pricing" id="pricing"><div class="wrap">${head(s.eyebrow, s.heading, s.sub)}<div class="grid g${Math.min(4, Math.max(2, list(s.tiers).length))}">${list(s.tiers).map((x) => { const hot = x.startsWith('*'); const [n, p, note, feats, cta] = split(x.replace(/^\*/, '')); return `<article class="card tier ${hot ? 'hot' : ''}">${hot ? '<span class="badge">Most popular</span>' : ''}<h3>${esc(n)}</h3><p class="price">${esc(p ?? '')}</p>${note ? `<p class="muted">${esc(note)}</p>` : ''}<ul class="checks">${(feats ?? '').split(';').map((y) => y.trim()).filter(Boolean).map((y) => `<li>${rich(y)}</li>`).join('')}</ul><a class="btn ${hot ? '' : 'ghost'}" href="${esc(s.url ?? '#')}">${esc(cta || s.cta || 'Get started')}</a></article>`; }).join('')}</div></div></section>`;
     case 'faq':
       return `<section class="faq" id="faq"><div class="wrap narrow">${head(s.eyebrow, s.heading ?? 'Questions')}${list(s.items).map((x) => { const [q, a] = split(x); return `<details><summary>${rich(q)}</summary><p>${rich(a ?? '')}</p></details>`; }).join('')}</div></section>`;
+    case 'event':
+      // An event hero: the when is as prominent as the what, and the register button sits right under it.
+      return `<section class="hero event" id="top"><div class="wrap hero-grid"><div class="hero-copy">${s.eyebrow ? `<p class="eyebrow">${esc(s.eyebrow)}</p>` : ''}<h1>${rich(s.headline)}</h1>${s.sub ? `<p class="lede">${rich(s.sub)}</p>` : ''}<div class="actions">${s.cta ? `<a class="btn" href="${esc(s.url ?? '#')}">${esc(s.cta)}</a>` : ''}</div>${s.note ? `<p class="note">${esc(s.note)}</p>` : ''}</div><dl class="when"><div><dt>Date</dt><dd>${esc(s.date)}</dd></div><div><dt>Time</dt><dd>${esc(s.time)} ${esc(s.timezone)}</dd></div>${s.where ? `<div><dt>Where</dt><dd>${esc(s.where)}</dd></div>` : ''}${s.length ? `<div><dt>Length</dt><dd>${esc(s.length)}</dd></div>` : ''}</dl></div></section>`;
+    case 'speakers':
+      return `<section class="speakers" id="speakers"><div class="wrap">${head(s.eyebrow, s.heading ?? 'Speakers', s.sub)}<div class="grid g${Math.min(3, Math.max(1, list(s.items).length))}">${list(s.items).map((x) => { const [n, r, p] = split(x); const ph = PLACEHOLDER_NAME.test((n ?? '').trim()); return `<article class="card person${ph ? ' ph' : ''}">${p ? `<img src="${img(p)}" alt="${esc(n ?? '')}">` : `<span class="av" aria-hidden="true">${ph ? '?' : esc(initials(n ?? ''))}</span>`}<h3>${esc(n ?? '')}</h3>${r ? `<p>${esc(r)}</p>` : ''}${ph ? '<p class="note">Speaker to be confirmed</p>' : ''}</article>`; }).join('')}</div></div></section>`;
+    case 'agenda':
+      return `<section class="agenda" id="agenda"><div class="wrap narrow">${head(s.eyebrow, s.heading ?? 'Agenda', s.sub)}<ol class="ag">${list(s.items).map((x) => { const [t, ti, d] = split(x); return `<li><span class="t">${esc(t)}</span><div><h3>${rich(ti ?? '')}</h3>${d ? `<p>${rich(d)}</p>` : ''}</div></li>`; }).join('')}</ol></div></section>`;
     case 'cta':
       return `<section class="final"><div class="wrap center">${head(undefined, s.heading, s.sub)}<div class="actions center">${s.cta ? `<a class="btn" href="${esc(s.url ?? '#')}">${esc(s.cta)}</a>` : ''}</div>${s.note ? `<p class="note">${esc(s.note)}</p>` : ''}</div></section>`;
   }
@@ -126,9 +135,13 @@ em{font-style:normal;color:var(--accent)}mark{background:color-mix(in srgb,var(-
 .pick.us{border:2px solid var(--brand-primary)}.pick h3{font-size:22px}
 details{border-bottom:1px solid var(--rule);padding:20px 0}summary{cursor:pointer;font:700 19px/1.35 var(--font-display);list-style:none}summary::-webkit-details-marker{display:none}summary::after{content:"+";float:right;color:var(--accent)}details[open] summary::after{content:"–"}details p{color:var(--muted);margin:12px 0 0}
 .final{background:var(--hero-bg);color:var(--hero-fg)}.final em{color:inherit;text-decoration:underline;text-decoration-thickness:.08em;text-underline-offset:.1em}.final .lede{color:inherit;opacity:.85}.final .btn{background:var(--hero-fg);color:var(--hero-bg);border-color:var(--hero-fg)}
+.when{display:grid;gap:14px;margin:0;align-self:center;background:var(--card);border:1px solid var(--rule);border-radius:24px;padding:32px}.when div{display:grid;gap:4px}.when dt{font:700 13px/1 var(--font-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}.when dd{margin:0;font:800 clamp(24px,3vw,34px)/1.15 var(--font-display);letter-spacing:-.02em}
+.hero.event .hero-grid{grid-template-columns:1.3fr 1fr}
+.person{display:grid;justify-items:start;gap:6px}.person img,.person .av{width:72px;height:72px;border-radius:50%;object-fit:cover;margin-bottom:10px}.person .av{display:grid;place-items:center;background:var(--brand-primary);color:var(--brand-on-primary);font:800 24px var(--font-display)}.person.ph{border-style:dashed}.person.ph .av{background:var(--rule);color:var(--muted)}
+.ag{list-style:none;padding:0;margin:36px 0 0;display:grid}.ag li{display:grid;grid-template-columns:110px 1fr;gap:20px;padding:20px 0;border-bottom:1px solid var(--rule)}.ag li:last-child{border-bottom:0}.ag .t{font:700 16px/1.5 var(--font-mono);color:var(--accent)}.ag h3{margin:0}.ag p{color:var(--muted);margin:6px 0 0}
 footer{padding:40px 0;color:var(--muted);font-size:14px;border-top:1px solid var(--rule)}
-@media (max-width:860px){section{padding:64px 0}.hero-grid,.split{grid-template-columns:1fr}.split.flip>figure{order:0}.g3,.g4{grid-template-columns:1fr 1fr}.vs{grid-template-columns:1fr}.topbar nav{display:none}}
-@media (max-width:560px){.g2,.g3,.g4{grid-template-columns:1fr}h1{font-size:40px}}
+@media (max-width:860px){section{padding:64px 0}.hero-grid,.split,.hero.event .hero-grid{grid-template-columns:1fr}.split.flip>figure{order:0}.g3,.g4{grid-template-columns:1fr 1fr}.vs{grid-template-columns:1fr}.topbar nav{display:none}}
+@media (max-width:560px){.g2,.g3,.g4{grid-template-columns:1fr}h1{font-size:40px}.ag li{grid-template-columns:1fr;gap:4px}}
 `;
 
 const THEMES: Record<string, string> = {

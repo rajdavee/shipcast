@@ -337,6 +337,63 @@ export const DOC_LAYOUTS: Layout[] = [
     ],
     html: (f, ctx) => `<section class="pg back">${logo(ctx, 'logo cover-logo')}<div class="cover-body"><h1 class="title">${rich(f.title)}</h1>${f.body ? `<p class="lede">${rich(f.body)}</p>` : ''}<div class="btn big-btn">${esc(f.cta)} →</div><div class="url">${esc(f.url)}</div>${f.contact ? `<div class="cover-meta">${esc(f.contact)}</div>` : ''}</div></section>`,
   },
+  {
+    id: 'press-release',
+    label: 'Press release page',
+    use: 'A news release in the form journalists expect. Page 1 carries the release line, headline, subhead, the dateline and the lead paragraph (who, what, when, where, why) and the body; a continuation page carries only more body. The last page adds the quotes, "About <company>", the media contact and the ### end mark (drawn for you). Quotes come only from people named in the brief; otherwise "[Placeholder — quote from a named spokesperson]" as the name, which is labelled on the page.',
+    fields: [
+      { id: 'release', type: 'text', label: 'Release line', max: 60, optional: true, help: 'default "For immediate release"; or "Embargoed until 9:00 CET, 12 May 2026"' },
+      { id: 'headline', type: 'text', label: 'Headline (≤ 120 chars, page 1 only)', max: 120, optional: true },
+      { id: 'subhead', type: 'text', label: 'Subhead (one sentence)', max: 200, optional: true },
+      { id: 'dateline', type: 'text', label: 'Dateline ("BERLIN, 3 November 2026")', max: 60, optional: true },
+      { id: 'lead', type: 'longtext', label: 'Lead paragraph: who, what, when, where, why (≤ 60 words)', max: 480, optional: true },
+      { id: 'body', type: 'longtext', label: 'Body (light markdown; facts, availability, pricing)', max: 3600, optional: true },
+      { id: 'quotes', type: 'list', label: 'Quotes: "exact words | Name, Role, Company" (1–2)', max: 2, optional: true },
+      { id: 'company', type: 'text', label: 'Company name for "About …"', max: 60, optional: true },
+      { id: 'about', type: 'longtext', label: 'Boilerplate: About the company (50–100 words)', max: 700, optional: true },
+      { id: 'contact', type: 'list', label: 'Media contact lines ("Name or role", "press@…", "+1 …")', max: 4, optional: true },
+    ],
+    html: (f, ctx) => {
+      const last = ctx.page === ctx.pages;
+      const head = f.headline ? `<header class="pr-head"><div class="pr-top">${logo(ctx, 'logo run-mark')}<span class="kicker ink">${esc(f.release || 'For immediate release')}</span></div><h1>${rich(f.headline)}</h1>${f.subhead ? `<p class="pr-sub">${rich(f.subhead)}</p>` : ''}</header>` : '';
+      const lead = f.lead ? `<p class="pr-lead">${f.dateline ? `<b>${esc(f.dateline)} —</b> ` : ''}${rich(f.lead)}</p>` : '';
+      const quotes = list(f.quotes)
+        .map((x) => {
+          const [q, ...who] = x.split('|').map((y) => y.trim());
+          const by = who.join(', ');
+          const ph = /placeholder|to confirm|^\[/i.test(by);
+          return `<blockquote class="pr-q${ph ? ' ph' : ''}">“${rich(q)}”<cite>— ${esc(by || 'Attribution needed')}</cite>${ph ? '<span class="pr-ph">Placeholder — needs a real, approved quote</span>' : ''}</blockquote>`;
+        })
+        .join('');
+      const about = f.about ? `<div class="pr-about"><h3>About ${esc(f.company || ctx.brand.name)}</h3><p>${rich(f.about)}</p></div>` : '';
+      const contact = list(f.contact).length ? `<div class="pr-contact"><h3>Media contact</h3>${list(f.contact).map((c) => `<div>${esc(c)}</div>`).join('')}</div>` : '';
+      return `<section class="pg pr${last ? ' pr-end' : ''}">${head ? '' : chrome(ctx)}<div class="pg-body pr-body">${head}<div class="copy">${lead}${md(f.body)}</div>${quotes}${about}${contact}${last ? '<div class="pr-mark">###</div>' : ''}</div></section>`;
+    },
+  },
+  {
+    id: 'fact-sheet',
+    label: 'Press fact sheet (one page)',
+    use: 'The one-page company / product fact sheet that rides with a press release: name and one-line description, key facts ("label | value": founded, headquarters, founders by name only if the brief names them, product, pricing, availability, website), 3–6 highlights, up to 4 verified numbers with their source, a cropped real screenshot, the boilerplate and the press contact.',
+    fields: [
+      { id: 'title', type: 'text', label: 'Company or product name', max: 50 },
+      { id: 'tagline', type: 'text', label: 'One-line description', max: 140 },
+      { id: 'facts', type: 'list', label: 'Facts: "label | value" (5–9)', max: 10 },
+      { id: 'highlights', type: 'list', label: 'Highlights (3–6, ≤ 14 words each)', max: 6 },
+      { id: 'numbers', type: 'list', label: 'Numbers: "value | label | source" (verified only)', max: 4, optional: true },
+      { id: 'image', type: 'image', label: 'Real screenshot (cropped)', optional: true },
+      { id: 'about', type: 'longtext', label: 'Boilerplate (the same as the release)', max: 700, optional: true },
+      { id: 'contact', type: 'text', label: 'Press contact line', max: 140 },
+    ],
+    html: (f, ctx) => {
+      const nums = list(f.numbers).map((s) => s.split('|').map((x) => x.trim()));
+      return `<section class="pg fs"><header class="op-head">${logo(ctx, 'logo cover-logo')}<div class="kicker">Fact sheet</div><h1 class="title">${rich(f.title)}</h1><p class="lede">${rich(f.tagline)}</p></header><div class="op-body fs-body">
+<div class="fs-grid"><dl class="fs-facts">${list(f.facts).map((x) => { const [k, ...v] = x.split('|').map((y) => y.trim()); return `<dt>${esc(k)}</dt><dd>${rich(v.join(' | '))}</dd>`; }).join('')}</dl>
+<div class="fs-side"><h4>Highlights</h4><ul>${list(f.highlights).map((x) => `<li>${rich(x)}</li>`).join('')}</ul></div></div>
+${f.image ? `<figure class="shot"><img src="${img(f.image, ctx)}" alt=""></figure>` : ''}
+${nums.length ? `<div class="stat-grid n${Math.min(4, nums.length)} tight">${nums.map(([v, l, s]) => `<div class="stat"><div class="big">${esc(v)}</div><div class="lbl">${rich(l ?? '')}</div>${s ? `<div class="src">${esc(s)}</div>` : ''}</div>`).join('')}</div>` : ''}
+${f.about ? `<div class="pr-about"><h3>About ${esc(String(f.title ?? '').replace(/[*=]/g, '') || ctx.brand.name)}</h3><p>${rich(f.about)}</p></div>` : ''}</div><footer class="op-foot"><span>Press: ${esc(f.contact)}</span><span>${esc(ctx.brand.url ?? '')}</span></footer></section>`;
+    },
+  },
 ];
 
 function safeJson(s: string): any {
@@ -476,6 +533,19 @@ tbody tr:nth-child(even) td{background:color-mix(in srgb,var(--tint) 60%,transpa
 .op-body{flex:1;min-height:0;padding:28px 56px 0;display:flex;flex-direction:column;gap:18px;overflow:hidden}
 .op-body .shot img{max-height:250px}
 .op-foot{display:flex;justify-content:space-between;align-items:center;padding:20px 56px 28px;border-top:1px solid var(--rule);font:600 13px var(--font-body);color:var(--soft)}
+.pr{padding:56px 72px 64px;font-size:14.5px;line-height:1.55}.pr .run{left:72px;right:72px}.pr .folio{left:72px;right:72px}.pr:not(:first-child){padding-top:96px}
+.pr-body{gap:16px}.pr-head{display:grid;gap:12px;padding-bottom:18px;border-bottom:2px solid var(--ink)}
+.pr-top{display:flex;justify-content:space-between;align-items:center}.pr-top .run-mark{height:26px;max-width:150px}.pr-top .wordmark{font:800 18px/1 var(--font-display)}
+.pr-head h1{font:800 30px/1.12 var(--font-display);letter-spacing:-.02em;text-wrap:balance}.pr-sub{font:500 16.5px/1.4 var(--font-body);color:var(--soft);text-wrap:pretty}
+.pr .copy p{margin:0 0 9px}.pr-lead b{font-weight:800;text-transform:uppercase;letter-spacing:.02em}
+.pr-q{border-left:3px solid var(--brand-primary);padding:4px 0 4px 16px;margin:2px 0;font:500 15px/1.5 var(--font-body)}.pr-q cite{display:block;margin-top:4px;font-style:normal;font-weight:700;font-size:13.5px}
+.pr-q.ph{border-left-style:dashed}.pr-ph{display:inline-block;margin-top:6px;font:700 11px/1 var(--font-body);letter-spacing:.04em;padding:6px 10px;border:1.5px dashed currentColor;border-radius:999px;color:#b42318}
+.pr-about h3,.pr-contact h3{margin:0 0 4px;font-size:15px;text-transform:uppercase;letter-spacing:.06em}.pr-about p{margin:0;font-size:13.5px;color:var(--soft)}.pr-contact{font-size:13.5px}
+.pr-mark{text-align:center;font:800 16px/1 var(--font-display);letter-spacing:.3em;margin-top:6px}
+.fs{padding:0;display:flex;flex-direction:column}.fs-body{gap:16px}.fs-grid{display:grid;grid-template-columns:1fr 1fr;gap:26px}
+.fs-facts{display:grid;grid-template-columns:auto 1fr;gap:9px 16px;align-content:start;font-size:13.5px}.fs-facts dt{font:700 11px/1.5 var(--font-body);text-transform:uppercase;letter-spacing:.08em;color:var(--soft)}.fs-facts dd{font-weight:600}
+.fs-side{display:flex;flex-direction:column;gap:10px;min-width:0}.fs-side h4{font:800 11.5px/1.2 var(--font-body);text-transform:uppercase;letter-spacing:.08em;color:var(--accent)}.fs-side ul{margin:0 0 0 16px;display:grid;gap:5px;font-size:13.5px}.fs .shot img{max-height:300px}.fs .pr-about{margin-top:auto}
+.fs .pr-about p{font-size:12.5px}
 `;
 
 /** Render a whole document into one HTML file: each page is a fixed-size <section>. */
@@ -520,9 +590,9 @@ export const DOC_AUDIT_SCRIPT = `(() => {
     const over = Math.max(0, box.scrollHeight - box.clientHeight, pg.scrollHeight - pg.clientHeight, foot ? lastBottom - foot.getBoundingClientRect().top : 0, lastBottom - pg.getBoundingClientRect().bottom);
     const wide = [...pg.querySelectorAll('h1,h2,table,.feat-grid,.stat-grid')].some((el) => el.scrollWidth > el.clientWidth + 2);
     const broken = [...pg.querySelectorAll('img')].filter((im) => !im.complete || !im.naturalWidth).length;
-    // How much of the page the content actually uses: half-empty inner pages look unfinished.
+    // How much of the page the content actually uses: half-empty inner pages look unfinished (a release simply ends where its story does).
     let fill = 1;
-    if (box.classList.contains('pg-body') && !pg.classList.contains('toc') && !pg.classList.contains('quote-pg')) {
+    if (box.classList.contains('pg-body') && !pg.classList.contains('toc') && !pg.classList.contains('quote-pg') && !pg.classList.contains('pr-end')) {
       const top = box.getBoundingClientRect().top;
       const bottom = Math.max(top, ...[...box.children].map((c) => c.getBoundingClientRect().bottom));
       fill = (bottom - top) / Math.max(1, box.clientHeight);

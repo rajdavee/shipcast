@@ -5,6 +5,7 @@ import { catalogMarkdown, checkCopy, packChecks, renderSpecs, SPEC_FILE, type Sp
 import { readFile, readdir, rename, stat } from 'node:fs/promises';
 import { shortsFromStoryboard } from './shorts.ts';
 import { renderExtras } from './longform.ts';
+import { renderKits } from './kits.ts';
 import { recentPatterns, scenePattern, varietyFeedback } from './variety.ts';
 import { callService } from './service.ts';
 import { existsSync, readFileSync } from 'node:fs';
@@ -607,10 +608,10 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
         if (pack?.id === 'audiogram') force.sizes = step.options.format === 'vertical' ? ['vertical'] : step.options.format === 'square' ? ['square-video'] : ['vertical', 'square-video'];
         if (pack?.id === 'photo-carousel') force.sizes = step.options.platform === 'tiktok' ? ['tiktok-photo'] : step.options.platform === 'instagram' ? ['instagram-carousel'] : ['tiktok-photo', 'instagram-carousel'];
         // Choices made in the format options win over what the model wrote.
-        if ((pack?.id === 'document' || pack?.id === 'battlecard' || pack?.id === 'case-study' || pack?.id === 'presentation' || pack?.id === 'ad-set' || pack?.id === 'email' || pack?.id === 'landing') && step.options.theme && step.options.theme !== 'auto') force.theme = step.options.theme;
-        if ((pack?.id === 'document' || pack?.id === 'battlecard' || pack?.id === 'case-study') && step.options.size && step.options.size !== 'auto') force.size = step.options.size;
+        if ((pack?.id === 'document' || pack?.id === 'battlecard' || pack?.id === 'case-study' || pack?.id === 'press-kit' || pack?.id === 'presentation' || pack?.id === 'ad-set' || pack?.id === 'email' || pack?.id === 'landing') && step.options.theme && step.options.theme !== 'auto') force.theme = step.options.theme;
+        if ((pack?.id === 'document' || pack?.id === 'battlecard' || pack?.id === 'case-study' || pack?.id === 'press-kit') && step.options.size && step.options.size !== 'auto') force.size = step.options.size;
         const r = await renderSpecs(specKinds, cwd, join(dir, 'brief'), { force });
-        const extra = [...(await packChecks(pack?.id ?? '', join(cwd, 'out'))), ...(await renderExtras(pack?.id, cwd, join(dir, 'brief')))];
+        const extra = [...(await packChecks(pack?.id ?? '', join(cwd, 'out'))), ...(await renderExtras(pack?.id, cwd, join(dir, 'brief'))), ...(await renderKits(pack?.id, cwd, join(dir, 'brief'), step.options))];
         if (extra.length) Object.assign(r, { ok: false, feedback: [...r.feedback, ...extra] });
         await log({ step: step.id, type: 'log', text: r.ok ? `Rendered: ${r.summary}` : `Quality check found ${r.feedback.length} issue(s): ${r.feedback.slice(0, 3).join(' · ')}` });
         if (r.ok) {

@@ -48,6 +48,17 @@ const box = (all: number): SafeZone => ({ top: all, right: all, bottom: all, lef
  */
 export const VERTICAL_SAFE: SafeZone = { top: 270, right: 140, bottom: 672, left: 65 };
 
+/**
+ * Where the standard end-screen template puts its elements on a 1920×1080
+ * frame (two stacked videos at the right, the subscribe circle beside them),
+ * with a little air: a background keeps words and logos out of all three.
+ */
+export const END_SCREEN_ZONES = [
+  { x: 1160, y: 130, w: 680, h: 400, what: 'the first end-screen video' },
+  { x: 1160, y: 550, w: 680, h: 400, what: 'the second end-screen video' },
+  { x: 840, y: 400, w: 280, h: 280, what: 'the subscribe button' },
+];
+
 export const PRESETS: PlatformPreset[] = [
   // ── vertical video ───────────────────────────────────────────────
   { id: 'vertical', label: 'Reels · Shorts · TikTok', kind: 'video', width: 1080, height: 1920, fps: 30, maxSeconds: 180, idealSeconds: [15, 45], safe: VERTICAL_SAFE, loudness: LOUD, notes: 'One master for all three platforms.' },
@@ -85,6 +96,9 @@ export const PRESETS: PlatformPreset[] = [
   { id: 'youtube-banner', label: 'YouTube channel art', kind: 'image', width: 2560, height: 1440, maxBytes: 6 * MB, safe: { top: 508, right: 507, bottom: 509, left: 507, images: true }, notes: 'Only the centre 1546×423 shows on every device; TVs show it all.' },
   { id: 'facebook-cover', label: 'Facebook cover', kind: 'image', width: 851, height: 315, maxBytes: 3 * MB, safe: { top: 16, right: 106, bottom: 16, left: 106, images: true }, notes: 'Phones show only the centre ~640 px.' },
   { id: 'profile-avatar', label: 'Avatar / profile logo', kind: 'image', width: 400, height: 400, maxBytes: 2 * MB, safe: { top: 0, right: 0, bottom: 0, left: 0, circle: true, images: true }, notes: 'Every platform crops to a circle (some to a rounded square).' },
+  // ── long-tail discovery ──────────────────────────────────────────
+  { id: 'pinterest-pin', label: 'Pinterest standard pin (2:3)', kind: 'image', width: 1000, height: 1500, maxBytes: 20 * MB, safe: { top: 80, right: 64, bottom: 110, left: 64 }, notes: 'Seen ~236 px wide in the grid: the title must read at that size. The save button sits top-right, the menu bottom-right; the link lives on the pin, not in the image.' },
+  { id: 'youtube-endscreen', label: 'YouTube end-screen background', kind: 'image', width: 1920, height: 1080, maxBytes: 2 * MB, safe: { top: 54, right: 96, bottom: 54, left: 96, images: true, avoid: END_SCREEN_ZONES }, notes: 'The last 5–20 s of a video: two video elements and a subscribe button are placed over the right side in the editor, so that side stays empty.' },
 ];
 
 export function getPreset(id: string): PlatformPreset | undefined {

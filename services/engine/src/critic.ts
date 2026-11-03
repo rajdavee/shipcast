@@ -58,16 +58,17 @@ export async function previews(dir: string): Promise<string[]> {
       if (existsSync(sheet)) ordered.push(sheet);
     }
   }
-  // Per-size sets (photo carousels, app-store screens): the first slides of the first set.
+  // Per-size sets (photo carousels, app-store screens): the first slides of the biggest set, then one from
+  // each other folder — a kit of different pieces (pins and an end screen) is judged as a whole.
   if (!ordered.length) {
+    const sets = [];
     for (const d of (await readdir(out, { withFileTypes: true }).catch(() => [])).filter((x) => x.isDirectory() && !['work', 'project', 'variants', 'assets'].includes(x.name))) {
       const sl = existsSync(join(out, d.name, 'slides')) ? join(out, d.name, 'slides') : join(out, d.name);
       const pngs = (await readdir(sl).catch(() => [] as string[])).filter((f) => /\.(png|jpe?g)$/.test(f)).sort();
-      if (pngs.length) {
-        ordered.push(...pngs.slice(0, 3).map((f) => join(sl, f)));
-        break;
-      }
+      if (pngs.length) sets.push(pngs.map((f) => join(sl, f)));
     }
+    sets.sort((a, b) => b.length - a.length);
+    if (sets.length) ordered.push(...sets[0].slice(0, 3), ...sets.slice(1).map((s) => s[0]));
   }
   // Loose images (posts, cards, galleries): one of each design, the feed size first.
   if (!ordered.length) {
