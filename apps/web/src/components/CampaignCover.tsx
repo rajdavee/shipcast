@@ -50,8 +50,8 @@ export function CampaignCover({ campaign: c }: { campaign: Campaign }) {
           <img src={fileUrl(c.id, cover)} alt="" loading="lazy" />
         ) : (
           <div className="swatches" aria-hidden="true">
-            <i style={{ background: 'var(--raised)' }} />
-            <i style={{ background: 'var(--hover)' }} />
+            <i style={{ background: 'var(--surface)' }} />
+            <i style={{ background: 'var(--surface-2)' }} />
           </div>
         )}
         <span className="badge">

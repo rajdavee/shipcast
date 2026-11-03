@@ -28,10 +28,65 @@ export const Icon = {
   ),
 };
 
+/** Navigation and shell icons: 20px stroke glyphs, sized by CSS. */
+export const Nav = {
+  create: () => (
+    <svg viewBox="0 0 24 24" {...P}><rect x="3.5" y="3.5" width="17" height="17" rx="4" /><path d="M12 8v8M8 12h8" /></svg>
+  ),
+  calendar: () => (
+    <svg viewBox="0 0 24 24" {...P}><rect x="3.5" y="5" width="17" height="15.5" rx="3" /><path d="M3.5 10h17M8 3v4M16 3v4" /><path d="M8 14h2M14 14h2M8 17h2" /></svg>
+  ),
+  library: () => (
+    <svg viewBox="0 0 24 24" {...P}><rect x="3.5" y="3.5" width="7" height="7" rx="2" /><rect x="13.5" y="3.5" width="7" height="7" rx="2" /><rect x="3.5" y="13.5" width="7" height="7" rx="2" /><rect x="13.5" y="13.5" width="7" height="7" rx="2" /></svg>
+  ),
+  ideas: () => (
+    <svg viewBox="0 0 24 24" {...P}><path d="M9 18h6M10 21h4" /><path d="M12 3a6 6 0 00-3.5 10.9c.6.4 1 1.1 1 1.9V16h5v-.2c0-.8.4-1.5 1-1.9A6 6 0 0012 3z" /></svg>
+  ),
+  brand: () => (
+    <svg viewBox="0 0 24 24" {...P}><path d="M4 12v0M8 8v8M12 5v14M16 9v6M20 11v2" /></svg>
+  ),
+  insights: () => (
+    <svg viewBox="0 0 24 24" {...P}><path d="M4 20V4M4 20h16" /><path d="M8 15l4-4 3 3 5-6" /></svg>
+  ),
+  settings: () => (
+    <svg viewBox="0 0 24 24" {...P}><circle cx="12" cy="12" r="3" /><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" /></svg>
+  ),
+  search: () => (
+    <svg viewBox="0 0 24 24" {...P}><circle cx="11" cy="11" r="6.5" /><path d="M16 16l4.5 4.5" /></svg>
+  ),
+  sun: () => (
+    <svg viewBox="0 0 24 24" {...P}><circle cx="12" cy="12" r="4" /><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4" /></svg>
+  ),
+  moon: () => (
+    <svg viewBox="0 0 24 24" {...P}><path d="M20 14.5A8 8 0 019.5 4a8 8 0 1010.5 10.5z" /></svg>
+  ),
+  system: () => (
+    <svg viewBox="0 0 24 24" {...P}><rect x="3" y="4" width="18" height="12.5" rx="2.5" /><path d="M8.5 20.5h7M12 16.5v4" /></svg>
+  ),
+  panel: () => (
+    <svg viewBox="0 0 24 24" {...P}><rect x="3.5" y="4" width="17" height="16" rx="3" /><path d="M9.5 4v16" /></svg>
+  ),
+  menu: () => (
+    <svg viewBox="0 0 24 24" {...P}><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+  ),
+  close: () => (
+    <svg viewBox="0 0 24 24" {...P}><path d="M6 6l12 12M18 6L6 18" /></svg>
+  ),
+  project: () => (
+    <svg viewBox="0 0 24 24" {...P}><path d="M3.5 7.5a2 2 0 012-2h4l2 2h7a2 2 0 012 2v8a2 2 0 01-2 2h-13a2 2 0 01-2-2z" /></svg>
+  ),
+  bolt: () => (
+    <svg viewBox="0 0 24 24" {...P}><path d="M13 3L5 13.5h6L10 21l8-10.5h-6z" /></svg>
+  ),
+  enter: () => (
+    <svg viewBox="0 0 24 24" {...P}><path d="M19 5v6a3 3 0 01-3 3H6M10 10l-4 4 4 4" /></svg>
+  ),
+};
+
 export function Mark({ className = 'brand-mark' }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 32 32" aria-hidden="true">
-      <rect width="32" height="32" rx="8" fill="var(--accent)" />
+      <rect width="32" height="32" rx="8" fill="var(--brand)" />
       <path d="M9 21.5c2.2 1.6 4.5 2.4 7 2.4 3.4 0 5.6-1.6 5.6-4 0-2.2-1.6-3.2-5-4l-1.6-.4c-2-.5-2.8-1-2.8-2 0-1.1 1.1-1.8 2.9-1.8 1.8 0 3.4.6 4.9 1.7l1.6-2.5c-1.8-1.4-4-2.1-6.5-2.1-3.4 0-5.7 1.7-5.7 4.3 0 2.3 1.5 3.4 5 4.2l1.6.4c2 .5 2.7 1 2.7 2 0 1.2-1.2 1.9-3 1.9-2.1 0-4-.8-5.6-2.1z" fill="#fff" />
       <circle cx="25" cy="7" r="3" fill="var(--live)" />
     </svg>
