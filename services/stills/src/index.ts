@@ -1,5 +1,5 @@
 import { copyFile, mkdir, writeFile, readFile, rename, rm } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import { assertInHome, browser, writePptx, type PptxSlide, createService, FIT_SCRIPT, run, TIDY_PAGE_SCRIPT, getPreset, layoutAuditScript, loadBrand, normalizeBrand, presetForSize, resolveIcons, SERVICE_PORTS, type BrandKit, type LayoutAudit, type SafeZone } from '@shipcast/engine';
@@ -63,9 +63,23 @@ export interface DeckSpec {
  * the spec is rewritten to point at them, so every template gets the detail
  * that proves the point instead of a whole screen shrunk to illegibility.
  */
+/**
+ * Marketing graphics from the brief (brand.json productImages) carry big type of their own, so the
+ * "UI text is ~13 px" legibility rule only applies to real screenshots; these names are exempt.
+ */
+const NOT_UI = new Set<string>();
+
 async function materializeCrops<T>(spec: T, assetsDir: string | undefined, outDir: string): Promise<T> {
   const dir = join(outDir, 'work', 'crops');
   const seen = new Map<string, string>();
+  const graphics = new Set<string>();
+  try {
+    const b = JSON.parse(await readFile(join(assetsDir ?? '', 'brand.json'), 'utf8'));
+    for (const f of Array.isArray(b.productImages) ? b.productImages : []) {
+      graphics.add(basename(String(f)));
+      NOT_UI.add(basename(String(f)));
+    }
+  } catch {}
   const walk = async (v: unknown): Promise<unknown> => {
     if (typeof v === 'string') {
       const m = v.match(/^(.+\.(?:png|jpe?g|webp))#crop=([\d.]+),([\d.]+),([\d.]+),([\d.]+)$/i);
@@ -78,7 +92,7 @@ async function materializeCrops<T>(spec: T, assetsDir: string | undefined, outDi
       // Nudge the edges out to clear space so a card isn't clipped a few pixels short of its border.
       const { x, y, w, h, srcW } = await snapCropFile(src, { x: asked[0], y: asked[1], w: asked[2], h: asked[3] }, join(dir, `${id}.gray`));
       // The name carries how many CSS px of screen the crop covers, so the layout audit can judge UI text size.
-      const out = join(dir, srcW ? `${id}-ui${Math.round((srcW / (srcW >= 2400 ? 2 : 1)) * w)}.png` : `${id}.png`);
+      const out = join(dir, graphics.has(basename(m[1])) ? `${id}-img.png` : srcW ? `${id}-ui${Math.round((srcW / (srcW >= 2400 ? 2 : 1)) * w)}.png` : `${id}.png`);
       const r = await run('ffmpeg', ['-y', '-v', 'error', '-i', src, '-vf', `crop=iw*${Math.max(0.02, w)}:ih*${Math.max(0.02, h)}:iw*${x}:ih*${y},scale='min(iw*2,2400)':-2:flags=lanczos`, out]);
       const res = r.code === 0 ? out : m[1];
       seen.set(v, res);
@@ -135,7 +149,7 @@ async function captureOnce(html: string, file: string, width: number, height: nu
     await page.eval(FIT_SCRIPT);
     // Templates with their own fitting rules (ads) expose it on the page.
     await page.eval('document.fonts.ready.then(() => (window.__shipcastFit ? window.__shipcastFit() : 0))');
-    const audit = await page.eval<LayoutAudit>(layoutAuditScript(safe, width, height, uiShare));
+    const audit = await page.eval<LayoutAudit>(layoutAuditScript(safe, width, height, uiShare, [...NOT_UI]));
     const jpg = /\.jpe?g$/.test(file);
     await writeFile(file, await page.screenshot(jpg ? 'jpeg' : 'png', 90));
     return { file, html: htmlFile, audit };

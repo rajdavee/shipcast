@@ -38,3 +38,10 @@ test('a crop wholly inside a panel is a deliberate zoom and stays put', () => {
   const box = { x: 120 / W, y: 90 / H, w: 100 / W, h: 50 / H };
   assert.deepEqual(snapCrop(g, W, H, box), box);
 });
+
+test('crops of marketing graphics are exempt from the UI-text rule; screenshot crops are not', async () => {
+  const { layoutAuditScript } = await import('@shipcast/engine');
+  const s = layoutAuditScript({ top: 0, right: 0, bottom: 0, left: 0 }, 1080, 1080, 0.022, ['carousel.jpg']);
+  assert.match(s, /"carousel\.jpg"/);
+  assert.match(s, /-img\\\\?\.png\$/);
+});

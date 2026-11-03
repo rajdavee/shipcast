@@ -238,7 +238,7 @@ export function browser(): Browser {
  * smallest rendered type size.
  */
 /** uiShare: smallest readable UI text as a share of canvas width — 2.2% for phone feeds, ~1.2% for screens. */
-export function layoutAuditScript(safe: SafeZone, width: number, height: number, uiShare = 0.022): string {
+export function layoutAuditScript(safe: SafeZone, width: number, height: number, uiShare = 0.022, notUi: string[] = []): string {
   return `(() => {
     const W = ${width}, H = ${height}, S = ${JSON.stringify(safe)};
     const out = { overflow: [], offCanvas: [], unsafe: [], minFont: 999, textCount: 0 };
@@ -288,8 +288,11 @@ export function layoutAuditScript(safe: SafeZone, width: number, height: number,
     // Screenshots whose UI text lands too small to read. UI body text is ~13 CSS px; a crop's file name
     // carries the CSS width of screen it covers (-ui620), otherwise 2x captures are assumed past 2400px.
     const minUi = Math.round(W * ${uiShare});
+    const NOT_UI = ${JSON.stringify(notUi)};
     out.tinyShots = [...document.querySelectorAll('img')].filter((im) => !im.closest('.logo, .tag, .ic, .who, .lchip, .run') && !im.classList.contains('logo') && im.getBoundingClientRect().width > 160).map((im) => {
       const src = im.getAttribute('src') || '';
+      // Crops of the brief's marketing graphics (-img) and the graphics themselves carry their own large type.
+      if (/-img\\.png$/.test(src) || NOT_UI.includes(decodeURIComponent(src.split('/').pop() || ''))) return null;
       const tag = src.match(/-ui(\\d+)\\.(?:png|jpe?g|webp)/);
       if (!tag && im.naturalWidth < 1000) return null;
       const css = tag ? Number(tag[1]) : im.naturalWidth / (im.naturalWidth >= 2400 ? 2 : 1);
