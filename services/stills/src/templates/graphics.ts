@@ -1,6 +1,7 @@
 import { esc, fit, img, list, logo, page, rich, type Layout, type RenderCtx } from './common.ts';
 import { THEMES } from './carousel.ts';
 import { ARTICLE_CARDS } from './article.ts';
+import { KIT_CARDS } from './kits.ts';
 
 /**
  * Thumbnails and social graphics. Thumbnails follow the research rules: one
@@ -570,4 +571,4 @@ export function renderCard(layoutId: string, theme: string, fields: Record<strin
 }
 
 // Long-form covers and figures live with the article page; they render as cards.
-CARD_LAYOUTS.push(...ARTICLE_CARDS);
+CARD_LAYOUTS.push(...ARTICLE_CARDS, ...KIT_CARDS);

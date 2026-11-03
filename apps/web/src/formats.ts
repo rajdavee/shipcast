@@ -20,6 +20,10 @@ export const FORMATS: { id: string; title: string; line: string; img?: string; r
   { id: 'document', title: 'PDF document', line: 'One-pager, case study, ebook or whitepaper', img: '/formats/document.jpg', ratio: 0.707 },
   { id: 'case-study', title: 'Case study', line: 'Customer story PDF with social cards — real or a labelled template', img: '/formats/case-study.jpg', ratio: 4 / 5 },
   { id: 'battlecard', title: 'Battlecard', line: 'Sales battlecard and an honest comparison page', img: '/formats/battlecard.jpg', ratio: 4 / 5 },
+  { id: 'press-kit', title: 'Press kit', line: 'Press release, fact sheet and a zip of logos and screenshots', img: '/formats/press-kit.jpg', ratio: 0.707 },
+  { id: 'event-kit', title: 'Webinar / event kit', line: 'Registration page, slides, promo posts and emails that agree', img: '/formats/event-kit.jpg', ratio: 4 / 5 },
+  { id: 'release-notes', title: 'Release notes', line: "What's new cards on real screens, a summary and the changelog", img: '/formats/release-notes.jpg', ratio: 4 / 5 },
+  { id: 'pins-endscreens', title: 'Pins & end screen', line: 'Pinterest pins and a YouTube end-screen background', img: '/formats/pins-endscreens.jpg', ratio: 2 / 3 },
   { id: 'ugc-ad', title: 'UGC ad', line: 'Creator-style ad with a labelled AI presenter', ratio: 9 / 16 },
   { id: 'reel', title: 'Reel', line: 'Vertical video with captions', img: '/formats/reel.jpg', ratio: 9 / 16 },
   { id: 'audiogram', title: 'Audiogram', line: 'Founder or podcast clip with a live waveform and big captions', img: '/formats/audiogram.jpg', ratio: 9 / 16 },
@@ -59,7 +63,9 @@ export function shape(pack: Pack | undefined, step?: Step): number {
   if (pack?.id === 'app-store-screens') return 9 / 16;
   if (pack?.id === 'product-hunt-kit') return 1270 / 760;
   if (pack?.id === 'profile-kit') return 16 / 9;
-  if (pack?.id === 'battlecard' || pack?.id === 'case-study') return 0.707;
+  if (pack?.id === 'battlecard' || pack?.id === 'case-study' || pack?.id === 'press-kit') return 0.707;
+  if (pack?.id === 'event-kit' || pack?.id === 'release-notes') return 4 / 5;
+  if (pack?.id === 'pins-endscreens') return 2 / 3;
   if (pack?.id === 'audiogram') return pick('format') === 'square' ? 1 : 9 / 16;
   if (pack?.id === 'document') return 0.707;
   if (pack?.id === 'ad-set') return 1;

@@ -1,0 +1,23 @@
+{
+  "id": "press-kit",
+  "name": "Press Kit",
+  "tagline": "A press release PDF (headline, dateline, lead, quotes, boilerplate, media contact), a one-page fact sheet, and press-kit.zip with both PDFs, your logo files, full-resolution screenshots and a README — checked for the parts newsrooms look for, ≤ 800 words, no unsourced superlatives.",
+  "category": "design",
+  "order": 14,
+  "estimate": "5–10 min",
+  "accent": "#334155",
+  "spec": "document",
+  "options": [
+    { "key": "news", "label": "The news", "type": "text", "default": "", "placeholder": "What is being announced — blank = the strongest launch story in the brief" },
+    { "key": "spokesperson", "label": "Who can be quoted (optional)", "type": "text", "default": "", "placeholder": "Name, role — and their approved words if you have them" },
+    { "key": "contact", "label": "Media contact (optional)", "type": "text", "default": "", "placeholder": "Name · press@… · phone" },
+    { "key": "city", "label": "Dateline city (optional)", "type": "text", "default": "", "placeholder": "e.g. BERLIN" },
+    { "key": "size", "label": "Paper", "type": "select", "choices": ["auto", "letter", "a4"], "default": "auto" },
+    { "key": "theme", "label": "Theme", "type": "select", "choices": ["auto", "clean", "editorial", "dark"], "default": "auto" }
+  ],
+  "outputs": ["press-kit.zip", "document.pdf", "pages/*.png", "fact-sheet/fact-sheet.pdf", "fact-sheet/pages/*.png", "document.json", "fact-sheet.json", "press-kit.json", "*.md"],
+  "skills": [],
+  "tools": ["chrome"],
+  "roles": ["copy", "humanize"],
+  "timeoutMinutes": 30
+}

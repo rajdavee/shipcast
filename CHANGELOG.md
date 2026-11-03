@@ -8,6 +8,7 @@
 - **Quality in the loop** — a critic scores every non-video piece at full size after its first clean render and the weakest fixable thing is fixed in the same session; video review sheets show each scene settled instead of mid-transition; nearly empty scenes go back as fixes; legibility is measured as UI text size on the canvas; crops that clip a card widen to show all of it.
 - **Nightly quality check** — an opt-in project that re-makes two formats per run in rotation and scores them; *Quality over time* on the Learning page.
 - **New formats** — TikTok/Instagram photo carousels, quote and testimonial cards, app store screenshot sets, Product Hunt launch kit.
+- **Press, event, release and discovery kits** — a press release and fact sheet with press-kit.zip (logos, full-size screenshots, README); a webinar/event kit whose page, slides, posts and emails share one date, timezone, speaker list and register link; release-note cards on real screenshots with a changelog entry; Pinterest pins and a YouTube end-screen background that keeps the element zones clear.
 
 ## Unreleased — sprint v5: every marketing material
 

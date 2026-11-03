@@ -1,0 +1,21 @@
+{
+  "id": "release-notes",
+  "name": "Release Notes Graphics",
+  "tagline": "\"What's new\" cards for each headline feature (1200×627 and 1080×1350, each with a real screenshot crop), a 1080×1350 summary card, and release-notes.md with the changelog entry and a short social post — one version and date everywhere.",
+  "category": "design",
+  "order": 16,
+  "estimate": "3–6 min",
+  "accent": "#4d7c0f",
+  "spec": "graphics",
+  "options": [
+    { "key": "version", "label": "Version (optional)", "type": "text", "default": "", "placeholder": "e.g. v2.4 — blank = the latest in the repo's CHANGELOG or releases" },
+    { "key": "date", "label": "Release date (optional)", "type": "text", "default": "", "placeholder": "e.g. 3 Nov 2026" },
+    { "key": "changes", "label": "What changed (optional)", "type": "text", "default": "", "placeholder": "Paste the changes — blank = from the brief or the repo" },
+    { "key": "features", "label": "Feature cards", "type": "number", "default": "2", "min": 1, "max": 4 },
+    { "key": "theme", "label": "Theme", "type": "select", "choices": ["auto", "editorial", "swiss", "bold", "midnight"], "default": "auto" }
+  ],
+  "outputs": ["release/*.png", "release-notes.md", "graphics.json", "*.md"],
+  "skills": [],
+  "tools": ["chrome"],
+  "roles": ["design-taste", "copy", "humanize"]
+}
