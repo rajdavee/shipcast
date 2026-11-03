@@ -142,3 +142,38 @@ export function useToast() {
   }, []);
   return msg;
 }
+
+// Layers (drawer, dialog, menu) stack; Escape closes only the top one.
+const escStack: { current: () => void }[] = [];
+let escBound = false;
+/** Close on Escape while active — only the most recently opened layer reacts. */
+export function useEscape(active: boolean, fn: () => void) {
+  const ref = useRef(fn);
+  ref.current = fn;
+  useEffect(() => {
+    if (!active) return;
+    const entry = { current: () => ref.current() };
+    escStack.push(entry);
+    if (!escBound) {
+      escBound = true;
+      document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape' || !escStack.length || e.defaultPrevented) return;
+        e.preventDefault();
+        escStack[escStack.length - 1].current();
+      });
+    }
+    return () => void escStack.splice(escStack.indexOf(entry), 1);
+  }, [active]);
+}
+
+/** Matches a media query, live. */
+export function useMedia(query: string) {
+  const [on, setOn] = useState(() => typeof matchMedia !== 'undefined' && matchMedia(query).matches);
+  useEffect(() => {
+    const m = matchMedia(query);
+    const f = () => setOn(m.matches);
+    m.addEventListener('change', f);
+    return () => m.removeEventListener('change', f);
+  }, [query]);
+  return on;
+}

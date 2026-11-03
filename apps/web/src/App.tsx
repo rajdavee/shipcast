@@ -55,7 +55,7 @@ export function App() {
       ) : route[0] === 'library' ? (
         <Library campaigns={campaigns.data} />
       ) : route[0] === 'calendar' ? (
-        <Calendar />
+        <Calendar sub={route[1]} />
       ) : route[0] === 'brand' ? (
         <Voice />
       ) : route[0] === 'ideas' ? (
