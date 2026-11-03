@@ -70,6 +70,7 @@ export async function catalogMarkdown(kind: SpecKind): Promise<string> {
       'Spec: `{ "title": "running head", "size": "a4|letter", "theme": "<theme>", "footer": "url or line on every page", "pages": [ { "layout": "<id>", "fields": {…} } ] }`',
       `Themes: ${Object.entries(c.document.themes).map(([k, v]) => `\`${k}\` — ${v}`).join('; ')}`,
       `Sizes: ${Object.entries(c.document.sizes).map(([k, v]) => `\`${k}\` ${v}`).join(' · ')} (Letter for US audiences, A4 elsewhere).`,
+      'Templates without a real customer: set `"sample": true` on the spec and every page is labelled "Sample — replace with your customer".',
       'Rich text: `*word*` accent · `**word**` bold · `==word==` highlight. Body fields take light markdown: blank-line paragraphs, `- ` bullets, `1. ` steps, `### ` subheads, `> ` callouts.',
       'Images: paths relative to the brief folder (e.g. `assets/screens/home.png`). Zoom into the detail that proves the point by adding `#crop=x,y,w,h` (fractions of the image, e.g. `assets/screens/docket.png#crop=0.05,0.1,0.55,0.45`) — a whole screen shrunk into a box is unreadable. Icons: a brand name ("Slack") or a plain icon word ("shield-check").',
       'Every page is checked after rendering: overflow, images that did not load, and pages under ~55% full come back to you to fix.',
@@ -447,6 +448,29 @@ export function checkComparison(doc: any, landing: any): string[] {
   return out.slice(0, 14);
 }
 
+/**
+ * Case study (document.json + graphics.json): the classic structure, the two
+ * social cards, and no invented customer — a template is labelled everywhere.
+ */
+export function checkCaseStudy(doc: any, graphics: any, notes: string | null): string[] {
+  const out: string[] = [];
+  const pages: any[] = Array.isArray(doc?.pages) ? doc.pages : [];
+  if (pages.length < 2 || pages.length > 4) out.push(`document.json: a case study is 2–4 pages, not ${pages.length}.`);
+  const res = pages.find((p) => p?.layout === 'case-results' || p?.layout === 'case-study');
+  if (!pages.some((p) => p?.layout === 'case-snapshot' || p?.layout === 'case-study')) out.push('document.json: add the customer snapshot and challenge (layout case-snapshot).');
+  if (!res) out.push('document.json: add the results page (layout case-results) — big numbers, the quote, what\'s next.');
+  else if (!texts(res.fields?.results).some((r) => /\d/.test(r))) out.push('document.json: the results have no numbers — use the customer\'s real figures (or sample placeholders in a template).');
+  const sample = /^(yes|true)$/i.test(String(doc?.sample ?? ''));
+  const cards: any[] = (Array.isArray(graphics?.items) ? graphics.items : []).filter((i: any) => i?.layout === 'case-card');
+  for (const p of ['linkedin-image', 'linkedin-landscape']) if (!cards.some((c) => c.preset === p)) out.push(`graphics.json: add the ${p} case-card (${p === 'linkedin-image' ? '1080×1350' : '1200×627'}).`);
+  const unlabeled = cards.filter((c) => !/^(yes|true)$/i.test(String(c?.fields?.sample ?? '')));
+  if (sample && unlabeled.length) out.push('graphics.json: the document is a sample template, so every case-card needs "sample": "yes".');
+  if (!sample && cards.length && unlabeled.length < cards.length) out.push('A card is marked sample but the document is not — if the story is real, drop "sample"; if not, set "sample": true on document.json too.');
+  if (sample && !/need|replace|missing/i.test(notes ?? '')) out.push('NOTES.md: say exactly what the user needs to supply to make this real (customer, approval, numbers, a quote).');
+  if (!sample && res?.layout === 'case-results' && res.fields?.quote && !res.fields?.who) out.push('document.json: the quote needs who said it ("Name, Role, Company").');
+  return out.slice(0, 12);
+}
+
 /** Format-specific checks that need more than one spec or a copy file; run after every render round. */
 export async function packChecks(packId: string, outDir: string): Promise<string[]> {
   const json = async (f: string) => JSON.parse(await readFile(join(outDir, f), 'utf8').catch(() => 'null'));
@@ -455,6 +479,7 @@ export async function packChecks(packId: string, outDir: string): Promise<string
     if (packId === 'product-hunt-kit') return checkLaunchCopy(await text('launch-copy.md'));
     if (packId === 'profile-kit') return checkProfileKit(await json('graphics.json'));
     if (packId === 'battlecard') return checkComparison(await json('document.json'), await json('landing.json'));
+    if (packId === 'case-study') return checkCaseStudy(await json('document.json'), await json('graphics.json'), await text('NOTES.md'));
   } catch (e) {
     return [`A spec is not valid JSON: ${(e as Error).message}`];
   }

@@ -269,6 +269,30 @@ test('battlecard: a dense one-page PDF at Letter and A4 that fits, plus an hones
   assert.ok(!/<img/.test(html.split('<main>')[1]), 'no logos or pictures of the competitor');
 });
 
+test('case study: 4 pages and two social cards, a template labelled on every page and card', { skip: !hasChrome && 'no Chrome' }, async () => {
+  const pages = [
+    { layout: 'cover', fields: { kicker: 'Case study', title: 'A *full campaign* in an afternoon', subtitle: 'How a two-person team shipped every launch asset without an agency.', meta: 'Sample customer story' } },
+    { layout: 'case-snapshot', fields: { client: 'Sample Co', heading: 'Launch assets took longer than the product', facts: ['Industry | B2B software', 'Team | 2 founders', 'Region | Remote', 'Customer since | Sample date'], summary: 'A small team needed launch videos, carousels and a deck in days, not weeks — without hiring.', challenge: 'Every launch meant weeks of design work before anything could be posted. The product was ready; the marketing was not.\n\n- Videos needed an editor and several rounds of review\n- Every channel wanted another size of every image\n- A late product change meant starting over\n\nThe team tried templates, but every template still needed a designer to fill it, and nobody owned the job. Launch dates slipped while the assets caught up, and the posts that did go out looked different on every channel.\n\n> Replace this with the customer\'s own words about the problem.' } },
+    { layout: 'article', fields: { heading: 'The solution', body: 'They pasted their product URL into Shipcast and picked the formats they needed. The brief came back in minutes; every asset was rendered and checked for overflow, safe zones and legibility before anyone looked at it.\n\nWhen the product changed the week before launch, they edited the copy and re-rendered — no new brief, no new invoice.\n\n### What they used\n- Launch film and a vertical reel\n- A LinkedIn carousel and quote cards\n- A pitch deck and a one-pager for sales\n\n### How the week went\n1. Monday: brief and first renders\n2. Tuesday: edits to copy and crops\n3. Wednesday: everything scheduled', aside: "Sample story — replace every line with the customer's real account." } },
+    { layout: 'case-results', fields: { heading: 'A whole launch set in one afternoon', results: ['1 day | from brief to every asset | was ? weeks', '30+ | formats from one brief', '0 | agency hours billed'], body: "Replace these with the customer's verified numbers and say where each one came from.", quote: 'Replace with a real quote from the customer, word for word.', who: 'Name, Role, Company', next: 'They plan to run every release through Shipcast and add the newsletter format next.' } },
+  ];
+  for (const size of ['a4', 'letter']) {
+    const out = join(home, `case-${size}`);
+    const job = await run('document', { brand: shipcast, size, theme: 'clean', title: 'Case study — Sample Co', sample: true, outDir: out, pages });
+    assert.equal(job.status, 'done', job.error);
+    assert.deepEqual(job.output.problems, [], size);
+    assert.equal(((await import('node:fs')).readFileSync(join(out, 'document.html'), 'utf8').match(/class="sample-band"/g) ?? []).length, 4, 'every page says it is a sample');
+  }
+  const fields = { client: 'Sample Co', title: 'A whole launch set in *one afternoon*', stats: ['1 day | brief to every asset', '30+ | formats from one brief', '0 | agency hours'], quote: 'Replace with a real quote from the customer.', who: 'Name, Role', sample: 'yes' };
+  const out = join(home, 'case-cards');
+  const items = ['linkedin-image', 'linkedin-landscape'].flatMap((preset) => [{ type: 'card', layout: 'case-card', theme: 'editorial', preset, name: `cards/${preset}.png`, fields }, { type: 'card', layout: 'case-card', theme: 'swiss', preset, name: `cards/${preset}-one.png`, fields: { client: 'Shipcast', title: 'Thirty formats from one brief', stats: ['30+ | formats'] } }]);
+  const job = await run('graphics', { brand: shipcast, outDir: out, items });
+  assert.equal(job.status, 'done', job.error);
+  job.output.items.forEach(clean);
+  assert.match((await import('node:fs')).readFileSync(join(out, 'cards', 'linkedin-landscape.html'), 'utf8'), /data-sample>Sample — replace with your customer/);
+  assert.ok(!/data-sample/.test((await import('node:fs')).readFileSync(join(out, 'cards', 'linkedin-image-one.html'), 'utf8')));
+});
+
 test('stills audit catches text that overflows', { skip: !hasChrome && 'no Chrome' }, async () => {
   const f = join(home, 'bad.html');
   writeFileSync(f, '<html><body style="margin:0"><div style="width:200px;overflow:hidden;white-space:nowrap;font-size:40px">This headline is far too long for its box</div></body></html>');

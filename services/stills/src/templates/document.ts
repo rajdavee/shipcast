@@ -245,6 +245,34 @@ export const DOC_LAYOUTS: Layout[] = [
     html: (f, ctx) => { const [qt, qb] = String(f.quote ?? '').split(/\s+—\s+/); return `<section class="pg">${chrome(ctx)}<div class="pg-body"><div class="kicker ink">${esc(f.client)}</div><h2>${rich(f.heading)}</h2><div class="stat-grid n${Math.min(3, list(f.results).length)} tight">${list(f.results).map((s) => { const [v, l] = s.split('|').map((x) => x.trim()); return `<div class="stat"><div class="big">${esc(v)}</div><div class="lbl">${rich(l ?? '')}</div></div>`; }).join('')}</div><div class="cols two"><div><h3>The challenge</h3>${md(f.challenge)}</div><div><h3>What changed</h3>${md(f.solution)}</div></div>${f.image ? `<figure class="shot sm"><img src="${img(f.image, ctx)}" alt=""></figure>` : ''}${qt ? `<blockquote class="cs-quote">${rich(qt)}${qb ? `<cite>${esc(qb)}</cite>` : ''}</blockquote>` : ''}</div></section>`; },
   },
   {
+    id: 'case-snapshot',
+    label: 'Case study: snapshot + challenge',
+    use: 'Page 2 of a case study: a side panel with the customer snapshot (who they are in 3–6 facts, the result at a glance) beside the challenge in their words. Real customers only — for a template, set the document\'s "sample": true.',
+    fields: [
+      { id: 'client', type: 'text', label: 'Customer', max: 60 },
+      { id: 'heading', type: 'text', label: 'Headline (the problem, in one line)', max: 90 },
+      { id: 'facts', type: 'list', label: 'Snapshot: "label | value" (Industry, Team size, Region, Using since…)', max: 6 },
+      { id: 'summary', type: 'longtext', label: 'At a glance (2–3 sentences)', max: 320 },
+      { id: 'challenge', type: 'longtext', label: 'The challenge (light markdown, ~250 words)', max: 1800 },
+      { id: 'image', type: 'image', label: "Customer's logo (from the brief only)", optional: true },
+    ],
+    html: (f, ctx) => `<section class="pg">${chrome(ctx)}<div class="pg-body cs-grid"><aside class="cs-side">${f.image ? `<img class="cs-logo" src="${img(f.image, ctx)}" alt="">` : `<div class="cs-name">${esc(f.client)}</div>`}<div class="kicker ink">Customer snapshot</div><dl>${list(f.facts).map((x) => { const [k, v] = x.split('|').map((y) => y.trim()); return `<div><dt>${esc(k)}</dt><dd>${rich(v ?? '')}</dd></div>`; }).join('')}</dl><div class="kicker ink">At a glance</div><p>${rich(f.summary)}</p></aside><div class="cs-main"><div class="kicker ink">${esc(f.client)} · The challenge</div><h2>${rich(f.heading)}</h2><div class="copy">${md(f.challenge)}</div></div></div></section>`,
+  },
+  {
+    id: 'case-results',
+    label: 'Case study: results, quote, what\'s next',
+    use: 'The results page: 2–4 big verified numbers with what they measure, the story of how they got there, the customer\'s own quote and what\'s next. Numbers and quotes come from the brief only.',
+    fields: [
+      { id: 'heading', type: 'text', label: 'Headline (the result)', max: 90 },
+      { id: 'results', type: 'list', label: 'Results: "value | what it measures | before → after or timeframe"', max: 4 },
+      { id: 'body', type: 'longtext', label: 'How they got there (light markdown, ~150 words)', max: 1100, optional: true },
+      { id: 'quote', type: 'longtext', label: 'Customer quote (exact words)', max: 300, optional: true },
+      { id: 'who', type: 'text', label: 'Quote by ("Name, Role, Company")', max: 90, optional: true },
+      { id: 'next', type: 'longtext', label: "What's next (2–3 sentences)", max: 420, optional: true },
+    ],
+    html: (f, ctx) => `<section class="pg">${chrome(ctx)}<div class="pg-body"><div class="kicker ink">Results</div><h2>${rich(f.heading)}</h2><div class="stat-grid n${Math.min(4, Math.max(1, list(f.results).length))} cs-res">${list(f.results).map((s) => { const [v, l, c] = s.split('|').map((x) => x.trim()); return `<div class="stat"><div class="big">${esc(v)}</div><div class="lbl">${rich(l ?? '')}</div>${c ? `<div class="src">${esc(c)}</div>` : ''}</div>`; }).join('')}</div>${f.body ? `<div class="copy">${md(f.body)}</div>` : ''}${f.quote ? `<blockquote class="cs-big-q">“${rich(f.quote)}”${f.who ? `<cite>${esc(f.who)}</cite>` : ''}</blockquote>` : ''}${f.next ? `<div class="cs-next"><h3>What's next</h3><p>${rich(f.next)}</p></div>` : ''}</div></section>`,
+  },
+  {
     id: 'battlecard',
     label: 'Sales battlecard (one page, internal)',
     use: 'An internal one-page battlecard against one competitor: their pitch vs ours, where we win, where they win (honest), landmines/objections with answers, proof points, pricing notes and numbered sources. Every claim about the competitor carries a [n] source from the brief\'s research; anything unverified stays out (list it as "to verify" in NOTES.md). Names in text only — no competitor logos.',
@@ -420,6 +448,15 @@ tbody tr:nth-child(even) td{background:color-mix(in srgb,var(--tint) 60%,transpa
 .toc li.sec{font-size:18px;padding-top:18px}
 .toc .lead{flex:1;border-bottom:1px dotted var(--rule);transform:translateY(-4px)}
 .toc .pn{color:var(--soft);font-variant-numeric:tabular-nums}
+.cs-grid{display:grid;grid-template-columns:230px 1fr;gap:30px;align-items:start}
+.cs-side{background:var(--tint);border-radius:18px;padding:24px;display:grid;gap:12px;align-content:start}
+.cs-logo{max-height:44px;width:auto;max-width:170px;object-fit:contain}.cs-name{font:800 22px/1.15 var(--font-display);letter-spacing:-.02em}
+.cs-side dl{display:grid;gap:10px;margin-bottom:6px}.cs-side dt{font:700 11px/1.2 var(--font-body);text-transform:uppercase;letter-spacing:.08em;color:var(--soft)}.cs-side dd{font:600 14.5px/1.35 var(--font-body)}
+.cs-side p{font-size:14.5px;line-height:1.5}.cs-main{display:flex;flex-direction:column;gap:16px;min-width:0}
+.cs-res .stat .big{font-size:52px}.stat-grid.n4.cs-res .stat .big{font-size:40px}
+.cs-big-q{border-left:4px solid var(--brand-primary);padding:4px 0 4px 20px;font:600 21px/1.4 var(--font-display);letter-spacing:-.01em;text-wrap:pretty}.cs-big-q cite{display:block;margin-top:10px;font:500 13px var(--font-body);font-style:normal;color:var(--soft)}
+.cs-next{background:var(--tint);border-radius:16px;padding:20px 22px}.cs-next h3{margin:0 0 6px}
+.sample-band{position:absolute;z-index:9;top:10px;left:50%;transform:translateX(-50%);white-space:nowrap;font:700 11.5px/1 var(--font-body);letter-spacing:.04em;padding:7px 12px;border:1.5px dashed currentColor;border-radius:999px;background:var(--paper);color:#b42318}
 .bc{padding:0;display:flex;flex-direction:column;font-size:12.5px;line-height:1.45}
 .bc-head{display:flex;align-items:center;gap:18px;padding:26px 40px 20px;background:var(--cover-bg);color:var(--cover-fg)}
 .bc-head .kicker{font-size:11px}.bc-head h1{font:800 28px/1.1 var(--font-display);letter-spacing:-.02em;margin-top:6px}.bc-head h1 span{opacity:.6;font-weight:600}
@@ -442,13 +479,14 @@ tbody tr:nth-child(even) td{background:color-mix(in srgb,var(--tint) 60%,transpa
 `;
 
 /** Render a whole document into one HTML file: each page is a fixed-size <section>. */
-export function renderDocument(spec: { title?: string; theme?: string; footer?: string; pages: DocPage[] }, ctx: RenderCtx): string {
+export function renderDocument(spec: { title?: string; theme?: string; footer?: string; sample?: unknown; pages: DocPage[] }, ctx: RenderCtx): string {
   const theme = DOC_THEMES[spec.theme ?? 'clean'] ?? DOC_THEMES.clean;
   const pages = spec.pages.length;
+  const sample = /^(yes|true)$/i.test(String(spec.sample ?? ''));
   // Contents need final page numbers: number every page first, then fill the contents from headings.
   const entries: { title: string; page: number; sec: boolean }[] = [];
   spec.pages.forEach((p, i) => {
-    const t = p.layout === 'section' ? p.fields.title : p.layout === 'article' || p.layout === 'stats' || p.layout === 'chart' || p.layout === 'features' || p.layout === 'steps' || p.layout === 'table' || p.layout === 'case-study' || p.layout === 'comparison' ? p.fields.heading : null;
+    const t = p.layout === 'section' ? p.fields.title : p.layout === 'article' || p.layout === 'stats' || p.layout === 'chart' || p.layout === 'features' || p.layout === 'steps' || p.layout === 'table' || p.layout === 'case-study' || p.layout === 'comparison' || p.layout === 'case-snapshot' || p.layout === 'case-results' ? p.fields.heading : null;
     if (t) entries.push({ title: String(t).replace(/[*=]/g, ''), page: i + 1, sec: p.layout === 'section' });
   });
   const body = spec.pages
@@ -457,7 +495,9 @@ export function renderDocument(spec: { title?: string; theme?: string; footer?: 
       if (p.layout === 'toc') return `<section class="pg toc">${chrome(dctx)}<div class="pg-body"><h2>Contents</h2>${p.fields?.intro ? `<p class="lede ink">${rich(p.fields.intro)}</p>` : ''}<ol>${entries.filter((e) => e.page > i + 1).map((e) => `<li class="${e.sec ? 'sec' : ''}">${esc(e.title)}<span class="lead"></span><span class="pn">${e.page}</span></li>`).join('')}</ol></div></section>`;
       const l = DOC_LAYOUTS.find((x) => x.id === p.layout);
       if (!l) throw new Error(`unknown document layout "${p.layout}" (have: ${DOC_LAYOUTS.map((x) => x.id).join(', ')})`);
-      return l.html(p.fields ?? {}, dctx);
+      const html = l.html(p.fields ?? {}, dctx);
+      // A template built without a real customer says so on every page, so it can't be mistaken for one.
+      return sample ? html.replace(/^<section class="([^"]*)">/, '<section class="$1"><div class="sample-band">Sample — replace with your customer</div>') : html;
     })
     .join('\n');
   return `<!doctype html><html><head><meta charset="utf-8">${fontLinks(ctx.brand)}<style>${brandCss(ctx.brand)}

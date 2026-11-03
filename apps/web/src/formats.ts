@@ -16,6 +16,7 @@ export const FORMATS: { id: string; title: string; line: string; img?: string; r
   { id: 'print', title: 'Print', line: 'Posters, flyers and roll-ups with bleed and crop marks', img: '/formats/print.jpg', ratio: 0.707 },
   { id: 'email', title: 'Email', line: 'Launch email, newsletter or sequence — HTML + text', img: '/formats/email.jpg', ratio: 4 / 5 },
   { id: 'document', title: 'PDF document', line: 'One-pager, case study, ebook or whitepaper', img: '/formats/document.jpg', ratio: 0.707 },
+  { id: 'case-study', title: 'Case study', line: 'Customer story PDF with social cards — real or a labelled template', img: '/formats/case-study.jpg', ratio: 4 / 5 },
   { id: 'battlecard', title: 'Battlecard', line: 'Sales battlecard and an honest comparison page', img: '/formats/battlecard.jpg', ratio: 4 / 5 },
   { id: 'ugc-ad', title: 'UGC ad', line: 'Creator-style ad with a labelled AI presenter', ratio: 9 / 16 },
   { id: 'reel', title: 'Reel', line: 'Vertical video with captions', img: '/formats/reel.jpg', ratio: 9 / 16 },
@@ -55,7 +56,7 @@ export function shape(pack: Pack | undefined, step?: Step): number {
   if (pack?.id === 'app-store-screens') return 9 / 16;
   if (pack?.id === 'product-hunt-kit') return 1270 / 760;
   if (pack?.id === 'profile-kit') return 16 / 9;
-  if (pack?.id === 'battlecard') return 0.707;
+  if (pack?.id === 'battlecard' || pack?.id === 'case-study') return 0.707;
   if (pack?.id === 'document') return 0.707;
   if (pack?.id === 'ad-set') return 1;
   if (pack?.id === 'print') return 0.707;

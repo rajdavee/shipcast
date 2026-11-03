@@ -79,6 +79,17 @@ test('comparison check: sourced competitor claims, honest cells, nothing unverif
   assert.ok(checkComparison({ pages: [card] }, null).some((p) => /landing\.json was not written/.test(p)));
 });
 
+test('case study check: structure, both cards, and a template labelled everywhere', async () => {
+  const { checkCaseStudy } = await import('@shipcast/engine');
+  const pages = [{ layout: 'cover' }, { layout: 'case-snapshot' }, { layout: 'case-results', fields: { results: ['3× | faster close'], quote: 'It works.', who: 'Jane, CFO, Acme' } }];
+  const cards = (sample?: string) => ({ items: ['linkedin-image', 'linkedin-landscape'].map((preset) => ({ layout: 'case-card', preset, fields: sample ? { sample } : {} })) });
+  assert.deepEqual(checkCaseStudy({ pages }, cards(), null), []);
+  assert.deepEqual(checkCaseStudy({ pages, sample: true }, cards('yes'), "## What's needed to make this real\n- a customer"), []);
+  const bad = checkCaseStudy({ pages: [{ layout: 'cover' }], sample: true }, { items: [cards().items[0]] }, '').join(' | ');
+  for (const re of [/2–4 pages, not 1/, /case-snapshot/, /results page/, /linkedin-landscape case-card/, /every case-card needs "sample"/, /NOTES\.md/]) assert.match(bad, re);
+  assert.match(checkCaseStudy({ pages }, cards('yes'), null).join(' '), /marked sample but the document is not/);
+});
+
 test('music is deterministic, the requested length, and not silent', () => {
   const a = makeMusic({ mood: 'tech', seconds: 6, seed: 3 });
   const b = makeMusic({ mood: 'tech', seconds: 6, seed: 3 });

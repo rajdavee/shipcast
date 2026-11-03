@@ -347,6 +347,7 @@ export const PACK_CHANNEL: Record<string, Channel> = {
   'product-hunt-kit': 'web',
   'profile-kit': 'web',
   battlecard: 'web',
+  'case-study': 'linkedin',
   'social-post': 'linkedin',
   reel: 'tiktok',
   'social-short': 'tiktok',

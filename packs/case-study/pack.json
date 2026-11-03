@@ -1,0 +1,22 @@
+{
+  "id": "case-study",
+  "name": "Case Study",
+  "tagline": "A 2–4 page case study PDF — customer snapshot, challenge, solution, results in big numbers, their quote, what's next — plus a 1080×1350 social card and a 1200×627 LinkedIn card. Real customers only; with no story yet, a clearly labelled template.",
+  "category": "design",
+  "order": 13,
+  "estimate": "5–10 min",
+  "accent": "#1d4ed8",
+  "spec": "document",
+  "also": ["graphics"],
+  "options": [
+    { "key": "customer", "label": "Customer (optional)", "type": "text", "default": "", "placeholder": "Who the story is about — blank = from the brief" },
+    { "key": "story", "label": "Their story (optional)", "type": "text", "default": "", "placeholder": "Paste interview notes, numbers and an approved quote" },
+    { "key": "size", "label": "Paper", "type": "select", "choices": ["auto", "a4", "letter"], "default": "auto" },
+    { "key": "theme", "label": "Theme", "type": "select", "choices": ["auto", "clean", "editorial", "dark"], "default": "auto" }
+  ],
+  "outputs": ["document.pdf", "pages/*.png", "cards/*.png", "document.json", "graphics.json", "*.md"],
+  "skills": [],
+  "tools": ["chrome"],
+  "roles": ["design-taste", "copy", "humanize"],
+  "timeoutMinutes": 30
+}

@@ -165,6 +165,14 @@ em{font-style:normal;color:var(--accent)}
 .pf-logo{display:inline-flex;flex:none;line-height:1}.pf-logo .logo{height:1em;width:auto;max-width:6em;object-fit:contain}.pf-logo .wordmark{font:800 1em/1 var(--font-display);letter-spacing:-.03em}
 .pf-url{font-family:var(--font-mono);font-weight:600;color:var(--muted);max-width:100%;white-space:nowrap;overflow:hidden}
 .pf-rule{flex:none;width:3px;align-self:stretch;border-radius:2px;background:var(--accent)}
+.cs-client{font-family:var(--font-body);font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.cs-nums{display:grid;grid-template-columns:repeat(var(--n),1fr);gap:24px}.cs-nums.col{grid-template-columns:1fr;flex:1;align-content:center}
+.cs-n{display:flex;flex-direction:column;gap:10px;min-width:0;background:var(--card);border-radius:28px;padding:28px;box-shadow:0 0 0 1px color-mix(in srgb,var(--rule) 45%,transparent)}
+.cs-nums.col .cs-n{padding:18px 24px;gap:4px;border-radius:20px}
+.cs-n b{font-family:var(--font-display);font-weight:800;line-height:1;letter-spacing:-.04em;color:var(--accent);white-space:nowrap}
+.cs-n span{font-family:var(--font-body);font-weight:600;line-height:1.25;color:var(--fg)}
+.cs-q{font-family:var(--font-display);font-weight:600;line-height:1.3;color:var(--fg);border-left:6px solid var(--accent);padding-left:.8em}
+.cs-q small{display:block;margin-top:.5em;font:500 .72em/1.3 var(--font-body);color:var(--muted)}
 .post footer svg{width:1.15em;height:1.15em;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
 `;
 
@@ -516,6 +524,34 @@ ${logo(ctx)}<div><div style="font:900 220px/.7 var(--font-display);color:var(--a
         : `<span style="font:800 ${Math.round(s * 0.36)}px/1 var(--font-display);letter-spacing:-.05em;color:${fg}">${esc(String(f.mark ?? '').slice(0, 2) || initials(ctx.brand.name))}</span>`;
       const bg = plain ?? 'var(--bg);background-image:radial-gradient(circle at 50% 50%,color-mix(in srgb,var(--accent) 22%,transparent),transparent 62%)';
       return `<div class="c" style="align-items:center;justify-content:center;background:${bg}">${mark}</div>`;
+    },
+  },
+  {
+    id: 'case-card',
+    label: 'Case study card',
+    use: 'Social summary of a case study at linkedin-image (1080×1350) and linkedin-landscape (1200×627): customer, the result as the headline, 1–3 big numbers and an optional short quote. Real customers, numbers and words only; with no real story set sample: yes — the card is then labelled "Sample — replace with your customer".',
+    fields: [
+      { id: 'client', type: 'text', label: 'Customer', max: 40 },
+      { id: 'title', type: 'text', label: 'Headline: the result (≤ 10 words)', max: 70, help: '*word* = accent' },
+      { id: 'stats', type: 'list', label: 'Results: "value | label" (1–3)', max: 3 },
+      { id: 'quote', type: 'text', label: 'Short quote (exact words)', max: 140, optional: true },
+      { id: 'who', type: 'text', label: 'Quote by ("Name, Role")', max: 60, optional: true },
+      { id: 'kicker', type: 'text', label: 'Kicker', max: 24, optional: true, help: 'default "Case study"' },
+      { id: 'sample', type: 'enum', label: 'Sample story', choices: ['no', 'yes'], optional: true, help: 'yes = template copy, labelled on the image' },
+    ],
+    html: (f, ctx) => {
+      const { land, u, pad } = quoteBox(ctx);
+      const stats = list(f.stats).slice(0, 3).map((s) => s.split('|').map((x) => x.trim()));
+      const k = Math.max(1, stats.length);
+      const t = Math.round(fit(f.title, land ? [[30, 60], [50, 52], [70, 46]] : [[30, 92], [50, 80], [70, 70]], land ? 42 : 64));
+      const vsz = land ? [[4, 76], [7, 62]] : k === 1 ? [[4, 190], [7, 150]] : k === 2 ? [[4, 140], [7, 112]] : [[4, 104], [7, 84]];
+      const tag = isSample(f) ? '<span class="sample" data-sample>Sample — replace with your customer</span>' : '';
+      const nums = `<div class="cs-nums${land ? ' col' : ''}" style="--n:${k}">${stats.map(([v, l]) => `<div class="cs-n"><b class="big" data-min-font="${land ? 40 : 56}" style="font-size:${fit(v, vsz as [number, number][], land ? 52 : 72)}px">${esc(v)}</b><span style="font-size:${land ? 22 : 28}px">${rich(l ?? '')}</span></div>`).join('')}</div>`;
+      const quote = f.quote ? `<div class="cs-q" style="font-size:${land ? 24 : 34}px"><p style="color:inherit">“${rich(f.quote)}”</p>${f.who ? `<small>${esc(f.who)}</small>` : ''}</div>` : '';
+      const head = `<div class="hd">${logo(ctx)}<span class="kick">${esc(f.kicker || 'Case study')}</span></div>`;
+      const h = `<div style="display:flex;flex-direction:column;gap:${land ? 14 : 20}px"><div class="cs-client" style="font-size:${land ? 22 : 30}px">${esc(f.client)}</div><h1 data-min-font="${Math.round(t * 0.75)}" style="font-size:${t}px">${rich(f.title)}</h1></div>`;
+      if (land) return `<div class="c" style="padding:${pad}px;gap:${pad}px;--k:22px;--s:18px"><div style="flex:1.3;min-width:0;display:flex;flex-direction:column;gap:22px;justify-content:space-between">${head}${h}${quote || tag ? `<div style="display:flex;flex-direction:column;gap:12px;align-items:flex-start">${quote}${tag}</div>` : ''}</div>${nums}</div>`;
+      return `<div class="c" style="flex-direction:column;justify-content:space-between;padding:${pad}px;gap:${Math.round(36 * u)}px;--k:30px;--s:24px">${head}${h}${nums}${quote}${tag ? `<div class="ft">${tag}</div>` : ''}</div>`;
     },
   },
 ];

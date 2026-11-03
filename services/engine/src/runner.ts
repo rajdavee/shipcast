@@ -602,8 +602,8 @@ export async function runStep(campaign: Campaign, step: Step, hooks: RunHooks = 
         if (pack?.id === 'carousel' || pack?.id === 'photo-carousel') force.motion = step.options.motion === 'no' ? null : 'chill';
         if (pack?.id === 'photo-carousel') force.sizes = step.options.platform === 'tiktok' ? ['tiktok-photo'] : step.options.platform === 'instagram' ? ['instagram-carousel'] : ['tiktok-photo', 'instagram-carousel'];
         // Choices made in the format options win over what the model wrote.
-        if ((pack?.id === 'document' || pack?.id === 'battlecard' || pack?.id === 'presentation' || pack?.id === 'ad-set' || pack?.id === 'email' || pack?.id === 'landing') && step.options.theme && step.options.theme !== 'auto') force.theme = step.options.theme;
-        if ((pack?.id === 'document' || pack?.id === 'battlecard') && step.options.size && step.options.size !== 'auto') force.size = step.options.size;
+        if ((pack?.id === 'document' || pack?.id === 'battlecard' || pack?.id === 'case-study' || pack?.id === 'presentation' || pack?.id === 'ad-set' || pack?.id === 'email' || pack?.id === 'landing') && step.options.theme && step.options.theme !== 'auto') force.theme = step.options.theme;
+        if ((pack?.id === 'document' || pack?.id === 'battlecard' || pack?.id === 'case-study') && step.options.size && step.options.size !== 'auto') force.size = step.options.size;
         const r = await renderSpecs(specKinds, cwd, join(dir, 'brief'), { force });
         const extra = await packChecks(pack?.id ?? '', join(cwd, 'out'));
         if (extra.length) Object.assign(r, { ok: false, feedback: [...r.feedback, ...extra] });

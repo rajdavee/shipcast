@@ -29,6 +29,8 @@ export interface DocumentSpec {
   size?: string;
   theme?: string;
   footer?: string;
+  /** true = a template with no real customer: every page is labelled as a sample. */
+  sample?: boolean | string;
   pages: DocPage[];
 }
 
