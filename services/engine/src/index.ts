@@ -54,3 +54,4 @@ export * from './context.ts';
 export * from './auth.ts';
 export * from './claude-account.ts';
 export * from './sandbox.ts';
+export * from './report-facts.ts';
