@@ -1,4 +1,6 @@
 // Types mirror services/engine/src/types.ts; the web app talks to it only over HTTP.
+import { useSyncExternalStore } from 'react';
+import { decideError, type ErrorDecision, type Role } from './auth-model.ts';
 export type SourceType = 'url' | 'github' | 'local' | 'text';
 export type Source = { type: SourceType; value: string };
 export interface HubPackage { id: string; name: string; repo: string; ref: string; paths: string[]; licence: string; area: string; roles: Record<string, string>; summary: string; verdict: number; needs?: string[]; stars?: number; custom?: boolean }
@@ -176,15 +178,66 @@ export interface AgentsState {
   runs: { job: string; at: string; ok: boolean; summary: string; ms: number }[];
 }
 
+// ── session plumbing: every request carries the anti-forgery header and the workspace it is for ──
+
+const WS_KEY = 'shipcast.workspace';
+let workspaceNow: string | null = (() => {
+  try {
+    return localStorage.getItem(WS_KEY);
+  } catch {
+    return null;
+  }
+})();
+const wsListeners = new Set<() => void>();
+export const currentWorkspace = () => workspaceNow;
+/** Remember the workspace this tab works in; every later request names it. */
+export function setCurrentWorkspace(id: string | null) {
+  if (id === workspaceNow) return;
+  workspaceNow = id;
+  try {
+    if (id) localStorage.setItem(WS_KEY, id);
+    else localStorage.removeItem(WS_KEY);
+  } catch {}
+  wsListeners.forEach((l) => l());
+}
+export function useWorkspaceId(): string | null {
+  return useSyncExternalStore((cb) => (wsListeners.add(cb), () => void wsListeners.delete(cb)), () => workspaceNow);
+}
+
+/** Headers for any request to the api (also for raw fetches like uploads). */
+export function apiHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  return { 'x-shipcast': '1', ...(workspaceNow ? { 'x-shipcast-workspace': workspaceNow } : {}), ...extra };
+}
+
+export class ApiError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
+type ProblemHandler = (d: ErrorDecision, path: string) => void;
+let onProblem: ProblemHandler = () => {};
+/** The app decides what a 401 or a lost workspace means for the screen; everything else is thrown to the caller. */
+export const setProblemHandler = (fn: ProblemHandler) => void (onProblem = fn);
+
+async function check(res: Response, path: string): Promise<any> {
+  const data = await res.json().catch(() => ({}));
+  if (res.ok) return data;
+  const message = data.error ?? `${res.status} ${res.statusText}`;
+  const d = decideError(res.status, message, path);
+  if (d.kind === 'signin' || d.kind === 'setup' || d.kind === 'workspace-gone') onProblem(d, path);
+  throw new ApiError(res.status, d.kind === 'forbidden' || d.kind === 'error' ? d.message : message);
+}
+
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(path, {
     method,
-    headers: body === undefined ? {} : { 'content-type': 'application/json' },
+    headers: apiHeaders(body === undefined ? {} : { 'content-type': 'application/json' }),
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error ?? `${res.status} ${res.statusText}`);
-  return data as T;
+  return check(res, path.split('?')[0]) as Promise<T>;
 }
 
 export interface VoiceState {
@@ -244,6 +297,40 @@ export interface StockState {
   photos: boolean;
   providers: Record<StockProvider, boolean>;
 }
+
+export interface PublicUser { id: string; email: string; name: string; createdAt: string; installOwner: boolean }
+export interface AuthStatus { setUp: boolean; signedIn: boolean; openSignup: boolean; user?: PublicUser }
+export interface WorkspaceSummary { id: string; name: string; role: Role; personal: boolean; members: number }
+export interface SessionInfo { id: string; createdAt: string; lastSeen: string; agent?: string; current: boolean }
+export interface Account { user: PublicUser; workspaces: WorkspaceSummary[]; current?: string; sessions: SessionInfo[] }
+export interface ClaudeConnection { connected: boolean; method: 'token' | 'apiKey' | 'machine' | 'none'; savedAt?: string; machineAllowed: boolean }
+export interface InviteInfo { valid: boolean; problem?: string; workspace?: string; role?: Role; email?: string }
+export interface MemberView { id: string; email: string; name: string; role: Role; addedAt: string }
+export interface PendingInvite { id: string; workspace: string; role: Exclude<Role, 'owner'>; email?: string; by: string; createdAt: string; expiresAt: string }
+
+export const auth = {
+  status: () => call<AuthStatus>('GET', '/api/auth/status'),
+  signUp: (b: { email: string; password: string; name?: string; invite?: string }) => call<{ user: PublicUser; workspace: string; migrated?: string[] }>('POST', '/api/auth/signup', b),
+  signIn: (email: string, password: string) => call<{ user: PublicUser }>('POST', '/api/auth/signin', { email, password }),
+  signOut: (everywhere = false) => call<{ ok: true }>('POST', '/api/auth/signout', { everywhere }),
+  inviteInfo: (token: string) => call<InviteInfo>('GET', `/api/auth/invite/${encodeURIComponent(token)}`),
+  setOpenSignup: (open: boolean) => call<{ openSignup: boolean }>('PUT', '/api/auth/open-signup', { open }),
+  account: () => call<Account>('GET', '/api/account'),
+  claude: () => call<ClaudeConnection>('GET', '/api/account/claude'),
+  saveClaude: (credential: string) => call<ClaudeConnection>('PUT', '/api/account/claude', { credential }),
+  forgetClaude: () => call<ClaudeConnection>('DELETE', '/api/account/claude'),
+  changePassword: (current: string, next: string) => call<{ ok: true }>('PUT', '/api/account/password', { current, next }),
+  createWorkspace: (name: string) => call<{ id: string; name: string }>('POST', '/api/workspaces', { name }),
+  switchTo: (id: string) => call<{ ok: true; workspace: string }>('POST', `/api/workspaces/${id}/switch`),
+  join: (token: string) => call<{ workspace: string; name: string }>('POST', `/api/workspaces/join/${encodeURIComponent(token)}`),
+  members: (id: string) => call<{ members: MemberView[]; invites: PendingInvite[] }>('GET', `/api/workspaces/${id}/members`),
+  invite: (id: string, role: Role, email?: string) => call<{ link: string; invite: PendingInvite }>('POST', `/api/workspaces/${id}/invites`, { role, ...(email ? { email } : {}) }),
+  revokeInvite: (id: string, invite: string) => call<{ ok: true }>('DELETE', `/api/workspaces/${id}/invites/${invite}`),
+  rename: (id: string, name: string) => call<{ id: string; name: string }>('PUT', `/api/workspaces/${id}`, { name }),
+  setRole: (id: string, user: string, role: Role) => call<unknown>('PUT', `/api/workspaces/${id}/members/${user}`, { role }),
+  removeMember: (id: string, user: string) => call<unknown>('DELETE', `/api/workspaces/${id}/members/${user}`),
+  deleteWorkspace: (id: string) => call<{ ok: true }>('DELETE', `/api/workspaces/${id}`),
+};
 
 export const api = {
   status: () => call<Status>('GET', '/api/status'),
@@ -361,10 +448,8 @@ export const api = {
     pending: () => call<PendingNumbers[]>('GET', '/api/metrics/pending'),
     collectNow: (postId: string) => call<{ queued: ChannelId[]; manual: ChannelId[]; note: string }>('POST', `/api/metrics/collect-now/${postId}`),
     readScreenshot: async (file: Blob & { name?: string }, channel: ChannelId): Promise<ScreenshotReading> => {
-      const res = await fetch(`/api/metrics/read-screenshot?channel=${channel}&name=${encodeURIComponent(file.name ?? 'screenshot.png')}`, { method: 'POST', headers: { 'content-type': file.type || 'application/octet-stream' }, body: file });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error ?? `${res.status} ${res.statusText}`);
-      return data as ScreenshotReading;
+      const res = await fetch(`/api/metrics/read-screenshot?channel=${channel}&name=${encodeURIComponent(file.name ?? 'screenshot.png')}`, { method: 'POST', headers: apiHeaders({ 'content-type': file.type || 'application/octet-stream' }), body: file });
+      return check(res, '/api/metrics/read-screenshot') as Promise<ScreenshotReading>;
     },
     playbook: () => call<Playbook | { computedAt: null; channels: [] }>('GET', '/api/metrics/playbook'),
     refreshPlaybook: (narrative = true) => call<Playbook>('POST', '/api/metrics/playbook/refresh', { narrative }),
@@ -375,8 +460,8 @@ export const api = {
     remix: (postId: string, channels?: ChannelId[]) => call<Post[]>('POST', `/api/calendar/posts/${postId}/remix`, channels ? { channels } : {}),
   },
   upload: async (id: string, file: File) => {
-    const res = await fetch(`/api/campaigns/${id}/uploads?name=${encodeURIComponent(file.name)}`, { method: 'POST', body: file });
-    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'upload failed');
+    const res = await fetch(`/api/campaigns/${id}/uploads?name=${encodeURIComponent(file.name)}`, { method: 'POST', headers: apiHeaders(), body: file });
+    await check(res, `/api/campaigns/${id}/uploads`);
   },
 };
 
