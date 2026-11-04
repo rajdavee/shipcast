@@ -159,7 +159,7 @@ test("each person's Claude: their own credential, isolated config, never someone
   const { statSync } = await import('node:fs');
   assert.equal(statSync(join(home, 'users', benU.id, 'claude.json')).mode & 0o777, 0o600);
   // A run that would use nobody's Claude never starts.
-  const r = E.runAs({ workspace: ana.ws!, user: 'u000000000000' }, () => E.runClaude({ prompt: 'x', cwd: home, onEvent: () => {} }));
+  const r = E.runAs({ workspace: ana.ws!, user: 'u000000000000' }, () => E.runClaude({ prompt: 'x', cwd: home, allowedTools: [], onEvent: () => {} }));
   assert.match((await r.done).stderr, /Connect your Claude account/);
   assert.equal((await call(me, 'POST', '/api/connect/claude', {})).status, 403, "signing this machine's Claude in is for the install owner only");
   assert.equal((await call(me, 'DELETE', '/api/account/claude')).body.method, 'none');
