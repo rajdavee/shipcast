@@ -6,11 +6,13 @@ import { askFor } from '../auth-model.ts';
 import { useAccess } from '../session.ts';
 import { Members } from './Members.tsx';
 import { Skills } from './Skills.tsx';
+import { Website } from './Website.tsx';
 
 const NAMES: Record<string, string> = { render: 'Video renderer', stills: 'Image & PDF renderer', media: 'Voice, captions & music', qa: 'Quality checks' };
 
 const TABS: [SettingsTab, string][] = [
   ['connections', 'Connections'],
+  ['website', 'Website'],
   ['generation', 'Generation'],
   ['agents', 'Agents'],
   ['members', 'Members'],
@@ -31,7 +33,7 @@ export function Settings({ tab, status, onChange }: { tab: SettingsTab; status: 
         ))}
       </nav>
       <div className="tab-panel">
-        {tab === 'generation' ? <Generation /> : tab === 'agents' ? <AgentsSection /> : tab === 'members' ? <Members /> : tab === 'skills' ? (a.install ? <Skills /> : <MachineNote />) : <Connections status={status} onChange={onChange} />}
+        {tab === 'website' ? <Website /> : tab === 'generation' ? <Generation /> : tab === 'agents' ? <AgentsSection /> : tab === 'members' ? <Members /> : tab === 'skills' ? (a.install ? <Skills /> : <MachineNote />) : <Connections status={status} onChange={onChange} />}
       </div>
     </main>
   );
