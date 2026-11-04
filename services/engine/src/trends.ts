@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runClaude } from './claude.ts';
 import { loadPacks } from './packs.ts';
-import { home } from './paths.ts';
+import { home, rootHome } from './paths.ts';
 import { getSecret } from './voices.ts';
 
 /**
@@ -139,7 +139,7 @@ export async function collectSignals(f: Fetch = fetch, now = new Date()): Promis
 
 // ── cards ──────────────────────────────────────────────────────────────
 
-const dir = () => join(home(), 'trends');
+const dir = () => join(rootHome(), 'trends');
 const cardsFile = () => join(dir(), 'cards.json');
 
 export interface TrendFeed {

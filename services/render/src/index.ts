@@ -2,7 +2,7 @@ import { copyFile, mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { existsSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
-import { assertInHome, callService, contactSheet, createService, frameDetail, home, PRESETS, presetForSize, run, SERVICE_PORTS, npxRun, engineEnv, chatterboxReady, findBroll, getSecret, readSettings } from '@shipcast/engine';
+import { assertInHome, rootHome, callService, contactSheet, createService, frameDetail, home, PRESETS, presetForSize, run, SERVICE_PORTS, npxRun, engineEnv, chatterboxReady, findBroll, getSecret, readSettings } from '@shipcast/engine';
 import { SCENES } from './scenes.ts';
 import { CAPTION_STYLES } from './captions.ts';
 import { compileStoryboard, echoesVoice, validateStoryboard, type Storyboard } from './compile.ts';
@@ -19,7 +19,7 @@ async function cachedVoice(text: string, voice: string, speed: number, out: stri
   if (s.voiceProvider === 'chatterbox' && chatterboxReady() && !voice.startsWith('eleven:')) voice = 'chatterbox';
   else if (s.voiceProvider === 'elevenlabs' && s.elevenVoice && !voice.startsWith('eleven:') && (await getSecret('elevenlabs'))) voice = `eleven:${s.elevenVoice}:${s.elevenModel || 'eleven_multilingual_v2'}`;
   const key = createHash('sha256').update(JSON.stringify([text, voice, speed])).digest('hex').slice(0, 24);
-  const dir = join(home(), 'cache', 'voice');
+  const dir = join(rootHome(), 'cache', 'voice');
   const wav = join(dir, `${key}.wav`);
   const meta = join(dir, `${key}.json`);
   if (!existsSync(wav) || !existsSync(meta)) {

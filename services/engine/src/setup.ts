@@ -2,14 +2,14 @@ import { setupChatterbox } from './chatterbox.ts';
 import { existsSync } from 'node:fs';
 import { writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import { home } from './paths.ts';
+import { home, rootHome } from './paths.ts';
 import { run } from './exec.ts';
 
 /**
  * Optional local engines Shipcast can set up for you. Each installs into
  * ~/.shipcast or a tool's own cache — never into system Python or global npm.
  */
-export const voiceVenv = () => join(home(), 'voice');
+export const voiceVenv = () => join(rootHome(), 'voice');
 export const voicePython = () => join(voiceVenv(), process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
 
 /** Env for Claude runs so HyperFrames finds Shipcast-managed engines. */

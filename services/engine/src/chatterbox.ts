@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { createInterface } from 'node:readline';
 import { join } from 'node:path';
-import { home } from './paths.ts';
+import { home, rootHome } from './paths.ts';
 import { run, which } from './exec.ts';
 
 /**
@@ -13,7 +13,7 @@ import { run, which } from './exec.ts';
  * the model loaded; every voice line is a JSON request on its stdin.
  */
 
-export const chatterboxVenv = () => join(home(), 'chatterbox');
+export const chatterboxVenv = () => join(rootHome(), 'chatterbox');
 const py = () => join(chatterboxVenv(), process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
 const marker = () => join(chatterboxVenv(), '.shipcast-ready');
 

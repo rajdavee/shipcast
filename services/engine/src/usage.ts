@@ -1,7 +1,8 @@
 import { existsSync } from 'node:fs';
-import { readFile, rm, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
-import { home } from './paths.ts';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
+import { currentContext } from './context.ts';
+import { home, userDir } from './paths.ts';
 
 /**
  * Claude plan usage windows. When Claude Code reports its usage limit, every
@@ -10,7 +11,11 @@ import { home } from './paths.ts';
  * hours, so this is a pause, not a failure.
  */
 
-const file = () => join(home(), 'usage-pause.json');
+// Usage belongs to a Claude account, and each user brings their own.
+const file = () => {
+  const u = currentContext()?.user;
+  return u ? join(userDir(u), 'usage-pause.json') : join(home(), 'usage-pause.json');
+};
 
 /** When the limit resets (ms since epoch), or null if `text` isn't a usage-limit message. */
 export function parseUsageReset(text: string, now = Date.now()): number | null {
@@ -56,5 +61,6 @@ export async function usagePause(): Promise<{ until: number; reason: string } | 
 
 export async function setUsagePause(until: number, reason: string): Promise<void> {
   // A minute of slack after the reset so the first call doesn't bounce.
+  await mkdir(dirname(file()), { recursive: true });
   await writeFile(file(), JSON.stringify({ until: until + 60_000, reason: reason.slice(0, 300) }));
 }

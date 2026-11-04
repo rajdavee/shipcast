@@ -2,7 +2,7 @@ import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
-import { home } from './paths.ts';
+import { home, rootHome } from './paths.ts';
 
 /**
  * Download Google Fonts as local woff2 files and return @font-face CSS that
@@ -32,7 +32,7 @@ async function fetchCss(family: string): Promise<string | null> {
  *          and the families that resolved (others should fall back).
  */
 export async function localizeFonts(families: string[], destDir: string, urlPrefix = 'fonts'): Promise<{ css: string; families: string[] }> {
-  const cache = join(home(), 'fonts');
+  const cache = join(rootHome(), 'fonts');
   await mkdir(cache, { recursive: true });
   await mkdir(destDir, { recursive: true });
   let css = '';

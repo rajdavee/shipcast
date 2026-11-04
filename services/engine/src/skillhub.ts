@@ -2,7 +2,7 @@ import { cp, mkdir, mkdtemp, readFile, rm, writeFile, rename } from 'node:fs/pro
 import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { home, ROOT } from './paths.ts';
+import { home, rootHome, ROOT } from './paths.ts';
 import { run } from './exec.ts';
 
 /**
@@ -58,7 +58,7 @@ export const skillName = (p: HubPackage, path: string) => p.names?.[path] ?? (pa
 const SAFE = new Set(['MIT', 'Apache-2.0', 'BSD-2-Clause', 'BSD-3-Clause', 'ISC', 'CC0-1.0', 'Unlicense', '0BSD']);
 export const isPermissive = (licence: string) => SAFE.has(licence);
 
-const hubDir = () => join(home(), 'skills');
+const hubDir = () => join(rootHome(), 'skills');
 const storeDir = (id: string) => join(hubDir(), 'store', id);
 const stateFile = () => join(hubDir(), 'state.json');
 /** The generated plugin Claude loads (--plugin-dir). */

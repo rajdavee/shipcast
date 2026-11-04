@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
-import { home } from './paths.ts';
+import { home, rootHome } from './paths.ts';
 
 /**
  * Platform logos for infographics and cards, from Iconify's open sets
@@ -113,7 +113,7 @@ const ALIASES: Record<string, string> = {
   community: 'mdi:account-group-outline#5B6170',
 };
 
-const cacheDir = () => join(home(), 'icons');
+const cacheDir = () => join(rootHome(), 'icons');
 
 function candidates(name: string): string[] {
   const n = name.trim().toLowerCase();

@@ -3,7 +3,7 @@ import { mkdir, readFile, readdir, writeFile, rename } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, resolve, sep } from 'node:path';
 import { randomBytes } from 'node:crypto';
-import { home } from './paths.ts';
+import { home, rootHome } from './paths.ts';
 
 /**
  * Service kit: every capability service (render, stills, media, qa) is a tiny
@@ -61,7 +61,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 /** Files a service may read or write must live under the Shipcast data dir. */
 export function assertInHome(p: string, label = 'path'): string {
   const abs = resolve(p);
-  const root = resolve(home());
+  const root = resolve(rootHome());
   if (abs !== root && !abs.startsWith(root + sep)) throw new ServiceError(400, `${label} must be inside ${root}`);
   return abs;
 }
@@ -75,7 +75,7 @@ export class ServiceError extends Error {
 }
 
 export function createService(opts: ServiceOptions) {
-  const dataDir = join(home(), 'services', opts.name);
+  const dataDir = join(rootHome(), 'services', opts.name);
   const jobsDir = join(dataDir, 'jobs');
   const jobs = new Map<string, Job>();
   const waiters = new Map<string, Set<() => void>>();
