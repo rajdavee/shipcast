@@ -38,7 +38,8 @@ test('the first account owns the install and inherits the existing single-user d
   assert.ok(existsSync(join(root, 'skills')), 'machine-wide caches stay where they are');
   assert.equal(statSync(join(root, 'auth', 'users.json')).mode & 0o777, 0o600);
   assert.ok(!readFileSync(join(root, 'auth', 'users.json'), 'utf8').includes(PW));
-  await assert.rejects(signUp({ email: 'owner@example.com', password: PW }), /already exists/);
+  // Without an invite the answer doesn't reveal whether the email has an account.
+  await assert.rejects(signUp({ email: 'owner@example.com', password: PW }), /invite/);
 });
 
 test('later sign-ups need an invite unless the owner opens sign-up', async () => {

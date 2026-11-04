@@ -79,7 +79,7 @@ function credsSync(uid: string): ClaudeCreds {
     return {};
   }
 }
-function isInstallOwnerSync(uid: string): boolean {
+export function isInstallOwnerSync(uid: string): boolean {
   try {
     return !!(JSON.parse(readFileSync(join(rootHome(), 'auth', 'users.json'), 'utf8')) as { id: string; installOwner?: boolean }[]).find((u) => u.id === uid)?.installOwner;
   } catch {

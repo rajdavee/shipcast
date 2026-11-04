@@ -1,5 +1,7 @@
 import { existsSync } from 'node:fs';
 import { run, which } from './exec.ts';
+import { currentContext } from './context.ts';
+import { isInstallOwnerSync } from './claude-account.ts';
 
 export interface GithubStatus {
   installed: boolean;
@@ -58,9 +60,13 @@ export async function cloneRepo(repo: string, dest: string, ref?: string): Promi
   if (!REPO_RE.test(repo)) return { ok: false, message: `not a repo: ${repo}` };
   if (existsSync(dest)) return { ok: true, message: 'already cloned' };
   const gitArgs = ['--depth', '1', ...(ref && !/^\d+$/.test(ref) ? ['--branch', ref] : [])];
-  const gh = await githubStatus();
+  // The machine's GitHub sign-in belongs to the person who set the install up; anyone else gets public repos only,
+  // with every stored credential (gh, keychain helpers) switched off.
+  const uid = currentContext()?.user;
+  const mine = !uid || isInstallOwnerSync(uid);
+  const gh = mine ? await githubStatus() : { loggedIn: false };
   const r = gh.loggedIn
     ? await run('gh', ['repo', 'clone', repo, dest, '--', ...gitArgs], { timeoutMs: 300_000 })
-    : await run('git', ['clone', ...gitArgs, `https://github.com/${repo}.git`, dest], { timeoutMs: 300_000 });
+    : await run('git', ['-c', 'credential.helper=', 'clone', ...gitArgs, `https://github.com/${repo}.git`, dest], { timeoutMs: 300_000, ...(mine ? {} : { env: { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_ASKPASS: '/bin/false', GH_TOKEN: '', GITHUB_TOKEN: '' } }) });
   return { ok: r.code === 0, message: (r.stderr || r.stdout).trim().slice(-500) };
 }

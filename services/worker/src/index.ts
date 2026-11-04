@@ -1,4 +1,4 @@
-import { appendEvent, claimNext, recoverOrphans, runAs, runStep, updateStep, WORKER_ID, workContexts, type WorkContext } from '@shipcast/engine';
+import { appendEvent, claimNext, recoverOrphans, roleIn, runAs, runStep, updateStep, WORKER_ID, workContexts, type WorkContext } from '@shipcast/engine';
 
 export { workContexts };
 
@@ -42,8 +42,9 @@ export function startWorker({ intervalMs = 1500, log = console.log } = {}): Work
       const j = job;
       log(`[worker] ${ctx.workspace ? `${ctx.workspace}/` : ''}${j.campaign.id} → ${j.step.kind === 'brief' ? 'brief' : j.step.pack} (${j.step.id})`);
       currentJob = { campaign: j.campaign.id, step: j.step.id, ctx };
-      // A step runs as the person who queued it when known, else the workspace's owner.
-      current = runAs({ ...ctx, ...(j.step.by ? { user: j.step.by } : {}) }, () => runStep(j.campaign, j.step, { onSpawn: (k) => (killCurrent = k) }));
+      // A step runs as the person who queued it while they're still a member, else the workspace's owner.
+      const by = j.step.by && ctx.workspace && (await roleIn(j.step.by, ctx.workspace)) ? j.step.by : undefined;
+      current = runAs({ ...ctx, ...(by ? { user: by } : {}) }, () => runStep(j.campaign, j.step, { onSpawn: (k) => (killCurrent = k) }));
       await current;
       current = null;
       killCurrent = null;

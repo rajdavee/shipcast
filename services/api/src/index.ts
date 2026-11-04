@@ -8,6 +8,11 @@ import { homedir, tmpdir } from 'node:os';
 import { pipeline } from 'node:stream/promises';
 import {
   appendEvent,
+  sessionUser,
+  can,
+  roleIn,
+  isInstallOwnerSync,
+  rootHome,
   claudeConnection,
   currentContext,
   runAs,
@@ -155,7 +160,7 @@ import {
   type OAuthProvider,
 } from '@shipcast/engine';
 import { HttpError, json, readBody, readJson, Router, sendFile } from './http.ts';
-import { gate, registerAuthRoutes, type Caller } from './gate.ts';
+import { cookieToken, gate, registerAuthRoutes, type Caller } from './gate.ts';
 import { loginState, startClaudeLogin, startGithubLogin } from './connect.ts';
 
 const router = new Router();
@@ -188,6 +193,7 @@ async function mustCampaign(id: string): Promise<Campaign> {
 }
 
 async function packOptions(packId: string, given: Record<string, unknown> = {}): Promise<Record<string, string>> {
+  if (APP_PACKS.has(packId) && !callerIsInstallOwner()) throw new HttpError(403, "Running an app on this machine is for the person who set up this Shipcast.");
   const pack = await getPack(packId);
   if (!pack) throw new HttpError(400, `unknown pack ${packId}`);
   const opts = defaultOptions(pack);
@@ -202,6 +208,14 @@ async function packOptions(packId: string, given: Record<string, unknown> = {}):
   }
   return opts;
 }
+
+/** Whether the signed-in caller set this install up (no caller: a single-user install, which is its owner). */
+function callerIsInstallOwner(): boolean {
+  const uid = currentContext()?.user;
+  return !uid || isInstallOwnerSync(uid);
+}
+/** Packs that run the user's own app on this machine. */
+const APP_PACKS = new Set(['app-run', 'app-capture']);
 
 function validateSource(s: Partial<Source> | undefined): Source {
   if (!s?.type || !s.value?.trim()) throw new HttpError(400, 'source.type and source.value are required');
@@ -223,9 +237,14 @@ function validateSource(s: Partial<Source> | undefined): Source {
       return { type: 'github', value: repo, ref: s.ref?.trim() || undefined };
     }
     case 'local': {
+      // A folder on this machine: only the person who set the install up, and never Shipcast's own data.
+      if (!callerIsInstallOwner()) throw new HttpError(403, "Only the person who set up this Shipcast can use a folder on this machine as a source — use a URL, a public GitHub repo or a description.");
       const abs = resolve(value.replace(/^~(?=$|[\\/])/, homedir()));
       if (!existsSync(abs)) throw new HttpError(400, `folder not found: ${abs}`);
-      return { type: 'local', value: abs };
+      const real = realpathSync(abs);
+      const root = realpathSync(rootHome());
+      if (real === root || real.startsWith(root + sep) || root.startsWith(real + sep)) throw new HttpError(400, "Shipcast's own data folder can't be a source.");
+      return { type: 'local', value: real };
     }
     case 'text':
       return { type: 'text', value: value.slice(0, 20_000) };
@@ -241,6 +260,8 @@ router.get('/api/status', async () => {
   const uid = currentContext()?.user;
   const mine = uid ? await claudeConnection(uid) : null;
   const claude = !mine || mine.method === 'machine' ? machine : { ...machine, loggedIn: mine.connected, method: mine.method === 'token' ? 'Claude token' : 'Anthropic API key', account: undefined };
+  // The machine's own sign-ins (and their in-progress login links) are the install owner's business.
+  if (!callerIsInstallOwner()) return { claude: { ...claude, ...(mine?.method === 'none' ? { account: undefined } : {}) }, github: { installed: github.installed, loggedIn: false }, logins: {} };
   return { claude, github, logins: { claude: loginState('claude'), github: loginState('github') } };
 });
 router.get('/api/doctor', () => doctor());
@@ -277,7 +298,8 @@ router.post('/api/packs/:id/install', async (req, _res, p) => {
 router.get('/api/services', async () => {
   const names = Object.keys(SERVICE_PORTS) as (keyof typeof SERVICE_PORTS)[];
   const health = await Promise.all(names.map((n) => serviceHealth(n)));
-  return names.map((n, i) => ({ name: n, ok: !!health[i], ...(health[i] ?? {}) }));
+  // Up/down only: a service's own report can describe whichever workspace it last worked for.
+  return names.map((n, i) => ({ name: n, ok: !!health[i], ...(health[i] ? { version: (health[i] as { version?: string }).version } : {}) }));
 });
 
 const catalogs = new Map<string, { at: number; data: unknown }>();
@@ -710,7 +732,9 @@ router.post('/api/agents/:id/run', async (_q, _r, p) => {
 });
 
 // ── voice (optional: your own ElevenLabs key; Kokoro is the free default) ─
-let voiceList: { at: number; voices: unknown[] } | null = null;
+// Per workspace: each has its own ElevenLabs account (and cloned voices).
+const voiceLists = new Map<string, { at: number; voices: unknown[] }>();
+const wsKey = () => currentContext()?.workspace ?? '';
 router.get('/api/voice', async () => {
   const s = await readSettings();
   const connected = !!(await getSecret('elevenlabs'));
@@ -718,8 +742,9 @@ router.get('/api/voice', async () => {
   let error: string | undefined;
   if (connected) {
     try {
-      if (!voiceList || Date.now() - voiceList.at > 10 * 60_000) voiceList = { at: Date.now(), voices: await elevenVoices() };
-      voices = voiceList.voices;
+      const cached = voiceLists.get(wsKey());
+      if (!cached || Date.now() - cached.at > 10 * 60_000) voiceLists.set(wsKey(), { at: Date.now(), voices: await elevenVoices() });
+      voices = voiceLists.get(wsKey())!.voices;
     } catch (e) {
       error = (e as Error).message;
     }
@@ -738,7 +763,7 @@ router.put('/api/voice', async (req) => {
       throw new HttpError(400, (e as Error).message);
     }
     await setSecret('elevenlabs', key);
-    voiceList = { at: Date.now(), voices };
+    voiceLists.set(wsKey(), { at: Date.now(), voices });
     const s = await readSettings();
     await writeSettings({ voiceProvider: 'elevenlabs', elevenVoice: s.elevenVoice || voices[0]?.id || '' });
   }
@@ -752,7 +777,7 @@ router.put('/api/voice', async (req) => {
 });
 router.delete('/api/voice/elevenlabs', async () => {
   await setSecret('elevenlabs', null);
-  voiceList = null;
+  voiceLists.delete(wsKey());
   await writeSettings({ voiceProvider: 'kokoro' });
   return { provider: 'kokoro', connected: false };
 });
@@ -1040,12 +1065,15 @@ router.post('/api/campaigns/:id/steps/:step/answer', async (req, _r, p) => {
   }
   if (typeof b.note === 'string' && b.note.trim()) said.push(`Note from the user: ${b.note.trim().slice(0, 2000)}`);
   if (!said.length) throw new HttpError(400, 'answer at least one field');
+  // Secrets go into the project's env, which only admins manage.
+  if (Object.keys(env).length && !can(currentContext()?.role, 'manage')) throw new HttpError(403, 'This answer includes secrets — ask a workspace admin to provide them.');
   if (Object.keys(env).length) await writeCampaignEnv(p.id, env);
   return mutateStep(p.id, p.step, (s) => {
     s.status = 'queued';
     s.pendingNote = `[answer] Question: ${st.question!.text}\n${said.join('\n')}`;
     s.question = undefined;
     s.error = undefined;
+    s.by = currentContext()?.user ?? s.by;
   });
 });
 router.get('/api/campaigns/:id/env', async (_q, _r, p) => {
@@ -1068,6 +1096,8 @@ router.post('/api/campaigns/:id/steps/:step/revise', async (req, _r, p) => {
     s.pendingNote = String(note).slice(0, 4000);
     s.status = 'queued';
     s.error = undefined;
+    // A revision runs on the Claude of whoever asked for it, not of whoever made the piece first.
+    s.by = currentContext()?.user ?? s.by;
   });
   await appendEvent(p.id, { step: p.step, type: 'log', text: `Revision queued: ${note}` });
   return c;
@@ -1099,6 +1129,7 @@ router.post('/api/campaigns/:id/steps/:step/retry', async (_q, _r, p) =>
     s.status = 'queued';
     s.error = undefined;
     s.pendingNote = undefined;
+    s.by = currentContext()?.user ?? s.by;
     s.sessionId = undefined;
     s.autoRetries = undefined;
     s.notBefore = undefined;
@@ -1256,7 +1287,7 @@ async function readTakes(id: string, step: string): Promise<{ all: Take[]; save:
 }
 const rel = (id: string, f: string) => (f.startsWith(campaignDir(id)) ? f.slice(campaignDir(id).length + 1) : f);
 router.get('/api/campaigns/:id/steps/:step/takes', async (_q, _r, p) => {
-  await mustCampaign(p.id);
+  if (!(await mustCampaign(p.id)).steps.some((s) => s.id === p.step)) throw new HttpError(404, 'step not found');
   const { all } = await readTakes(p.id, p.step);
   return all.map((t) => ({ ...t, files: t.files.map((f) => rel(p.id, f)), posters: t.posters.map((f) => rel(p.id, f)) }));
 });
@@ -1316,7 +1347,14 @@ router.get('/api/campaigns/:id/events', async (req, res, p) => {
   let lastUpdated = '';
   let closed = false;
   req.on('close', () => (closed = true));
+  const who = currentContext();
+  let checked = Date.now();
   while (!closed) {
+    // Someone removed from the workspace stops receiving its live log within seconds.
+    if (who?.user && who.workspace && Date.now() - checked > 5000) {
+      checked = Date.now();
+      if (!(await roleIn(who.user, who.workspace))) break;
+    }
     const r = await readEvents(p.id, offset);
     offset = r.offset;
     for (const e of r.events) res.write(`event: log\ndata: ${JSON.stringify(e)}\n\n`);
@@ -1445,9 +1483,18 @@ export function createApp({ serveWeb = true } = {}): Server {
         if (!m) throw new HttpError(404, 'no such route');
         let ctx: WorkContext | undefined;
         if (url.pathname.startsWith('/oauth/')) {
-          // The provider's redirect carries no session of ours we can trust for the workspace; the state we issued does.
-          ctx = oauthOwners.get(url.searchParams.get('state') ?? '')?.ctx;
-          if (ctx) oauthOwners.delete(url.searchParams.get('state')!);
+          // The state we issued says which workspace and person started this; the browser finishing it must be
+          // that same person's session, so a link forwarded to someone else can't plant their account in yours.
+          const st = url.searchParams.get('state') ?? '';
+          const owner = oauthOwners.get(st)?.ctx;
+          const s = await sessionUser(cookieToken(req));
+          if (!owner || !s || s.user.id !== owner.user) {
+            res.writeHead(400, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
+            res.end(callbackPage('Not connected', 'This sign-in link is not valid here — start Connect again from Shipcast in this browser.'));
+            return;
+          }
+          oauthOwners.delete(st);
+          ctx = owner;
         } else {
           const caller = await gate(req, method, url.pathname);
           if (caller) {

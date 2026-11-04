@@ -3,6 +3,10 @@ import { createInterface } from 'node:readline';
 import { run } from './exec.ts';
 import { engineEnv } from './setup.ts';
 import { claudeEnv } from './claude-account.ts';
+import { sandboxed } from './sandbox.ts';
+import { currentContext } from './context.ts';
+import { home } from './paths.ts';
+import { mintRunToken } from './service.ts';
 
 export interface ClaudeAuth {
   installed: boolean;
@@ -149,16 +153,24 @@ export interface ClaudeRun {
 export function runClaude(o: RunOptions): ClaudeRun {
   const bin = process.env.SHIPCAST_CLAUDE_BIN ?? 'claude';
   // The person this run is for brings their own Claude; without one it never starts.
+  // ...and runs in a sandbox that only sees their own workspace unless they set the install up.
   let who: Record<string, string>;
+  let cmd: { bin: string; args: string[] };
   try {
     who = claudeEnv();
+    cmd = sandboxed(bin, buildArgs(o));
   } catch (e) {
     const child = spawn(process.execPath, ['-e', ''], { stdio: 'ignore' });
     return { child, kill: () => {}, done: Promise.resolve({ code: -1, stderr: (e as Error).message }) };
   }
-  const child = spawn(bin, buildArgs(o), {
+  // Its helper scripts reach the services with a token for this workspace — never the services' own key.
+  const ctx = currentContext();
+  const token = ctx?.workspace ? mintRunToken(ctx) : undefined;
+  const { SHIPCAST_INTERNAL_KEY: _key, ...parentEnv } = process.env;
+  void _key;
+  const child = spawn(cmd.bin, cmd.args, {
     cwd: o.cwd,
-    env: { ...process.env, ...engineEnv(), ...who, ...(o.env ?? {}) },
+    env: { ...parentEnv, ...engineEnv(), ...who, ...(token ? { SHIPCAST_RUN_TOKEN: token, SHIPCAST_WORKSPACE_HOME: home() } : {}), ...(o.env ?? {}) },
     stdio: ['ignore', 'pipe', 'pipe'],
     // Own process group, so stopping a run also stops the renders it started.
     detached: process.platform !== 'win32',

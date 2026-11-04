@@ -2,6 +2,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createServer } from 'node:net';
 import { join } from 'node:path';
+import { randomBytes } from 'node:crypto';
 import { doctor, ROOT, SERVICE_PORTS, serviceHealth, type ServiceName } from '@shipcast/engine';
 
 const [cmd = 'start', ...rest] = process.argv.slice(2);
@@ -11,6 +12,9 @@ const opt = (name: string) => {
   return i >= 0 ? rest[i + 1] : undefined;
 };
 const apiPort = Number(process.env.PORT ?? 4317);
+
+// Shared by the services this supervisor starts (never by Claude runs): only they may say which workspace a job is for.
+const INTERNAL_KEY = process.env.SHIPCAST_INTERNAL_KEY || randomBytes(32).toString('base64url');
 
 const SERVICES: Record<string, { entry: string; port?: number }> = {
   api: { entry: 'services/api/src/main.ts', port: apiPort },
@@ -78,7 +82,7 @@ async function supervise(names: string[]) {
     if (taken) return later(n, Math.min(attempt + 1, 6), `port ${ports[n]} is taken by another process`);
     if (stopping || children.has(n)) return;
     const c = spawn(process.execPath, [join(ROOT, SERVICES[n].entry)], {
-      env: { ...process.env, ...env, ...(ports[n] ? { PORT: String(ports[n]) } : {}) },
+      env: { ...process.env, ...env, SHIPCAST_INTERNAL_KEY: INTERNAL_KEY, ...(ports[n] ? { PORT: String(ports[n]) } : {}) },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     const tag = `\x1b[${COLORS[n]}m${n.padEnd(6)}\x1b[0m │ `;

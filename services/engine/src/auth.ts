@@ -83,6 +83,8 @@ async function read<T>(name: string, fallback: T): Promise<T> {
 }
 async function write(name: string, data: unknown) {
   await mkdir(dir(), { recursive: true, mode: 0o700 });
+  // The lock helper may have created it first with the default mode.
+  await chmod(dir(), 0o700).catch(() => {});
   const tmp = `${f(name)}.${process.pid}.${randomBytes(3).toString('hex')}.tmp`;
   await writeFile(tmp, JSON.stringify(data, null, 1) + '\n', { mode: 0o600 });
   await rename(tmp, f(name));
@@ -168,7 +170,9 @@ export const LEGACY_ENTRIES = ['campaigns', 'calendar', 'metrics', 'tone', 'less
 export async function migrateLegacy(wid: string): Promise<string[]> {
   const moved: string[] = [];
   const target = workspaceDir(wid);
-  await mkdir(target, { recursive: true });
+  await mkdir(target, { recursive: true, mode: 0o700 });
+  // Accounts on one machine share an OS user, but no other OS user should read anyone's workspace.
+  for (const d of [rootHome(), join(rootHome(), 'workspaces'), target]) await chmod(d, 0o700).catch(() => {});
   for (const e of LEGACY_ENTRIES) {
     const from = join(rootHome(), e);
     const to = join(target, e);
@@ -196,13 +200,14 @@ export function signUp(input: SignupInput): Promise<{ user: User; workspace: Wor
     const weak = passwordProblem(input.password, email);
     if (weak) throw new AuthError(400, weak);
     const users = await listUsers();
-    if (users.some((u) => u.email === email)) throw new AuthError(409, 'An account with that email already exists — sign in instead.');
     const first = users.length === 0;
     const invites = await read<Invite[]>('invites', []);
     const inv = input.invite ? invites.find((i) => i.hash === sha(input.invite!)) : undefined;
+    // The invite is checked first, so a stranger can't learn which emails have accounts.
     if (!first && !(await authConfig()).openSignup) {
       if (!inv) throw new AuthError(403, 'Sign-up needs an invite link from someone in a workspace.');
     }
+    if (users.some((u) => u.email === email)) throw new AuthError(409, 'An account with that email already exists — sign in instead.');
     if (inv) {
       const problem = inviteProblem(inv, email);
       if (problem) throw new AuthError(403, problem);
@@ -233,7 +238,11 @@ function tooMany(key: string, t = Date.now()): boolean {
   attempts.set(key, xs);
   return xs.length >= 10;
 }
-const failed = (key: string, t = Date.now()) => attempts.set(key, [...(attempts.get(key) ?? []), t]);
+const failed = (key: string, t = Date.now()) => {
+  // Bounded: old entries go first if someone sprays many emails or addresses.
+  if (attempts.size > 50_000) for (const k of [...attempts.keys()].slice(0, 10_000)) attempts.delete(k);
+  attempts.set(key, [...(attempts.get(key) ?? []), t]);
+};
 export const resetRateLimits = () => attempts.clear();
 
 export const SESSION_DAYS = 30;
@@ -242,13 +251,14 @@ export async function signIn(emailIn: string, password: string, meta: { ip?: str
   const email = normEmail(emailIn);
   const keys = [`e:${email}`, ...(meta.ip ? [`i:${meta.ip}`] : [])];
   if (keys.some((k) => tooMany(k))) throw new AuthError(429, 'Too many attempts — wait a few minutes and try again.');
+  // Count the try before the slow password check, so parallel guesses can't all slip under the limit.
+  keys.forEach((k) => failed(k));
   const user = (await listUsers()).find((u) => u.email === email);
   // Same work whether or not the account exists, so timing doesn't reveal which emails are registered.
   const ok = await verifyPassword(password, user?.passHash ?? 'scrypt$32768$8$1$AAAAAAAAAAAAAAAAAAAAAA==$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=');
-  if (!user || !ok) {
-    keys.forEach((k) => failed(k));
-    throw new AuthError(401, 'Email or password is wrong.');
-  }
+  if (!user || !ok) throw new AuthError(401, 'Email or password is wrong.');
+  // A good password clears this email's count (not the address's: one person shouldn't unlock a sprayer).
+  attempts.delete(`e:${email}`);
   return { token: await createSession(user.id, meta.agent), user };
 }
 
@@ -338,7 +348,7 @@ export function createWorkspace(uid: string, name: string): Promise<Workspace> {
   return locked(async () => {
     const w: Workspace = { id: id('w'), name: String(name ?? '').trim().slice(0, 80) || 'Team workspace', createdAt: now(), members: [{ user: uid, role: 'owner', addedAt: now() }] };
     await write('workspaces', [...(await listWorkspaces()), w]);
-    await mkdir(workspaceDir(w.id), { recursive: true });
+    await mkdir(workspaceDir(w.id), { recursive: true, mode: 0o700 });
     return w;
   });
 }
@@ -406,6 +416,12 @@ export const INVITE_DAYS = 7;
 export function createInvite(wid: string, role: Invite['role'], by: string, email?: string): Promise<{ token: string; invite: Omit<Invite, 'hash'> }> {
   return locked(async () => {
     if (!['admin', 'editor', 'viewer'].includes(role)) throw new AuthError(400, 'Invite as admin, editor or viewer.');
+    const w = (await listWorkspaces()).find((x) => x.id === wid);
+    if (!w) throw new AuthError(404, 'Workspace not found.');
+    if (w.personalOf) throw new AuthError(409, 'Personal workspaces are just yours — create a team workspace to invite people.');
+    // Nobody hands out more than they have: admins invite editors and viewers; owners may invite admins.
+    const mine = w.members.find((m) => m.user === by)?.role;
+    if (!mine || (ROLE_RANK[role] >= ROLE_RANK[mine] && mine !== 'owner')) throw new AuthError(403, 'You can only invite people to a role below your own.');
     const token = randomBytes(24).toString('base64url');
     const inv: Invite = { hash: sha(token), workspace: wid, role, ...(email ? { email: normEmail(email) } : {}), by, createdAt: now(), expiresAt: new Date(Date.now() + INVITE_DAYS * 86_400_000).toISOString() };
     await write('invites', [...(await read<Invite[]>('invites', [])), inv]);

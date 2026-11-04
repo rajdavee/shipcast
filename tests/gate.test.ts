@@ -159,7 +159,7 @@ test("each person's Claude: their own credential, isolated config, never someone
   const { statSync } = await import('node:fs');
   assert.equal(statSync(join(home, 'users', benU.id, 'claude.json')).mode & 0o777, 0o600);
   // A run that would use nobody's Claude never starts.
-  const r = E.runAs({ workspace: ana.ws!, user: 'u000000000000' }, () => E.runClaude({ prompt: 'x', cwd: home, onEvent: () => {} } as any));
+  const r = E.runAs({ workspace: ana.ws!, user: 'u000000000000' }, () => E.runClaude({ prompt: 'x', cwd: home, allowedTools: [], onEvent: () => {} } as any));
   assert.match((await r.done).stderr, /Connect your Claude account/);
   assert.equal((await call(me, 'POST', '/api/connect/claude', {})).status, 403, "signing this machine's Claude in is for the install owner only");
   assert.equal((await call(me, 'DELETE', '/api/account/claude')).body.method, 'none');
@@ -176,4 +176,96 @@ test('review fixes: no path escapes through ids or file names, no secrets throug
   writeFileSync(join(home, 'workspaces', ana.ws!, 'campaigns', anaProject, '.env.local'), 'X=1');
   assert.equal((await call(me, 'GET', `/api/campaigns/${anaProject}/files/secrets.env`)).status, 403);
   assert.equal((await call(me, 'GET', `/api/campaigns/${anaProject}/files/.env.local`)).status, 403);
+});
+
+test('other people\'s runs are sandboxed to their own workspace (macOS sandbox-exec)', { skip: process.platform !== 'darwin' && 'macOS only here' }, async () => {
+  const E = await import('@shipcast/engine');
+  const { writeFileSync, mkdirSync, realpathSync } = await import('node:fs');
+  const users = await E.listUsers();
+  const benU = users.find((u) => u.email === 'ben@test.dev')!;
+  const anaU = users.find((u) => u.email === 'ana@test.dev')!;
+  const benWs = (await E.workspacesFor(benU.id)).find((w) => w.personalOf === benU.id)!.id;
+  await E.saveClaudeCredential(benU.id, 'sk-ant-oat01-' + 'y'.repeat(40));
+  mkdirSync(join(home, 'workspaces', benWs), { recursive: true });
+  writeFileSync(join(home, 'workspaces', benWs, 'mine.txt'), 'MINE');
+  // A stand-in for the CLI that tries to read what it shouldn't and reports to stderr.
+  const probe = join(mkdtempSync(join(tmpdir(), 'probe-')), 'probe.mjs');
+  writeFileSync(probe, `#!/usr/bin/env node
+import { readFileSync } from 'node:fs';
+const r = (p) => { try { return readFileSync(p, 'utf8').slice(0, 20); } catch (e) { return 'DENIED'; } };
+process.stderr.write(JSON.stringify({ own: r(${JSON.stringify(join(realpathSync(home), 'workspaces', benWs, 'mine.txt'))}), accounts: r(${JSON.stringify(join(realpathSync(home), 'auth', 'users.json'))}), other: r(${JSON.stringify(join(realpathSync(home), 'workspaces', ana.ws!, 'secrets.json'))}), anaClaude: r(${JSON.stringify(join(realpathSync(home), 'users', anaU.id, 'claude.json'))}) }));
+`);
+  const { chmodSync } = await import('node:fs');
+  chmodSync(probe, 0o755);
+  const prev = process.env.SHIPCAST_CLAUDE_BIN;
+  process.env.SHIPCAST_CLAUDE_BIN = probe;
+  try {
+    writeFileSync(join(home, 'workspaces', ana.ws!, 'secrets.json'), '{"fal":"ANA"}');
+    const r = E.runAs({ workspace: benWs, user: benU.id }, () => E.runClaude({ prompt: 'x', cwd: join(home, 'workspaces', benWs), allowedTools: [], onEvent: () => {} } as any));
+    const out = (await r.done).stderr;
+    const seen = JSON.parse(out);
+    assert.deepEqual(seen, { own: 'MINE', accounts: 'DENIED', other: 'DENIED', anaClaude: 'DENIED' });
+    // The person who set the install up is not sandboxed.
+    const o = E.runAs({ workspace: ana.ws!, user: anaU.id }, () => E.runClaude({ prompt: 'x', cwd: home, allowedTools: [], onEvent: () => {} } as any));
+    assert.notEqual(JSON.parse((await o.done).stderr).accounts, 'DENIED');
+  } finally {
+    if (prev === undefined) delete process.env.SHIPCAST_CLAUDE_BIN;
+    else process.env.SHIPCAST_CLAUDE_BIN = prev;
+  }
+});
+
+test('review fixes: non-owners get no local folders, app runs, machine GitHub or owner details; invites and roles stay capped', async () => {
+  const E = await import('@shipcast/engine');
+  const s = await call(null, 'POST', '/api/auth/signin', { email: 'ben@test.dev', password: 'another long password' });
+  const acct = await call({ cookie: s.cookie }, 'GET', '/api/account');
+  const benWs = acct.body.workspaces.find((w: any) => w.personal).id;
+  const me = { cookie: s.cookie, ws: benWs };
+  assert.equal((await call(me, 'POST', '/api/campaigns', { source: { type: 'local', value: home }, deliverables: [{ pack: 'carousel' }] })).status, 403);
+  assert.equal((await call(me, 'POST', '/api/campaigns', { source: { type: 'url', value: 'https://b.test' }, deliverables: [{ pack: 'app-run' }] })).status, 403);
+  assert.equal((await call(me, 'GET', '/api/github/repos')).status, 403);
+  const st = (await call(me, 'GET', '/api/status')).body;
+  assert.deepEqual(st.logins, {});
+  assert.equal(st.github.loggedIn, false);
+  // Even the install owner can't make Shipcast's own data a source.
+  const a = await call(null, 'POST', '/api/auth/signin', { email: 'ana@test.dev', password: PW });
+  assert.equal((await call({ cookie: a.cookie, ws: ana.ws }, 'POST', '/api/campaigns', { source: { type: 'local', value: home }, deliverables: [{ pack: 'carousel' }] })).status, 400);
+  // Invites: none to personal workspaces; nobody invites at or above their own role (owners may invite admins).
+  assert.equal((await call({ cookie: a.cookie, ws: ana.ws }, 'POST', `/api/workspaces/${ana.ws}/invites`, { role: 'viewer' })).status, 409);
+  const team = (await call({ cookie: a.cookie }, 'POST', '/api/workspaces', { name: 'Two' })).body.id;
+  assert.equal((await call({ cookie: a.cookie }, 'POST', `/api/workspaces/${team}/invites`, { role: 'admin' })).status, 200);
+});
+
+test('review fixes: services take a workspace only from Shipcast itself or a run token; renders read only your files', async () => {
+  const E = await import('@shipcast/engine');
+  const { writeFileSync, mkdirSync } = await import('node:fs');
+  const benU = (await E.listUsers()).find((u) => u.email === 'ben@test.dev')!;
+  const benWs = (await E.workspacesFor(benU.id)).find((w) => w.personalOf === benU.id)!.id;
+  mkdirSync(join(home, 'workspaces', benWs), { recursive: true });
+  writeFileSync(join(home, 'workspaces', benWs, 'pic.png'), 'x');
+  writeFileSync(join(home, 'workspaces', ana.ws!, 'secret.png'), 'x');
+  E.runAs({ workspace: benWs, user: benU.id }, () => {
+    assert.equal(E.readableAsset(join(home, 'workspaces', benWs, 'pic.png')), true);
+    assert.equal(E.readableAsset(join(home, 'workspaces', ana.ws!, 'secret.png')), false, "another workspace's file");
+    assert.equal(E.readableAsset(join(home, 'auth', 'users.json')), false);
+    assert.equal(E.readableAsset(join(process.cwd(), 'docs', 'assets', 'mark.svg')), true, "Shipcast's own files");
+    assert.throws(() => E.assertInHome(join(home, 'workspaces', ana.ws!, 'out')), /must be inside/);
+  });
+  // A run token stands for exactly its workspace and person.
+  const tok = E.runAs({ workspace: benWs, user: benU.id }, () => E.mintRunToken({ workspace: benWs, user: benU.id }))!;
+  assert.deepEqual(await E.resolveRunToken(tok), { workspace: benWs, user: benU.id });
+  assert.equal(await E.resolveRunToken('forged-token-value'), null);
+  // Through the API, a run token acts as that person in that workspace, and can't reach account routes.
+  assert.equal((await call(null, 'GET', '/api/calendar/posts', undefined, { 'x-shipcast-run': tok })).status, 200);
+  assert.equal((await call(null, 'GET', '/api/account', undefined, { 'x-shipcast-run': tok })).status, 403);
+  assert.equal((await call(null, 'GET', '/api/calendar/posts', undefined, { 'x-shipcast-run': 'forged-token-value' })).status, 401);
+});
+
+test('review fixes: parallel wrong passwords still hit the limit; a spoofed forwarded address does not reset it', async () => {
+  const { resetRateLimits } = await import('@shipcast/engine');
+  resetRateLimits();
+  const tries = await Promise.all(Array.from({ length: 30 }, () => call(null, 'POST', '/api/auth/signin', { email: 'ana@test.dev', password: 'nope nope nope' })));
+  assert.ok(tries.some((r) => r.status === 429), 'some of 30 parallel guesses are refused');
+  const spoof = await call(null, 'POST', '/api/auth/signin', { email: 'zed@test.dev', password: 'nope nope nope' }, { 'x-forwarded-for': '203.0.113.9' });
+  assert.equal(spoof.status, 429, 'the real address is still over the limit');
+  resetRateLimits();
 });

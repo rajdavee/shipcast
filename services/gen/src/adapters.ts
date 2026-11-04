@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFile, stat, writeFile, mkdir } from 'node:fs/promises';
 import { basename, dirname, extname } from 'node:path';
-import { run } from '@shipcast/engine';
+import { currentContext, internalHeaders, run } from '@shipcast/engine';
 import type { ModelInfo } from './registry.ts';
 
 /**
@@ -114,7 +114,7 @@ export function fakeAdapter(workDir: string): Adapter {
       let drawn = false;
       try {
         const base = process.env.SHIPCAST_STILLS_URL ?? 'http://127.0.0.1:4321';
-        const r = await fetch(`${base}/run`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'html', input: { file: card, out: png, width: w, height: h } }), signal: AbortSignal.timeout(60_000) });
+        const r = await fetch(`${base}/run`, { method: 'POST', headers: { 'content-type': 'application/json', ...internalHeaders() }, body: JSON.stringify({ kind: 'html', input: { file: card, out: png, width: w, height: h }, ...(currentContext()?.workspace ? { ctx: { workspace: currentContext()!.workspace } } : {}) }), signal: AbortSignal.timeout(60_000) });
         drawn = r.ok && ((await r.json()) as { status?: string }).status === 'done';
       } catch {}
       if (!drawn) {

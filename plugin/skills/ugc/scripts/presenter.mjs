@@ -27,7 +27,7 @@ const clips = resolve('work/clips');
 const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'presenter';
 
 async function job(base, kind, input) {
-  const r = await fetch(`${base}/run`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind, input }) }).catch(() => null);
+  const r = await fetch(`${base}/run`, { method: 'POST', headers: { 'content-type': 'application/json', ...(process.env.SHIPCAST_RUN_TOKEN ? { 'x-shipcast-run': process.env.SHIPCAST_RUN_TOKEN } : {}) }, body: JSON.stringify({ kind, input }) }).catch(() => null);
   if (!r) die(`The ${base.includes('4324') ? 'gen' : 'media'} service isn't running (shipcast start).`);
   const j = await r.json();
   if (j.status !== 'done') die(j.error || `${kind} failed`, /cap/i.test(j.error || '') ? 5 : 1);
@@ -55,7 +55,7 @@ async function portrait() {
 
 async function voiceId() {
   // Same voice as the rest of the video: the one chosen in Setup → Voiceover.
-  const v = await fetch(`${API}/api/voice`).then((r) => r.json()).catch(() => null);
+  const v = await fetch(`${API}/api/voice`, { headers: process.env.SHIPCAST_RUN_TOKEN ? { 'x-shipcast-run': process.env.SHIPCAST_RUN_TOKEN } : {} }).then((r) => r.json()).catch(() => null);
   if (v?.provider === 'elevenlabs' && v.connected && v.voice) return `eleven:${v.voice}:${v.model || 'eleven_multilingual_v2'}`;
   return String(flags.voice || 'af_heart');
 }
@@ -86,5 +86,5 @@ async function say() {
 
 if (pos[0] === 'portrait') await portrait();
 else if (pos[0] === 'say') await say();
-else if (pos[0] === 'status') console.log(JSON.stringify(await fetch(`${GEN}/run`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'spend', input: { key: campaign } }) }).then((r) => r.json()).then((j) => j.output).catch(() => ({ error: 'gen service not running' }))));
+else if (pos[0] === 'status') console.log(JSON.stringify(await fetch(`${GEN}/run`, { method: 'POST', headers: { 'content-type': 'application/json', ...(process.env.SHIPCAST_RUN_TOKEN ? { 'x-shipcast-run': process.env.SHIPCAST_RUN_TOKEN } : {}) }, body: JSON.stringify({ kind: 'spend', input: { key: campaign } }) }).then((r) => r.json()).then((j) => j.output).catch(() => ({ error: 'gen service not running' }))));
 else die('usage: presenter.mjs portrait|say|status …', 64);

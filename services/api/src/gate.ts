@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { acceptInvite, AuthError, claudeConnection, forgetClaudeCredential, saveClaudeCredential, authConfig, can, changePassword, createInvite, createWorkspace, deleteWorkspace, getUser, hasUsers, inviteInfo, invitesFor, listUsers, publicUser, removeMember, renameWorkspace, revokeInvite, roleIn, sessionsOf, sessionUser, setLastWorkspace, setMemberRole, setOpenSignup, signIn, signOut, signOutAll, signUp, workspacesFor, type Action, type Role, type User } from '@shipcast/engine';
+import { acceptInvite, AuthError, resolveRunToken, claudeConnection, forgetClaudeCredential, saveClaudeCredential, authConfig, can, changePassword, createInvite, createWorkspace, deleteWorkspace, getUser, hasUsers, inviteInfo, invitesFor, listUsers, publicUser, removeMember, renameWorkspace, revokeInvite, roleIn, sessionsOf, sessionUser, setLastWorkspace, setMemberRole, setOpenSignup, signIn, signOut, signOutAll, signUp, workspacesFor, type Action, type Role, type User } from '@shipcast/engine';
 import { HttpError, readJson, type Router } from './http.ts';
 
 /**
@@ -45,6 +45,10 @@ const INSTALL_OWNER: [string, RegExp][] = [
   ['*', /^\/api\/skills(\/|$)/],
   ['POST', /^\/api\/connect\/(github|claude)$/],
   ['POST', /^\/api\/campaigns\/[^/]+\/reveal$/],
+  // Running a project's app executes its code on this machine.
+  ['POST', /^\/api\/campaigns\/[^/]+\/app\/(start|stop|unlock)$/],
+  // The machine's GitHub sign-in sees the owner's private repos.
+  ['GET', /^\/api\/github\//],
 ];
 /** Connections, keys, publishing and workspace settings: admins and owners. */
 const MANAGE: [string, RegExp][] = [
@@ -60,7 +64,8 @@ const hit = (list: [string, RegExp][], method: string, path: string) => list.som
 
 /** What a request needs: reads need read; writes need write; the lists above need more. */
 export function levelFor(method: string, path: string): Action | 'install' {
-  if (hit(INSTALL_OWNER, method, path)) return method === 'GET' ? 'read' : 'install';
+  // A '*' entry lets everyone read (e.g. the skills list); an explicit GET entry is owner-only even to read.
+  if (hit(INSTALL_OWNER, method, path)) return method === 'GET' && !INSTALL_OWNER.some(([m, re]) => m === 'GET' && re.test(path)) ? 'read' : 'install';
   if (hit(MANAGE, method, path)) return 'manage';
   return method === 'GET' || method === 'HEAD' ? 'read' : 'write';
 }
@@ -78,6 +83,17 @@ export interface Caller {
  */
 export async function gate(req: IncomingMessage, method: string, path: string): Promise<Caller | null> {
   if (PUBLIC.some(([m, re]) => m === method && re.test(path))) return null;
+  // A Claude run's helper scripts call with the run's token: they act as that person, in that workspace, with their current role.
+  const run = String(req.headers['x-shipcast-run'] ?? '');
+  if (run) {
+    const t = await resolveRunToken(run);
+    const user = t?.user ? await getUser(t.user) : undefined;
+    const role = t?.workspace && user ? await roleIn(user.id, t.workspace) : null;
+    if (!t?.workspace || !user || !role) throw new HttpError(401, 'run token not valid');
+    const level = levelFor(method, path);
+    if (level === 'install' || PERSONAL.test(path) || !can(role, level)) throw new HttpError(403, 'not allowed from a run');
+    return { user, token: '', workspace: t.workspace, role };
+  }
   if (method !== 'GET' && method !== 'HEAD' && !req.headers['x-shipcast']) throw new HttpError(403, 'missing request header');
   const token = cookieToken(req);
   const s = await sessionUser(token);
@@ -102,7 +118,8 @@ const authErr = (e: unknown): never => {
 
 /** Sign-up, sign-in, the account itself, and managing workspaces and members. */
 export function registerAuthRoutes(router: Router, callerOf: (req: IncomingMessage) => Caller) {
-  const meta = (req: IncomingMessage) => ({ ip: String(req.headers['x-forwarded-for'] ?? req.socket.remoteAddress ?? '').split(',')[0].trim(), agent: String(req.headers['user-agent'] ?? '') });
+  // x-forwarded-for is whatever the client says unless a proxy we trust sets it.
+  const meta = (req: IncomingMessage) => ({ ip: String((process.env.SHIPCAST_TRUST_PROXY === '1' && req.headers['x-forwarded-for']) || req.socket.remoteAddress || '').split(',')[0].trim(), agent: String(req.headers['user-agent'] ?? '') });
 
   router.get('/api/auth/status', async (req) => {
     const s = await sessionUser(cookieToken(req));

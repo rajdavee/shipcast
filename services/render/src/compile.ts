@@ -2,7 +2,7 @@ import { copyFile, mkdir, writeFile } from 'node:fs/promises';
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, extname, join } from 'node:path';
 import { createHash } from 'node:crypto';
-import { brandCss, getPreset, loadBrand, localizeFonts, normalizeBrand, probe, resolveIcons, run, type BrandKit, type PlatformPreset } from '@shipcast/engine';
+import { brandCss, getPreset, readableAsset, loadBrand, localizeFonts, normalizeBrand, probe, resolveIcons, run, type BrandKit, type PlatformPreset } from '@shipcast/engine';
 import { getScene, type SceneCtx } from './scenes.ts';
 import { parseSteps } from './scenes-explainer.ts';
 import { MOODS, type Mood } from '@shipcast/media';
@@ -153,7 +153,8 @@ export async function compileStoryboard(story: Storyboard, opts: { dir: string; 
   const copied = new Map<string, string>();
   const asset = (src: string): string => {
     if (copied.has(src)) return copied.get(src)!;
-    if (!existsSync(src)) return '';
+    // A spec can name any path; only files this workspace may read are copied into the project.
+    if (!existsSync(src) || !readableAsset(src)) return '';
     const name = `${createHash('sha1').update(src).digest('hex').slice(0, 8)}-${basename(src).replace(/[^\w.-]/g, '_')}`;
     copied.set(src, `assets/${name}`);
     pendingCopies.push(copyFile(src, join(dir, 'assets', name)));

@@ -11,7 +11,8 @@ import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-const home = process.env.SHIPCAST_HOME || join(homedir(), '.shipcast');
+// Inside a run, this workspace's own folder (its keys); otherwise the install as before.
+const home = process.env.SHIPCAST_WORKSPACE_HOME || process.env.SHIPCAST_HOME || join(homedir(), '.shipcast');
 const secrets = (() => { try { return JSON.parse(readFileSync(join(home, 'secrets.json'), 'utf8')); } catch { return {}; } })();
 const key = (n) => process.env[`SHIPCAST_${n.toUpperCase()}_KEY`] || secrets[n] || '';
 const argv = process.argv.slice(2);

@@ -1,9 +1,10 @@
 import { createServer, type IncomingMessage, type ServerResponse, type Server } from 'node:http';
 import { mkdir, readFile, readdir, writeFile, rename } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { join, resolve, sep } from 'node:path';
-import { randomBytes } from 'node:crypto';
-import { home, rootHome } from './paths.ts';
+import { createHash, randomBytes } from 'node:crypto';
+import { home, ROOT, rootHome } from './paths.ts';
+import { currentContext, isId, runAs, type WorkContext } from './context.ts';
 
 /**
  * Service kit: every capability service (render, stills, media, qa) is a tiny
@@ -25,6 +26,8 @@ export type JobStatus = 'queued' | 'running' | 'done' | 'failed';
 export interface Job<I = unknown, O = unknown> {
   id: string;
   kind: string;
+  /** The workspace (and person) the job is for; the handler runs inside it. */
+  ctx?: WorkContext;
   status: JobStatus;
   input: I;
   output?: O;
@@ -61,7 +64,8 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 /** Files a service may read or write must live under the Shipcast data dir. */
 export function assertInHome(p: string, label = 'path'): string {
   const abs = resolve(p);
-  const root = resolve(rootHome());
+  // Inside a workspace's job, its own folder; otherwise the install.
+  const root = resolve(home());
   if (abs !== root && !abs.startsWith(root + sep)) throw new ServiceError(400, `${label} must be inside ${root}`);
   return abs;
 }
@@ -141,7 +145,7 @@ export function createService(opts: ServiceOptions) {
       },
     };
     try {
-      job.output = await handler(job.input, ctx);
+      job.output = await (job.ctx ? runAs(job.ctx, () => handler(job.input, ctx)) : handler(job.input, ctx));
       job.status = 'done';
       job.progress = 1;
     } catch (e) {
@@ -154,9 +158,9 @@ export function createService(opts: ServiceOptions) {
     notify(job.id);
   }
 
-  async function submit(kind: string, input: unknown): Promise<Job> {
+  async function submit(kind: string, input: unknown, ctx?: WorkContext): Promise<Job> {
     if (!Object.hasOwn(opts.handlers, kind)) throw new ServiceError(400, `unknown kind "${kind}" (have: ${Object.keys(opts.handlers).join(', ')})`);
-    const job: Job = { id: `${opts.name}-${Date.now().toString(36)}-${randomBytes(3).toString('hex')}`, kind, status: 'queued', input, createdAt: new Date().toISOString() };
+    const job: Job = { id: `${opts.name}-${Date.now().toString(36)}-${randomBytes(3).toString('hex')}`, kind, status: 'queued', input, createdAt: new Date().toISOString(), ...(ctx?.workspace ? { ctx } : {}) };
     jobs.set(job.id, job);
     await persist(job);
     pump();
@@ -210,7 +214,7 @@ export function createService(opts: ServiceOptions) {
       }
       if (req.method === 'POST' && (url.pathname === '/jobs' || url.pathname === '/run')) {
         const b = await body(req);
-        const job = await submit(String(b.kind ?? ''), b.input ?? {});
+        const job = await submit(String(b.kind ?? ''), b.input ?? {}, await callerContext(req, b.ctx));
         if (url.pathname === '/run') {
           while (job.status === 'queued' || job.status === 'running') await wait(job.id, 55_000);
         }
@@ -270,7 +274,9 @@ async function fetchRetry(url: string, init: RequestInit | undefined, forMs: num
 export async function callService<O = any>(name: ServiceName, kind: string, input: unknown, { timeoutMs = 3_600_000 } = {}): Promise<O> {
   const base = serviceUrl(name);
   // Jobs are persisted and resumed by the service, so a restart mid-call is survivable.
-  const res = await fetchRetry(`${base}/jobs`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind, input }) }, 90_000).catch(() => {
+  const cur = currentContext();
+  const ctx = cur?.workspace ? { workspace: cur.workspace, ...(cur.user ? { user: cur.user } : {}) } : undefined;
+  const res = await fetchRetry(`${base}/jobs`, { method: 'POST', headers: { 'content-type': 'application/json', ...internalHeaders() }, body: JSON.stringify({ kind, input, ...(ctx ? { ctx } : {}) }) }, 90_000).catch(() => {
     throw new Error(`The ${name} service isn't reachable at ${base}. Start it with \`shipcast start\` or \`npm run service:${name}\`.`);
   });
   let job = (await res.json()) as Job<unknown, O> & { error?: string };
@@ -294,3 +300,82 @@ export async function serviceHealth(name: ServiceName): Promise<Record<string, u
 }
 
 export { sleep };
+
+// ── who a service job is for ───────────────────────────────────────────
+
+/**
+ * Shipcast's own processes share a key the supervisor makes at start (Claude runs never get it); a Claude run's
+ * helper scripts instead carry a one-run token. A job's workspace is taken only from one of those — anything
+ * else on this machine calling a service can't pick someone's workspace (or reach the root once a key is set).
+ */
+export const internalHeaders = (): Record<string, string> => (process.env.SHIPCAST_INTERNAL_KEY ? { 'x-shipcast-internal': process.env.SHIPCAST_INTERNAL_KEY } : {});
+
+const runTokensFile = () => join(rootHome(), 'auth', 'run-tokens.json');
+type RunTokens = Record<string, { workspace: string; user?: string; expires: number }>;
+
+/** A token for one Claude run: its scripts can use the services as this workspace, for a few hours. */
+export function mintRunToken(ctx: WorkContext, hours = 6): string | undefined {
+  if (!ctx.workspace) return undefined;
+  const token = randomBytes(24).toString('base64url');
+  let all: RunTokens = {};
+  try {
+    all = JSON.parse(readFileSync(runTokensFile(), 'utf8'));
+  } catch {}
+  const now = Date.now();
+  for (const [k, v] of Object.entries(all)) if (v.expires < now) delete all[k];
+  all[createHash('sha256').update(token).digest('hex')] = { workspace: ctx.workspace, ...(ctx.user ? { user: ctx.user } : {}), expires: now + hours * 3_600_000 };
+  mkdirSync(join(rootHome(), 'auth'), { recursive: true, mode: 0o700 });
+  writeFileSync(runTokensFile(), JSON.stringify(all), { mode: 0o600 });
+  return token;
+}
+
+async function callerContext(req: IncomingMessage, asked: unknown): Promise<WorkContext | undefined> {
+  const key = process.env.SHIPCAST_INTERNAL_KEY;
+  const run = String(req.headers['x-shipcast-run'] ?? '');
+  if (run) {
+    const t = await resolveRunToken(run);
+    if (!t) throw new ServiceError(403, 'run token not valid');
+    return t;
+  }
+  const trusted = !key || req.headers['x-shipcast-internal'] === key;
+  if (!trusted) throw new ServiceError(403, 'not allowed');
+  const c = asked as WorkContext | undefined;
+  if (c?.workspace && isId(c.workspace) && (!c.user || isId(c.user))) return { workspace: c.workspace, ...(c.user ? { user: c.user } : {}) };
+  return undefined;
+}
+
+/** The workspace and person a run token stands for, or null. */
+export async function resolveRunToken(token: string): Promise<WorkContext | null> {
+  let all: RunTokens = {};
+  try {
+    all = JSON.parse(await readFile(runTokensFile(), 'utf8'));
+  } catch {}
+  const t = all[createHash('sha256').update(String(token)).digest('hex')];
+  if (!t || t.expires < Date.now()) return null;
+  return { workspace: t.workspace, ...(t.user ? { user: t.user } : {}) };
+}
+
+/** Install-wide folders any workspace's renders may read (fonts, icons, skills, caches). */
+const SHARED_READ = ['fonts', 'icons', 'skills', 'cache', 'trends'];
+
+/**
+ * Whether a render may read this file: inside the current workspace (the whole install outside a
+ * workspace), Shipcast's own app files, or the shared read-only folders. Symlinks are resolved first.
+ */
+export function readableAsset(p: string): boolean {
+  let real: string;
+  try {
+    real = realpathSync(resolve(p));
+  } catch {
+    return false;
+  }
+  const under = (dir: string) => {
+    try {
+      const d = realpathSync(dir);
+      return real === d || real.startsWith(d + sep);
+    } catch {
+      return false;
+    }
+  };
+  return under(home()) || under(ROOT) || SHARED_READ.some((d) => under(join(rootHome(), d)));
+}

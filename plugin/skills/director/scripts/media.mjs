@@ -17,7 +17,8 @@ import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { extname, join, resolve } from 'node:path';
 
-const home = process.env.SHIPCAST_HOME || join(homedir(), '.shipcast');
+// Inside a run, this workspace's own folder (its keys); otherwise the install as before.
+const home = process.env.SHIPCAST_WORKSPACE_HOME || process.env.SHIPCAST_HOME || join(homedir(), '.shipcast');
 const secrets = (() => {
   try {
     return JSON.parse(readFileSync(join(home, 'secrets.json'), 'utf8'));
@@ -269,7 +270,7 @@ async function genViaService(kind, prompt) {
     budgetKey: campaign ?? 'adhoc',
     out: join(out, `gen-${kind}-${slug(prompt)}-${Date.now().toString(36)}`),
   };
-  const r = await fetch(`${base}/run`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'generate', input }) });
+  const r = await fetch(`${base}/run`, { method: 'POST', headers: { 'content-type': 'application/json', ...(process.env.SHIPCAST_RUN_TOKEN ? { 'x-shipcast-run': process.env.SHIPCAST_RUN_TOKEN } : {}) }, body: JSON.stringify({ kind: 'generate', input }) });
   const j = await r.json().catch(() => ({}));
   if (j.status !== 'done') die(j.error || `generation failed (${r.status})`, /cap|budget/i.test(j.error || '') ? 5 : 1);
   const takes = j.output.takes ?? [j.output];

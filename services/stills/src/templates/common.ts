@@ -1,5 +1,5 @@
 import { pathToFileURL } from 'node:url';
-import { brandCss, fontLinks, type BrandKit, type SafeZone } from '@shipcast/engine';
+import { brandCss, fontLinks, readableAsset, type BrandKit, type SafeZone } from '@shipcast/engine';
 
 export type FieldType = 'text' | 'longtext' | 'image' | 'list' | 'enum' | 'color';
 
@@ -66,6 +66,8 @@ export function img(src: unknown, ctx: RenderCtx): string {
   if (!s) return '';
   if (/^https?:\/\//.test(s) || s.startsWith('data:')) return esc(s);
   const abs = s.startsWith('/') ? s : `${ctx.assetsDir ?? ''}/${s}`;
+  // Pages render in a browser that can read any local file: only this workspace's (or shared) files go in.
+  if (!readableAsset(abs)) return '';
   return esc(pathToFileURL(abs).href);
 }
 

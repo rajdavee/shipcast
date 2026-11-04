@@ -3,7 +3,7 @@ import { basename, dirname, join } from 'node:path';
 import { existsSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
-import { assertInHome, browser, writePptx, type PptxSlide, createService, FIT_SCRIPT, run, TIDY_PAGE_SCRIPT, getPreset, layoutAuditScript, loadBrand, normalizeBrand, presetForSize, resolveIcons, SERVICE_PORTS, type BrandKit, type LayoutAudit, type SafeZone } from '@shipcast/engine';
+import { assertInHome, browser, readableAsset, writePptx, type PptxSlide, createService, FIT_SCRIPT, run, TIDY_PAGE_SCRIPT, getPreset, layoutAuditScript, loadBrand, normalizeBrand, presetForSize, resolveIcons, SERVICE_PORTS, type BrandKit, type LayoutAudit, type SafeZone } from '@shipcast/engine';
 import { CAROUSEL_LAYOUTS, carouselIconNames, renderCarouselSlide, THEMES } from './templates/carousel.ts';
 import type { RenderCtx } from './templates/common.ts';
 import { CARD_LAYOUTS, renderCard, renderThumbnail, THUMBNAIL_LAYOUTS } from './templates/graphics.ts';
@@ -88,6 +88,10 @@ async function materializeCrops<T>(spec: T, assetsDir: string | undefined, outDi
       if (!m) return v;
       if (seen.has(v)) return seen.get(v);
       const src = m[1].startsWith('/') ? m[1] : join(assetsDir ?? outDir, m[1]);
+      if (!readableAsset(src)) {
+        seen.set(v, '');
+        return '';
+      }
       const asked = m.slice(2).map(Number).map((n) => Math.min(1, Math.max(0, n)));
       const id = createHash('sha1').update(v).digest('hex').slice(0, 12);
       await mkdir(dir, { recursive: true });

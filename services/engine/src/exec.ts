@@ -62,7 +62,7 @@ export function spawnCollect(cmd: string, args: string[], opts: { cwd?: string; 
 }
 
 /** Run a command without a shell. Never throws; missing binaries give code 127. */
-export function run(cmd: string, args: string[], opts: { cwd?: string; timeoutMs?: number; input?: string } = {}): Promise<ExecResult> {
+export function run(cmd: string, args: string[], opts: { cwd?: string; timeoutMs?: number; input?: string; env?: NodeJS.ProcessEnv } = {}): Promise<ExecResult> {
   return spawnCollect(cmd, args, opts);
 }
 
