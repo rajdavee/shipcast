@@ -65,7 +65,11 @@ const MANAGE: [string, RegExp][] = [
 const hit = (list: [string, RegExp][], method: string, path: string) => list.some(([m, re]) => (m === '*' || m === method) && re.test(path));
 
 /** What a request needs: reads need read; writes need write; the lists above need more. */
+/** POSTs that change nothing and spend nothing (scoring text against the brand voice): readers may use them. */
+const READ_POSTS = [/^\/api\/tones\/score$/];
+
 export function levelFor(method: string, path: string): Action | 'install' {
+  if (method === 'POST' && READ_POSTS.some((re) => re.test(path))) return 'read';
   // A '*' entry lets everyone read (e.g. the skills list); an explicit GET entry is owner-only even to read.
   if (hit(INSTALL_OWNER, method, path)) return method === 'GET' && !INSTALL_OWNER.some(([m, re]) => m === 'GET' && re.test(path)) ? 'read' : 'install';
   if (hit(MANAGE, method, path)) return 'manage';

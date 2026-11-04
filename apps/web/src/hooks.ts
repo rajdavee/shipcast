@@ -14,7 +14,7 @@ export const go = (path: string) => {
   window.location.hash = path;
 };
 
-export const SETTINGS_TABS = ['connections', 'generation', 'agents', 'skills'] as const;
+export const SETTINGS_TABS = ['connections', 'generation', 'agents', 'members', 'skills'] as const;
 export type SettingsTab = (typeof SETTINGS_TABS)[number];
 // Older names stay valid: docs, notifications and the code link to them.
 const ALIAS: Record<string, string[]> = { trending: ['ideas'], voice: ['brand'], learning: ['insights'], setup: ['settings', 'connections'], skills: ['settings', 'skills'], projects: ['library'] };

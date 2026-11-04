@@ -9,6 +9,7 @@ import { blankChannel, PostDrawer, type DrawerTab } from '../components/PostDraw
 import { ExperimentTag, ForecastHint, LiftBadge } from '../components/PulseBits.tsx';
 import { BUCKET_ADJ, heatStrength, liftTone, postHeadline } from '../pulse-model.ts';
 import { ImportDialog, PlanMonthDialog, PlanSettingsDialog, plannable, SubscribeDialog, type PlanRun } from '../components/CalendarDialogs.tsx';
+import { useAccess } from '../session.ts';
 
 const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const DAY_START = 6 * 60;
@@ -28,6 +29,8 @@ interface Pulse { lift: Map<string, Performance>; fc: Map<string, Forecast> }
 export function Calendar({ sub, arg }: { sub?: string; arg?: string }) {
   const phone = useMedia('(max-width: 699px)');
   const wide = useMedia('(min-width: 1100px)');
+  // Viewers see everything but change nothing: no adding, dragging or editing.
+  const ro = !useAccess().write;
   const [view, setView] = useState<View>(() => (typeof matchMedia !== 'undefined' && matchMedia('(max-width: 699px)').matches ? 'list' : 'month'));
   const posts = useLoad(() => api.calendar.posts(), [], 20000);
   const channels = useLoad(() => api.calendar.channels());
@@ -52,6 +55,7 @@ export function Calendar({ sub, arg }: { sub?: string; arg?: string }) {
   // Deep links from the palette: #/calendar/idea, #/calendar/plan, #/calendar/new
   useEffect(() => {
     if (!sub) return;
+    if (ro && ['idea', 'plan', 'new'].includes(sub)) return;
     if (sub === 'idea') {
       setPane('ideas');
       setTimeout(() => ideaInput.current?.focus(), 60);
@@ -112,7 +116,7 @@ export function Calendar({ sub, arg }: { sub?: string; arg?: string }) {
   /** Optimistic move: the chip lands at once; on error it goes back and the reason shows. */
   async function move(id: string, date: string | null, minutes?: number) {
     const p = all.find((x) => x.id === id);
-    if (!p || p.status === 'published') return;
+    if (!p || p.status === 'published' || ro) return;
     const at = date === null ? undefined : minutes !== undefined ? zonedToUtc(date, timeOf(minutes), tz) : p.at ? moveToDay(p.at, date, tz) : zonedToUtc(date, slotTime(plan.data, p.channels[0]?.channel, date), tz);
     if (at === p.at) return;
     replace({ ...p, at, status: at && p.status === 'idea' ? 'draft' : !at && ['draft', 'ready', 'scheduled'].includes(p.status) ? 'idea' : p.status });
@@ -126,6 +130,7 @@ export function Calendar({ sub, arg }: { sub?: string; arg?: string }) {
     }
   }
   async function quickAdd(date: string | null, title: string) {
+    if (ro) return;
     const ch = defaultChannel();
     try {
       const p = await api.calendar.create({ title, tz, status: date ? 'draft' : 'idea', ...(date ? { at: zonedToUtc(date, slotTime(plan.data, ch, date), tz) } : {}), channels: [blankChannel(ch)] });
@@ -186,13 +191,18 @@ export function Calendar({ sub, arg }: { sub?: string; arg?: string }) {
         description="Plan every post for every channel, make it with Shipcast, and get it out."
         actions={
           <>
-            <button className="btn" onClick={() => setDialog('plan')} disabled={loading}>{planning ? <><span className="spinner" aria-hidden="true" />Planning…</> : <><Cal.spark />Plan my month</>}</button>
-            <button className="btn primary" onClick={() => openNew()} disabled={loading}><Cal.plus />New post</button>
+            {ro ? (
+              <span className="view-only" title="Viewers can look but not change things — ask an editor."><Nav.eye />View only</span>
+            ) : (
+              <>
+                <button className="btn" onClick={() => setDialog('plan')} disabled={loading}>{planning ? <><span className="spinner" aria-hidden="true" />Planning…</> : <><Cal.spark />Plan my month</>}</button>
+                <button className="btn primary" onClick={() => openNew()} disabled={loading}><Cal.plus />New post</button>
+              </>
+            )}
             <MoreMenu items={[
               { label: 'Subscribe in Google/Apple Calendar', run: () => setDialog('subscribe') },
               { label: 'Export CSV', href: api.calendar.csvUrl() },
-              { label: 'Import CSV', run: () => setDialog('import') },
-              { label: 'Content plan settings', run: () => setDialog('settings') },
+              ...(ro ? [] : [{ label: 'Import CSV', run: () => setDialog('import') }, { label: 'Content plan settings', run: () => setDialog('settings') }]),
             ]} />
           </>
         }
@@ -247,15 +257,17 @@ export function Calendar({ sub, arg }: { sub?: string; arg?: string }) {
                 {empty ? (
                   <EmptyState
                     icon={<Nav.calendar />}
-                    title="Your content calendar is empty"
-                    action={
+                    title={ro ? 'Nothing planned yet' : 'Your content calendar is empty'}
+                    action={ro ? undefined :
                       <>
                         <button className="btn primary" onClick={() => setDialog('plan')}><Cal.spark />Plan my month</button>
                         <button className="btn" onClick={() => openNew()}><Cal.plus />New post</button>
                       </>
                     }
                   >
-                    {campaigns.data && !plannable(campaigns.data).length ? (
+                    {ro ? (
+                      <>When editors in this workspace plan posts, they show up here.</>
+                    ) : campaigns.data && !plannable(campaigns.data).length ? (
                       <>Plan my month writes a month of post ideas from your product's research — <a href="#/new">create a project first</a> so they're about your product, or start with a single post.</>
                     ) : (
                       <>Let Shipcast fill the next four weeks with drafts balanced across your pillars ({plan.data!.pillars.map((p) => p.name).join(', ')}), or add a post yourself. Ideas from the Ideas page land in the backlog.</>
@@ -287,6 +299,7 @@ export function Calendar({ sub, arg }: { sub?: string; arg?: string }) {
           conns={conns.data}
           campaigns={campaigns.data}
           account={account}
+          readOnly={ro}
           onSaved={(p) => {
             replace(p);
             void pending.reload();
@@ -392,6 +405,7 @@ function PulseMarks({ p, pulse }: { p: Post; pulse: Pulse }) {
 function PostChip({ p, tz, chInfo, fresh, pulse, onOpen, compact }: { p: Post; tz: string; chInfo: ChannelInfo[]; fresh: boolean; pulse: Pulse; onOpen: (p: Post) => void; compact?: boolean }) {
   const time = p.at ? localParts(p.at, tz).time : '';
   const names = p.channels.map((c) => channelName(chInfo, c.channel)).join(', ');
+  const canDrag = useAccess().write;
   const h = pulse.lift.get(p.id);
   const tone = liftTone(h?.lift);
   return (
@@ -399,7 +413,7 @@ function PostChip({ p, tz, chInfo, fresh, pulse, onOpen, compact }: { p: Post; t
       className={`chip st-${p.status}${fresh ? ' fresh' : ''}${compact ? ' compact' : ''}${tone === 'up' || tone === 'down' ? ` heat-${tone}` : ''}`}
       // Subtle on purpose: half of all posts sit below the median, and the calendar shouldn't shout about it.
       style={h ? ({ '--heat': `${Math.round(heatStrength(h.lift) * (tone === 'up' ? 22 : 14))}%` } as CSSProperties) : undefined}
-      draggable={p.status !== 'published'}
+      draggable={p.status !== 'published' && canDrag}
       onDragStart={(e) => {
         dragging = { id: p.id, grabY: e.clientY - e.currentTarget.getBoundingClientRect().top };
         e.dataTransfer.setData('text/plain', p.title);
@@ -523,6 +537,7 @@ function DayCell({ d, out, today, past, list, max, tabIndex, onFocus, onKey, add
 }) {
   const drop = useDrop((id) => onMove(id, d));
   const label = fmtDay(d, { weekday: 'long', day: 'numeric', month: 'long' });
+  const ro = !useAccess().write;
   return (
     <div
       role="gridcell"
@@ -532,12 +547,12 @@ function DayCell({ d, out, today, past, list, max, tabIndex, onFocus, onKey, add
       className={`day${out ? ' out' : ''}${today ? ' today' : ''}${past ? ' past' : ''}${drop.over ? ' over' : ''}`}
       onFocus={(e) => e.target === e.currentTarget && onFocus()}
       onKeyDown={onKey}
-      onDoubleClick={(e) => e.target === e.currentTarget && onNew(d)}
+      onDoubleClick={(e) => !ro && e.target === e.currentTarget && onNew(d)}
       {...drop.props}
     >
       <div className="day-head">
         <span className="day-num">{Number(d.slice(8))}</span>
-        <button className="day-add" tabIndex={-1} aria-label={`Add a post on ${label}`} onClick={() => setAdding(true)}><Cal.plus /></button>
+        {!ro && <button className="day-add" tabIndex={-1} aria-label={`Add a post on ${label}`} onClick={() => setAdding(true)}><Cal.plus /></button>}
       </div>
       {adding && <QuickAdd label={`New post on ${label}`} onAdd={(t) => onQuickAdd(d, t)} onCancel={() => setAdding(false)} />}
       <div className="day-chips">
@@ -631,9 +646,10 @@ function WeekView({ anchor, byDay, today, tz, chInfo, fresh, pulse, onOpen, onMo
 
 function ListView({ from, to, byDay, today, tz, chInfo, fresh, pulse, onOpen, onNew }: ViewCtx & { from: string; to: string; byDay: Map<string, Post[]>; onNew: (d: string) => void }) {
   const days: string[] = [];
+  const write = useAccess().write;
   for (let d = from; d <= to; d = addDays(d, 1)) if (byDay.get(d)?.length) days.push(d);
   if (!days.length) {
-    return <EmptyState compact icon={<Nav.calendar />} title="Nothing planned in these four weeks" action={<button className="btn" onClick={() => onNew(from < today ? today : from)}><Cal.plus />New post</button>}>Use the arrows to look further ahead, or add a post.</EmptyState>;
+    return <EmptyState compact icon={<Nav.calendar />} title="Nothing planned in these four weeks" action={write ? <button className="btn" onClick={() => onNew(from < today ? today : from)}><Cal.plus />New post</button> : undefined}>{write ? 'Use the arrows to look further ahead, or add a post.' : 'Use the arrows to look further ahead.'}</EmptyState>;
   }
   return (
     <div className="list-view">
@@ -671,20 +687,23 @@ function Backlog({ ideas, chInfo, fresh, inputRef, onAdd, onOpen, onDropBack }: 
   const [q, setQ] = useState('');
   const [t, setT] = useState('');
   const drop = useDrop((id) => onDropBack(id));
+  const ro = !useAccess().write;
   const list = ideas.filter((p) => !q.trim() || `${p.title} ${p.notes} ${p.pillar ?? ''}`.toLowerCase().includes(q.trim().toLowerCase()));
   return (
     <aside className={`backlog${drop.over ? ' over' : ''}`} aria-label="Ideas backlog" {...drop.props}>
       <header className="backlog-head">
         <h2>Ideas <span className="count-badge">{ideas.length}</span></h2>
-        <p className="hint">No date yet. Drag one onto a day, or open it to pick a date.</p>
+        <p className="hint">{ro ? 'Post ideas without a date yet.' : 'No date yet. Drag one onto a day, or open it to pick a date.'}</p>
       </header>
-      <form className="backlog-add" onSubmit={(e) => (e.preventDefault(), t.trim() && (onAdd(t.trim()), setT('')))}>
-        <input ref={inputRef} className="input" value={t} placeholder="Add idea…" aria-label="Add idea" onChange={(e) => setT(e.target.value)} />
-        <button className="btn icon-btn" aria-label="Add idea" disabled={!t.trim()}><Cal.plus /></button>
-      </form>
+      {!ro && (
+        <form className="backlog-add" onSubmit={(e) => (e.preventDefault(), t.trim() && (onAdd(t.trim()), setT('')))}>
+          <input ref={inputRef} className="input" value={t} placeholder="Add idea…" aria-label="Add idea" onChange={(e) => setT(e.target.value)} />
+          <button className="btn icon-btn" aria-label="Add idea" disabled={!t.trim()}><Cal.plus /></button>
+        </form>
+      )}
       {ideas.length > 4 && <input className="input backlog-search" type="search" value={q} placeholder="Search ideas" aria-label="Search ideas" onChange={(e) => setQ(e.target.value)} />}
       {!ideas.length ? (
-        <p className="backlog-empty">Ideas without a date live here — type one above, or use <a href="#/ideas">Add to calendar</a> on a trend.</p>
+        <p className="backlog-empty">{ro ? 'No ideas yet.' : <>Ideas without a date live here — type one above, or use <a href="#/ideas">Add to calendar</a> on a trend.</>}</p>
       ) : !list.length ? (
         <p className="backlog-empty">No ideas match “{q}”.</p>
       ) : (
@@ -701,10 +720,13 @@ function Backlog({ ideas, chInfo, fresh, inputRef, onAdd, onOpen, onDropBack }: 
 }
 
 function IdeaCard({ p, chInfo, fresh, onOpen }: { p: Post; chInfo: ChannelInfo[]; fresh: boolean; onOpen: (p: Post) => void }): ReactNode {
+  const canDrag = useAccess().write;
   return (
+
     <button
       className={`idea${fresh ? ' fresh' : ''}`}
-      draggable
+      draggable={canDrag}
+
       onDragStart={(e) => {
         dragging = { id: p.id, grabY: 10 };
         e.dataTransfer.setData('text/plain', p.title);

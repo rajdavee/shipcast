@@ -5,7 +5,9 @@ import { go, useLoad } from '../hooks.ts';
 import { DEFAULT_FORMATS, FORMAT_GROUPS, FORMATS } from '../formats.ts';
 import { CampaignCover } from '../components/CampaignCover.tsx';
 import { Brainstorm } from '../components/Brainstorm.tsx';
-import { PageHeader } from '../components/ui.tsx';
+import { EmptyState, PageHeader } from '../components/ui.tsx';
+import { useAccess } from '../session.ts';
+import { Nav } from '../components/icons.tsx';
 
 const KIND: Record<SourceType, string> = { url: 'Website', github: 'GitHub repo', local: 'Folder on this computer', text: 'Description' };
 const PICK_KEY = 'shipcast.formats';
@@ -73,6 +75,7 @@ const PostMock = () => (
 );
 
 export function Home({ status, services, campaigns }: { status: Status | null; services: { name: string; ok: boolean }[] | null; campaigns: Campaign[] | null }) {
+  const access = useAccess();
   const [text, setText] = useState('');
   const [picks, setPicks] = useState<string[]>(loadPicks);
   const [group, setGroup] = useState(() => {
@@ -201,11 +204,30 @@ export function Home({ status, services, campaigns }: { status: Status | null; s
 
   const minutes = Math.max(5, chosen.length * 3) + (hasLong ? Number(longLen.split(' ')[0]) * 3 : 0);
 
+  if (!access.write) {
+    return (
+      <main className="page home">
+        <PageHeader hero title={access.workspace?.name ?? 'Shipcast'} description="You're a viewer here: look through the projects, calendar and numbers. Making and scheduling is for editors." />
+        <section className="section">
+          {campaigns && campaigns.length > 0 ? (
+            <>
+              <div className="section-head"><h2>Projects</h2><a className="linkish" href="#/library">See all</a></div>
+              <div className="covers">{campaigns.slice(0, 8).map((c) => <CampaignCover key={c.id} campaign={c} />)}</div>
+            </>
+          ) : (
+            <EmptyState icon={<Nav.library />} title="Nothing made here yet">When someone in this workspace makes something, it shows up here. <a href="#/calendar">See the calendar</a>.</EmptyState>
+          )}
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="page home">
       <PageHeader hero title="Paste a link. Get the launch content." description="Shipcast studies your product, then designs the posts, videos and carousels — on your own computer, with your Claude account." />
 
-      {status && !claudeReady ? (
+      {status && !claudeReady && access.install ? (
+
         <div className="banner center">Connect your Claude account to start — it's the only account Shipcast needs. <a href="#/settings/connections">Connect Claude</a></div>
       ) : servicesDown.length ? (
         <div className="banner center">The renderers aren't running ({servicesDown.join(', ')}). Start them with <code>npm start</code>.</div>

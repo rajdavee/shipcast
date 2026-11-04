@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import { api, type AgentsState, type LoginState, type Settings, type Status, type StockProvider } from '../api.ts';
 import { toast, useLoad, type SettingsTab } from '../hooks.ts';
-import { PageHeader } from '../components/ui.tsx';
+import { AskAdmin, PageHeader } from '../components/ui.tsx';
+import { askFor } from '../auth-model.ts';
+import { useAccess } from '../session.ts';
+import { Members } from './Members.tsx';
 import { Skills } from './Skills.tsx';
 
 const NAMES: Record<string, string> = { render: 'Video renderer', stills: 'Image & PDF renderer', media: 'Voice, captions & music', qa: 'Quality checks' };
@@ -10,24 +13,40 @@ const TABS: [SettingsTab, string][] = [
   ['connections', 'Connections'],
   ['generation', 'Generation'],
   ['agents', 'Agents'],
+  ['members', 'Members'],
   ['skills', 'Skills'],
 ];
 
 /** Everything that used to be Setup and Skills, one tab per concern; the tab lives in the hash (#/settings/agents). */
 export function Settings({ tab, status, onChange }: { tab: SettingsTab; status: Status | null; onChange: () => void }) {
+  const a = useAccess();
+  // Skills are installed for the whole machine, so only the person who set Shipcast up sees them.
+  const tabs = TABS.filter(([id]) => id !== 'skills' || a.install);
   return (
     <main className="page settings-page">
-      <PageHeader title="Settings" description="Shipcast never asks for passwords. It uses the Claude Code and GitHub apps already signed in on this computer; optional keys stay here too." />
+      <PageHeader title="Settings" description={<>For <b>{a.workspace?.name ?? 'this workspace'}</b>. Connections, keys and preferences belong to this workspace and stay on this computer.</>} />
       <nav className="tabs" aria-label="Settings sections">
-        {TABS.map(([id, label]) => (
+        {tabs.map(([id, label]) => (
           <a key={id} href={`#/settings/${id}`} aria-current={tab === id ? 'page' : undefined}>{label}</a>
         ))}
       </nav>
       <div className="tab-panel">
-        {tab === 'generation' ? <Generation /> : tab === 'agents' ? <AgentsSection /> : tab === 'skills' ? <Skills /> : <Connections status={status} onChange={onChange} />}
+        {tab === 'generation' ? <Generation /> : tab === 'agents' ? <AgentsSection /> : tab === 'members' ? <Members /> : tab === 'skills' ? (a.install ? <Skills /> : <MachineNote />) : <Connections status={status} onChange={onChange} />}
       </div>
     </main>
   );
+}
+
+/** Why machine-wide settings are missing for everyone but the install owner. */
+function MachineNote() {
+  return <p className="role-note">Skills, installs and this computer's own Claude and GitHub sign-in are shared by everyone on this Shipcast, so only the person who set it up changes them.</p>;
+}
+
+/** Above a section the role can see but not change. */
+function RoleNote({ need }: { need: 'write' | 'manage' }) {
+  const a = useAccess();
+  if (need === 'manage' ? a.manage : a.write) return null;
+  return <p className="role-note">{askFor(a, need)} You can see these settings but not change them.</p>;
 }
 
 function Connections({ status, onChange }: { status: Status | null; onChange: () => void }) {
@@ -66,12 +85,30 @@ function Connections({ status, onChange }: { status: Status | null; onChange: ()
     }
   }
 
+  const a = useAccess();
   const c = status?.claude;
   const g = status?.github;
   const tools = (checks.data ?? []).filter((k) => !['claude', 'gh', 'node'].includes(k.id));
 
   return (
     <>
+      {!a.install ? (
+        <section className="setup-section">
+          <h2>Your Claude</h2>
+          <p>What you make runs on your own Claude account, connected on your Account page.</p>
+          <div className="rows">
+            <div className="srow">
+              <i className={`dot ${c?.loggedIn ? 'ok' : 'bad'}`} />
+              <div>
+                <h3>Claude</h3>
+                <p>{!c ? 'Checking…' : c.loggedIn ? `Connected with your ${c.method === 'Anthropic API key' ? 'API key' : 'Claude token'}.` : 'Not connected yet.'}</p>
+              </div>
+              <a className={`btn${c?.loggedIn ? '' : ' primary'}`} href="#/account/claude">{c?.loggedIn ? 'Manage' : 'Connect'}</a>
+            </div>
+          </div>
+          <MachineNote />
+        </section>
+      ) : (
       <section className="setup-section">
         <h2>Accounts</h2>
         <p>Claude does the thinking. GitHub is only needed for private repos and pull-request videos.</p>
@@ -116,6 +153,7 @@ function Connections({ status, onChange }: { status: Status | null; onChange: ()
           </div>
         </div>
       </section>
+      )}
 
       <PublishingSection />
 
@@ -145,7 +183,7 @@ function Connections({ status, onChange }: { status: Status | null; onChange: ()
                 <h3>{k.label.replace(' (voiceover)', '').replace(' (captions)', '')}{!k.required && <span className="muted" style={{ fontWeight: 500 }}> · optional</span>}</h3>
                 <p>{k.ok ? k.detail : k.fix ? k.hint : <>Install with <code>{k.hint}</code></>}</p>
               </div>
-              {!k.ok && k.fix ? (
+              {!k.ok && k.fix && a.install ? (
                 <button className="btn sm" disabled={!!fixing} onClick={() => fix(k.fix!, k.label)}>{fixing === k.fix ? 'Setting up…' : 'Set up'}</button>
               ) : (
                 <span />
@@ -203,11 +241,13 @@ function PublishingSection() {
   const paused = !!s.data?.publishingPaused;
   const metricsPaused = !!s.data?.metricsPaused;
   const ytReconnect = !!c.data?.youtube.stats?.needsReconnect;
+  const a = useAccess();
 
   return (
     <section className="setup-section">
       <h2>Publishing</h2>
       <p>How calendar posts go out. Without a connection every channel still works as a ready-to-post kit with a reminder. Keys and tokens stay on this computer and are never shown again.</p>
+      <RoleNote need="manage" />
       <div className="rows">
         <div className="srow">
           <i className={`dot ${paused ? 'bad' : 'ok'}`} />
@@ -215,7 +255,7 @@ function PublishingSection() {
             <h3>Pause all publishing</h3>
             <p>{paused ? 'Paused — nothing is sent, even scheduled posts. Reminders for manual posts still show.' : 'Scheduled posts go out at their time.'}</p>
           </div>
-          <label className="switch"><input type="checkbox" checked={paused} disabled={!s.data} onChange={async (e) => { s.setData(await api.saveSettings({ publishingPaused: e.target.checked })); toast(e.target.checked ? 'Publishing paused' : 'Publishing resumed'); }} /> Pause</label>
+          <label className="switch"><input type="checkbox" checked={paused} disabled={!s.data || !a.manage} onChange={async (e) => { s.setData(await api.saveSettings({ publishingPaused: e.target.checked })); toast(e.target.checked ? 'Publishing paused' : 'Publishing resumed'); }} /> Pause</label>
         </div>
         <div className="srow">
           <i className={`dot ${metricsPaused ? 'bad' : 'ok'}`} />
@@ -223,7 +263,7 @@ function PublishingSection() {
             <h3>Pause collecting numbers</h3>
             <p>{metricsPaused ? 'Paused — no stats are read from YouTube or Postiz, and no reminders ask for numbers. Numbers you add yourself still count.' : 'After a post goes out, its numbers are read at 1, 3, 7 and 30 days where a connection can, and you get a reminder where none can.'}</p>
           </div>
-          <label className="switch"><input type="checkbox" checked={metricsPaused} disabled={!s.data} onChange={async (e) => { s.setData(await api.saveSettings({ metricsPaused: e.target.checked })); toast(e.target.checked ? 'Collecting numbers paused' : 'Collecting numbers resumed'); }} /> Pause</label>
+          <label className="switch"><input type="checkbox" checked={metricsPaused} disabled={!s.data || !a.manage} onChange={async (e) => { s.setData(await api.saveSettings({ metricsPaused: e.target.checked })); toast(e.target.checked ? 'Collecting numbers paused' : 'Collecting numbers resumed'); }} /> Pause</label>
         </div>
         {OAUTH_APPS.map((app) => {
           const st = c.data?.[app.id];
@@ -242,7 +282,9 @@ function PublishingSection() {
                   <p className="notice" role="status"><b>Reconnect YouTube to read stats.</b> This sign-in was made before Shipcast could read views and likes back — connect again and allow the new read-only access.</p>
                 )}
               </div>
-              {st?.connected ? (
+              {!a.manage ? (
+                <AskAdmin />
+              ) : st?.connected ? (
                 <div className="row-actions">
                   {app.id === 'youtube' && ytReconnect && <button className="btn primary" disabled={busy === app.id} onClick={() => act(app.id, async () => { const r = await api.publish.connect(app.id); window.open(r.url, '_blank', 'noopener'); addEventListener('focus', () => c.reload(), { once: true }); }, 'Finish signing in in the new tab')}>Reconnect</button>}
                   <button className="btn ghost" disabled={busy === app.id} onClick={() => act(app.id, () => api.publish.disconnect(app.id), 'Disconnected')}>Disconnect</button>
@@ -275,7 +317,9 @@ function PublishingSection() {
               {c.data && <><br />{c.data.postiz.note}</>}
             </p>
           </div>
-          {c.data?.postiz.configured ? (
+          {!a.manage ? (
+            <AskAdmin />
+          ) : c.data?.postiz.configured ? (
             <button className="btn ghost" disabled={busy === 'postiz'} onClick={() => act('postiz', () => api.publish.disconnect('postiz'), 'Postiz disconnected')}>Disconnect</button>
           ) : (
             <form className="row-actions" onSubmit={(e) => { e.preventDefault(); const f = field('postiz'); act('postiz', async () => { const r = await api.publish.savePostiz(f.a.trim(), f.b.trim()); setForm((x) => ({ ...x, postiz: { a: '', b: '' } })); toast(`Postiz connected — ${r.integrations.length} channel${r.integrations.length === 1 ? '' : 's'}`); }); }}>
@@ -292,6 +336,7 @@ function PublishingSection() {
 
 /** Model, reviews, time limits and spending caps: how each piece gets made. */
 function Generation() {
+  const a = useAccess();
   const [settings, setSettings] = useState<Settings | null>(null);
   useEffect(() => void api.settings().then(setSettings), []);
   const save = async (patch: Partial<Settings>) => {
@@ -299,11 +344,12 @@ function Generation() {
     toast('Saved');
   };
   return (
-    <>
+    <fieldset className="plain-set" disabled={!a.manage}>
+      <RoleNote need="manage" />
       {settings && (
         <section className="setup-section">
           <h2>Preferences</h2>
-          <p>How Claude directs your content. Stored in ~/.shipcast/settings.json.</p>
+          <p>How Claude directs this workspace's content.</p>
           <div className="rows">
             <div className="srow">
               <span />
@@ -368,7 +414,7 @@ function Generation() {
         <p>Only used when a media engine is connected in Connections.</p>
         <GenBudget />
       </section>
-    </>
+    </fieldset>
   );
 }
 
@@ -399,10 +445,12 @@ function VoiceSection() {
     }
   };
   const current = d?.voices?.find((x) => x.id === d.voice);
+  const a = useAccess();
   return (
     <section className="setup-section">
       <h2>Voiceover</h2>
       <p>Kokoro runs on this computer for free. Connect your own ElevenLabs account for more natural voices — your key stays on this computer.</p>
+      <RoleNote need="manage" />
       <div className="rows">
         <div className="srow">
           <i className={`dot ${d?.provider === 'kokoro' ? 'ok' : ''}`} />
@@ -410,7 +458,7 @@ function VoiceSection() {
             <h3>Kokoro (free, local)</h3>
             <p>{d?.provider === 'kokoro' ? 'In use for every voiceover.' : 'Always available as the fallback.'}</p>
           </div>
-          {d && d.provider !== 'kokoro' && <button className="btn" disabled={busy} onClick={() => save({ provider: 'kokoro' }, 'Using Kokoro')}>Use Kokoro</button>}
+          {d && d.provider !== 'kokoro' && a.manage && <button className="btn" disabled={busy} onClick={() => save({ provider: 'kokoro' }, 'Using Kokoro')}>Use Kokoro</button>}
         </div>
         <div className="srow">
           <i className={`dot ${d?.provider === 'chatterbox' ? 'ok' : ''}`} />
@@ -418,8 +466,12 @@ function VoiceSection() {
             <h3>Chatterbox (free, local, more natural)</h3>
             <p>{d?.chatterbox ? (d.provider === 'chatterbox' ? 'In use for every voiceover.' : 'Installed, not in use.') : 'Open-source (MIT) voice that runs on this computer. Installs PyTorch (~2 GB); the first voiceover also downloads the voice model (~1 GB).'}</p>
           </div>
-          {d?.chatterbox ? (
+          {!a.manage ? (
+            <span />
+          ) : d?.chatterbox ? (
             d.provider !== 'chatterbox' && <button className="btn primary" disabled={busy} onClick={() => save({ provider: 'chatterbox' }, 'Using Chatterbox')}>Use it</button>
+          ) : !a.install ? (
+            <AskAdmin>Installed by whoever set up Shipcast</AskAdmin>
           ) : (
             <button className="btn" disabled={installing} onClick={async () => { setInstalling(true); try { const r = await api.setup('chatterbox'); toast(r.ok ? 'Chatterbox installed' : 'Install failed — see the log in Activity'); if (r.ok) await save({ provider: 'chatterbox' }, 'Using Chatterbox'); } catch (e) { toast(String((e as Error).message)); } finally { setInstalling(false); } }}>{installing ? 'Installing…' : 'Install'}</button>
           )}
@@ -430,7 +482,9 @@ function VoiceSection() {
             <h3>ElevenLabs (your account)</h3>
             <p>{d?.connected ? (d.error ? d.error : d.provider === 'elevenlabs' ? `In use · ${current?.name ?? 'pick a voice'}` : 'Connected, not in use') : 'Paste an API key from elevenlabs.io → Profile → API keys.'}</p>
           </div>
-          {d?.connected ? (
+          {!a.manage ? (
+            <AskAdmin />
+          ) : d?.connected ? (
             <div className="row-actions">
               {d.provider !== 'elevenlabs' && <button className="btn primary" disabled={busy} onClick={() => save({ provider: 'elevenlabs' }, 'Using ElevenLabs')}>Use it</button>}
               <button className="btn ghost" disabled={busy} onClick={async () => { await api.disconnectVoice(); await v.reload(); toast('ElevenLabs disconnected'); }}>Disconnect</button>
@@ -441,7 +495,7 @@ function VoiceSection() {
               <button className="btn primary" disabled={busy || !key.trim()}>{busy ? 'Checking…' : 'Connect'}</button>
             </form>
           )}
-          {d?.connected && (d.voices?.length ?? 0) > 0 && (
+          {a.manage && d?.connected && (d.voices?.length ?? 0) > 0 && (
             <div className="device-code" style={{ background: 'var(--surface-2)' }}>
               <label className="field" style={{ minWidth: 240 }}>
                 <span>Voice</span>
@@ -475,6 +529,7 @@ function BrollSection() {
   const b = useLoad(() => api.broll());
   const [keys, setKeys] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
+  const a = useAccess();
   return (
     <section className="setup-section">
       <h2>Stock footage</h2>
@@ -490,7 +545,9 @@ function BrollSection() {
                 <h3>{s.title}</h3>
                 <p>{on ? `Connected — ${s.what}` : `${s.what} Key: ${s.where}`}</p>
               </div>
-              {on ? (
+              {!a.manage ? (
+                <AskAdmin />
+              ) : on ? (
                 <button className="btn ghost" onClick={async () => { await api.disconnectBroll(s.id); await b.reload(); toast(`${s.title.split(' —')[0]} disconnected`); }}>Disconnect</button>
               ) : (
                 <form className="row-actions" onSubmit={async (e) => { e.preventDefault(); if (!key.trim()) return; setBusy(s.id); try { await api.saveBroll(s.id, key.trim()); await b.reload(); setKeys((k) => ({ ...k, [s.id]: '' })); toast(`${s.title.split(' —')[0]} connected`); } catch (err) { toast(String((err as Error).message)); } finally { setBusy(null); } }}>
@@ -518,6 +575,7 @@ function EnginesSection() {
   const p = useLoad(() => api.providers());
   const [keys, setKeys] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
+  const a = useAccess();
   return (
     <section className="setup-section">
       <h2>Media engines for “Anything”</h2>
@@ -532,7 +590,9 @@ function EnginesSection() {
                 <h3>{e.title}</h3>
                 <p>{on ? 'Connected.' : `${e.what} Key: ${e.where}`}</p>
               </div>
-              {on ? (
+              {!a.manage ? (
+                <AskAdmin />
+              ) : on ? (
                 <button className="btn ghost" onClick={async () => { await api.removeProvider(e.id); await p.reload(); toast(`${e.title.split(' —')[0]} disconnected`); }}>Disconnect</button>
               ) : (
                 <form className="row-actions" onSubmit={async (ev) => { ev.preventDefault(); const k = (keys[e.id] ?? '').trim(); if (!k) return; setBusy(e.id); try { await api.saveProvider(e.id, k); await p.reload(); setKeys({ ...keys, [e.id]: '' }); toast('Connected'); } catch (err) { toast(String((err as Error).message)); } finally { setBusy(null); } }}>
@@ -596,6 +656,7 @@ function AgentsSection() {
     const t = setInterval(load, 10_000);
     return () => clearInterval(t);
   }, []);
+  const a = useAccess();
   if (!s) return null;
   const save = async (patch: Partial<Settings>) => {
     await api.saveSettings(patch);
@@ -604,6 +665,7 @@ function AgentsSection() {
   };
   return (
     <section className="setup-section">
+      <RoleNote need="manage" />
       <h2>Background agents</h2>
       <p>While you're not using Shipcast, these learn from past runs and watch what's working in marketing. They wait until your own campaigns finish, stay out of quiet hours and use at most {s.cap} Claude runs a day ({s.usedToday} used today).</p>
       <div className="rows">
@@ -619,12 +681,12 @@ function AgentsSection() {
               </p>
             </div>
             <div className="row-actions">
-              <select className="input" value={j.every} onChange={async (e) => { await api.setAgent(j.id, { every: Number(e.target.value) }); await load(); }} aria-label={`${j.title} schedule`}>
+              <select className="input" disabled={!a.manage} value={j.every} onChange={async (e) => { await api.setAgent(j.id, { every: Number(e.target.value) }); await load(); }} aria-label={`${j.title} schedule`}>
                 {EVERY.map(([m, l]) => <option key={m} value={m}>{l}</option>)}
                 {!EVERY.some(([m]) => m === j.every) && <option value={j.every}>every {j.every} min</option>}
               </select>
-              <button className="btn ghost" disabled={j.running || j.runNow} onClick={async () => { await api.runAgent(j.id); await load(); toast('Queued — it starts when nothing else is running'); }}>{j.runNow ? 'Queued' : 'Run now'}</button>
-              <label className="switch"><input type="checkbox" checked={j.enabled} onChange={async (e) => { await api.setAgent(j.id, { enabled: e.target.checked }); await load(); }} /> On</label>
+              <button className="btn ghost" disabled={j.running || j.runNow || !a.write} onClick={async () => { await api.runAgent(j.id); await load(); toast('Queued — it starts when nothing else is running'); }}>{j.runNow ? 'Queued' : 'Run now'}</button>
+              <label className="switch"><input type="checkbox" checked={j.enabled} disabled={!a.manage} onChange={async (e) => { await api.setAgent(j.id, { enabled: e.target.checked }); await load(); }} /> On</label>
             </div>
           </div>
         ))}
@@ -634,12 +696,12 @@ function AgentsSection() {
             <h3>{s.paused ? 'Paused' : 'Schedule'}</h3>
             <p>Quiet hours keep them off while you sleep or present. "Run now" ignores quiet hours.</p>
           </div>
-          <div className="row-actions">
+          <fieldset className="plain-set row-actions" disabled={!a.manage}>
             <label className="field" style={{ width: 96 }}><span>Quiet from</span><input className="input" type="time" defaultValue={s.quiet.start} onBlur={(e) => save({ agentsQuietStart: e.target.value })} /></label>
             <label className="field" style={{ width: 96 }}><span>until</span><input className="input" type="time" defaultValue={s.quiet.end} onBlur={(e) => save({ agentsQuietEnd: e.target.value })} /></label>
             <label className="field" style={{ width: 96 }}><span>Runs / day</span><input className="input" type="number" min={0} max={50} defaultValue={s.cap} onBlur={(e) => save({ agentsMaxClaudeRunsPerDay: Number(e.target.value) })} /></label>
             <button className="btn ghost" onClick={() => save({ agentsPaused: !s.paused })}>{s.paused ? 'Resume' : 'Pause all'}</button>
-          </div>
+          </fieldset>
         </div>
       </div>
     </section>

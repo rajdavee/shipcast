@@ -26,8 +26,10 @@ export function viaOptions(info: ChannelInfo | undefined, conns: PublishConnecti
 
 export type DrawerTab = 'post' | 'performance' | 'forecast';
 
-export function PostDrawer({ initial, channels, plan, conns, campaigns, account, tab: startTab, addFor, onSaved, onDeleted, onCreated, onClose }: {
+export function PostDrawer({ initial, channels, plan, conns, campaigns, account, tab: startTab, addFor, onSaved, onDeleted, onCreated, onClose, readOnly }: {
   initial: Post;
+  /** A viewer's drawer: everything visible, nothing editable. */
+  readOnly?: boolean;
   tab?: DrawerTab;
   /** Open the Performance tab with this channel's add-numbers form showing. */
   addFor?: ChannelId;
@@ -111,7 +113,7 @@ export function PostDrawer({ initial, channels, plan, conns, campaigns, account,
   const action = edit.id ? nextAction(edit, channels) : null;
   const problems = scheduleProblems(edit, channels);
   const project = campaigns?.find((c) => c.id === edit.campaign);
-  const locked = edit.status === 'published';
+  const locked = edit.status === 'published' || !!readOnly;
   const out = !!edit.id && wentOut(edit);
   const tabs: { id: DrawerTab; label: string }[] = !edit.id ? [] : [{ id: 'post', label: 'Post' }, out ? { id: 'performance', label: 'Performance' } : { id: 'forecast', label: 'Forecast' }];
   const view = tabs.some((t) => t.id === tab) ? tab : 'post';
@@ -226,10 +228,13 @@ export function PostDrawer({ initial, channels, plan, conns, campaigns, account,
               </div>
             )}
             {view === 'performance' ? (
-              <div id="dpanel-performance" role="tabpanel" aria-labelledby="dtab-performance"><PerformancePanel post={edit} channels={channels} conns={conns} addFor={addFor} onCreated={(ps, what) => onCreated?.(ps, what)} /></div>
+              <div id="dpanel-performance" role="tabpanel" aria-labelledby="dtab-performance"><PerformancePanel post={edit} channels={channels} conns={conns} addFor={readOnly ? undefined : addFor} readOnly={readOnly} onCreated={(ps, what) => onCreated?.(ps, what)} /></div>
             ) : view === 'forecast' ? (
               <div id="dpanel-forecast" role="tabpanel" aria-labelledby="dtab-forecast"><ForecastPanel post={server ?? edit} channels={channels} /></div>
             ) : (<>
+            {readOnly ? (
+              <div className="drawer-actions"><span className="view-only"><Nav.eye />View only — ask an editor to change this post</span></div>
+            ) : (
             <div className="drawer-actions">
               {!edit.id ? (
                 <button className="btn primary" disabled={!edit.title.trim() || !!busy} onClick={create}>{busy === 'create' ? 'Adding…' : edit.at ? 'Add to calendar' : 'Add to ideas'}</button>
@@ -244,6 +249,7 @@ export function PostDrawer({ initial, channels, plan, conns, campaigns, account,
                 <button className="btn ghost icon-btn" aria-label="Delete post" title="Delete post" onClick={() => setConfirmDelete(true)}><Cal.trash /></button>
               ))}
             </div>
+            )}
             {error && <div className="banner" role="alert">{error}</div>}
             {edit.id && action === 'schedule' && problems.length > 0 && (
               <ul className="problems" aria-label="Before it can be scheduled">{problems.map((p) => <li key={p}>{p}</li>)}</ul>
@@ -260,11 +266,11 @@ export function PostDrawer({ initial, channels, plan, conns, campaigns, account,
               </label>
               <div className="field tz-note">
                 <span>&nbsp;</span>
-                <p className="hint">{tz.replace(/_/g, ' ')} time{date && <> · <button className="linkish" disabled={locked} onClick={() => set({ at: undefined })}>back to ideas</button></>}</p>
+                <p className="hint">{tz.replace(/_/g, ' ')} time{date && !readOnly && <> · <button className="linkish" disabled={locked} onClick={() => set({ at: undefined })}>back to ideas</button></>}</p>
               </div>
               <label className="field">
                 <span>Pillar</span>
-                <select className="select" value={edit.pillar ?? ''} onChange={(e) => set({ pillar: e.target.value || undefined })}>
+                <select className="select" value={edit.pillar ?? ''} disabled={readOnly} onChange={(e) => set({ pillar: e.target.value || undefined })}>
                   <option value="">—</option>
                   {(plan?.pillars ?? []).map((p) => <option key={p.name} value={p.name}>{p.name}</option>)}
                   {edit.pillar && !plan?.pillars.some((p) => p.name === edit.pillar) && <option value={edit.pillar}>{edit.pillar}</option>}
@@ -272,7 +278,7 @@ export function PostDrawer({ initial, channels, plan, conns, campaigns, account,
               </label>
               <label className="field">
                 <span>Format</span>
-                <select className="select" value={edit.format ?? ''} onChange={(e) => set({ format: e.target.value || undefined })}>
+                <select className="select" value={edit.format ?? ''} disabled={readOnly} onChange={(e) => set({ format: e.target.value || undefined })}>
                   <option value="">—</option>
                   {[...new Set([...formats, ...(edit.format ? [edit.format] : [])])].map((f) => <option key={f} value={f}>{formatTitle(f)}</option>)}
                 </select>
@@ -284,7 +290,7 @@ export function PostDrawer({ initial, channels, plan, conns, campaigns, account,
             </div>
             <label className="field">
               <span>Notes</span>
-              <textarea className="textarea notes" rows={2} value={edit.notes} placeholder="Angle, hook, links, who to tag…" onChange={(e) => set({ notes: e.target.value })} />
+              <textarea className="textarea notes" rows={2} value={edit.notes} disabled={readOnly} placeholder="Angle, hook, links, who to tag…" onChange={(e) => set({ notes: e.target.value })} />
             </label>
 
             <section className="ch-section" aria-label="Channels">
@@ -309,7 +315,7 @@ export function PostDrawer({ initial, channels, plan, conns, campaigns, account,
               {!ch ? (
                 <p className="hint ch-empty">Pick at least one channel to write for.</p>
               ) : (
-                <ChannelEditor key={ch.channel} post={edit} ch={ch} info={info} conns={conns} busy={busy} locked={locked || ch.state === 'sent' || ch.state === 'sending'} onChange={(patch) => setCh(ch.channel, patch)} onRemove={() => removeChannel(ch.channel)} onMake={action === 'make' ? make : undefined} onMark={(url) => markSent(ch, url)} onRetry={retry} />
+                <ChannelEditor key={ch.channel} post={edit} ch={ch} info={info} conns={conns} busy={busy} locked={locked || ch.state === 'sent' || ch.state === 'sending'} readOnly={readOnly} onChange={(patch) => setCh(ch.channel, patch)} onRemove={() => removeChannel(ch.channel)} onMake={action === 'make' && !readOnly ? make : undefined} onMark={(url) => markSent(ch, url)} onRetry={retry} />
               )}
             </section>
             </>)}
@@ -332,13 +338,14 @@ export function PostDrawer({ initial, channels, plan, conns, campaigns, account,
   );
 }
 
-function ChannelEditor({ post, ch, info, conns, busy, locked, onChange, onRemove, onMake, onMark, onRetry }: {
+function ChannelEditor({ post, ch, info, conns, busy, locked, readOnly, onChange, onRemove, onMake, onMark, onRetry }: {
   post: Post;
   ch: PostChannel;
   info?: ChannelInfo;
   conns: PublishConnections | null;
   busy: string | null;
   locked: boolean;
+  readOnly?: boolean;
   onChange: (p: Partial<PostChannel>) => void;
   onRemove: () => void;
   onMake?: () => void;
@@ -358,7 +365,8 @@ function ChannelEditor({ post, ch, info, conns, busy, locked, onChange, onRemove
 
   // Brand score, a moment after typing stops.
   useEffect(() => {
-    if (!text.trim()) return setScore(null);
+    // Scoring is a POST the server only takes from editors; viewers just see the copy.
+    if (!text.trim() || readOnly) return setScore(null);
     let on = true;
     const t = setTimeout(() => api.scoreCopy({ text, ...(post.campaign ? { campaign: post.campaign } : { toneId: 'default' }), channel: TONE_CHANNELS.includes(ch.channel) ? ch.channel : undefined }).then((s) => on && setScore(s)).catch(() => {}), 600);
     return () => {
@@ -388,7 +396,7 @@ function ChannelEditor({ post, ch, info, conns, busy, locked, onChange, onRemove
           {ch.state === 'sent' && ch.url && <a href={ch.url} target="_blank" rel="noreferrer noopener"><Cal.link />Open the live post</a>}
           {ch.state === 'sent' && !ch.url && ch.sentAt && <span className="muted">{new Date(ch.sentAt).toLocaleString()}</span>}
           {ch.state === 'failed' && ch.error && <span>{ch.error}</span>}
-          {ch.state === 'failed' && <button className="btn sm" disabled={!!busy} onClick={onRetry}>Retry</button>}
+          {ch.state === 'failed' && !readOnly && <button className="btn sm" disabled={!!busy} onClick={onRetry}>Retry</button>}
           {ch.note && <span className="muted">{ch.note}</span>}
         </div>
       )}
@@ -478,7 +486,8 @@ function ChannelEditor({ post, ch, info, conns, busy, locked, onChange, onRemove
       {post.id && (
         <div className="ch-foot">
           {ch.via === 'manual' && <a className="btn sm" href={api.calendar.kitUrl(post.id, ch.channel)} download><Cal.download />Download post kit</a>}
-          {ch.state !== 'sent' && (post.status === 'scheduled' || ch.state === 'due' || ch.state === 'failed') && ch.via === 'manual' && (
+          {!readOnly && ch.state !== 'sent' && (post.status === 'scheduled' || ch.state === 'due' || ch.state === 'failed') && ch.via === 'manual' && (
+
             <form className="mark-form" onSubmit={(e) => (e.preventDefault(), onMark(link.trim() || undefined))}>
               <input className="input" type="url" placeholder="Link to the live post (optional)" value={link} onChange={(e) => setLink(e.target.value)} aria-label="Link to the live post" />
               <button className="btn sm" disabled={!!busy}>Mark posted</button>

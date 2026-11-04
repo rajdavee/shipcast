@@ -5,6 +5,7 @@ import { formatTitle } from '../formats.ts';
 import { PREFILL_KEY } from './Home.tsx';
 import { EmptyState, Loading, PageHeader } from '../components/ui.tsx';
 import { Nav } from '../components/icons.tsx';
+import { useAccess } from '../session.ts';
 
 const PLATFORMS = ['all', 'linkedin', 'instagram', 'tiktok', 'youtube', 'x', 'newsletter', 'web'];
 const PLATFORM_NAME: Record<string, string> = { all: 'All', linkedin: 'LinkedIn', instagram: 'Instagram', tiktok: 'TikTok', youtube: 'YouTube', x: 'X', newsletter: 'Newsletter', web: 'Web', any: 'All platforms' };
@@ -26,6 +27,7 @@ const host = (u: string) => {
 
 /** What's working in marketing right now, refreshed by the trends agent, each with a recipe to make one. */
 export function Trending() {
+  const write = useAccess().write;
   const feed = useLoad(() => api.trends(), [], 15000);
   const agents = useLoad(() => api.agents(), [], 10000);
   const [platform, setPlatform] = useState('all');
@@ -64,7 +66,7 @@ export function Trending() {
       <PageHeader
         title="Ideas"
         description={<>What's working in marketing right now — formats, hooks, topics and platform changes, each with evidence. Refreshed {ago(feed.data.refreshedAt)}{job?.enabled ? `; next ${job.running ? 'running now' : job.waiting ? `waiting (${job.waiting.toLowerCase()})` : 'on schedule'}` : ' (auto-refresh is off)'}.</>}
-        actions={<button className="btn" disabled={job?.running || job?.runNow} onClick={refresh}>{job?.running ? 'Refreshing…' : job?.runNow ? 'Queued' : 'Refresh now'}</button>}
+        actions={write && <button className="btn" disabled={job?.running || job?.runNow} onClick={refresh}>{job?.running ? 'Refreshing…' : job?.runNow ? 'Queued' : 'Refresh now'}</button>}
       />
       <div className="filter-bar">
         <div className="seg" role="group" aria-label="Platform">
@@ -75,7 +77,7 @@ export function Trending() {
         <label className="switch"><input type="checkbox" checked={risingOnly} onChange={(e) => setRisingOnly(e.target.checked)} /> Rising only</label>
       </div>
       {!feed.data.cards.length ? (
-        <EmptyState icon={<Nav.ideas />} title="No trends yet" action={<button className="btn primary" disabled={job?.running || job?.runNow} onClick={refresh}>{job?.runNow ? 'Queued' : 'Refresh now'}</button>}>
+        <EmptyState icon={<Nav.ideas />} title="No trends yet" action={write && <button className="btn primary" disabled={job?.running || job?.runNow} onClick={refresh}>{job?.runNow ? 'Queued' : 'Refresh now'}</button>}>
           The first refresh runs a few minutes after Shipcast starts (outside quiet hours), or press Refresh now.
         </EmptyState>
       ) : !cards.length ? (
@@ -100,10 +102,11 @@ export function Trending() {
             </ul>
             <div className="trend-foot">
               <span className="muted">as {formatName(c.recipe.pack)}</span>
-              <span className="trend-actions">
+              {write && <span className="trend-actions">
                 <button className="btn" disabled={adding === c.key} onClick={() => addToCalendar(c)}>{adding === c.key ? 'Adding…' : 'Add to calendar'}</button>
                 <button className="btn primary" onClick={() => makeOne(c)}>Make one like this</button>
-              </span>
+              </span>}
+
             </div>
           </article>
         ))}

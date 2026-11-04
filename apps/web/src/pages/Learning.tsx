@@ -4,6 +4,7 @@ import { toast, useLoad } from '../hooks.ts';
 import { formatTitle } from '../formats.ts';
 import { EmptyState, Loading } from '../components/ui.tsx';
 import { Nav } from '../components/icons.tsx';
+import { useAccess } from '../session.ts';
 
 const pct = (r?: { rate: number; runs: number }) => (r && r.runs ? `${Math.round(r.rate * 100)}% of ${r.runs} runs` : '—');
 const STATUS: Record<Lesson['status'], string> = { trial: 'On trial', kept: 'Kept — it works', retired: 'Retired — no effect', off: 'Off' };
@@ -11,6 +12,7 @@ const formatName = formatTitle;
 
 /** Insights → Quality & learning: what Shipcast learned from its own runs, and whether each lesson is paying off. */
 export function Learning() {
+  const write = useAccess().write;
   const data = useLoad(() => api.lessons(), [], 15000);
   const agents = useLoad(() => api.agents(), [], 10000);
   const [busy, setBusy] = useState(false);
@@ -57,7 +59,7 @@ export function Learning() {
           </div>
           <div className="row-actions">
             <a className="btn ghost" href="#/settings/agents">Schedule</a>
-            <button className="btn primary" disabled={busy || job?.running || job?.runNow} onClick={learnNow}>{job?.runNow ? 'Queued' : 'Learn now'}</button>
+            {write && <button className="btn primary" disabled={busy || job?.running || job?.runNow} onClick={learnNow}>{job?.runNow ? 'Queued' : 'Learn now'}</button>}
           </div>
         </div>
       </div>
@@ -114,7 +116,8 @@ export function Learning() {
                     )}
                   </div>
                   <div className="row-actions">
-                    {l.status !== 'retired' && <button className="btn ghost" onClick={() => toggle(l)}>{l.status === 'off' ? 'Turn on' : 'Turn off'}</button>}
+                    {write && l.status !== 'retired' && <button
+ className="btn ghost" onClick={() => toggle(l)}>{l.status === 'off' ? 'Turn on' : 'Turn off'}</button>}
                   </div>
                 </div>
               ))}
