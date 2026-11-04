@@ -13,6 +13,8 @@ import { Insights } from './pages/Insights.tsx';
 import { Trending } from './pages/Trending.tsx';
 import { Calendar } from './pages/Calendar.tsx';
 import { Account } from './pages/Account.tsx';
+import { Reports } from './pages/Reports.tsx';
+import { ReportPage } from './pages/Report.tsx';
 import { FirstRun, Join, Offline, SignIn, SignUp } from './pages/Auth.tsx';
 import { ClaudeBanner } from './components/Workspace.tsx';
 import { Loading } from './components/ui.tsx';
@@ -63,7 +65,7 @@ function Studio() {
     return () => removeEventListener('keydown', onKey);
   }, []);
   useEffect(() => {
-    document.title = route[0] === 'c' ? 'Shipcast' : `${{ new: 'Create', account: 'Account', calendar: 'Calendar', library: 'Library', ideas: 'Ideas', brand: 'Brand', insights: 'Insights', settings: 'Settings' }[place] ?? 'Shipcast'} · Shipcast`;
+    document.title = route[0] === 'c' ? 'Shipcast' : `${{ new: 'Create', account: 'Account', calendar: 'Calendar', library: 'Library', ideas: 'Ideas', brand: 'Brand', insights: 'Insights', reports: 'Reports', settings: 'Settings' }[place] ?? 'Shipcast'} · Shipcast`;
   }, [place]);
 
   const items = useMemo(() => commands(campaigns.data, [
@@ -89,6 +91,10 @@ function Studio() {
         <Voice />
       ) : route[0] === 'ideas' ? (
         <Trending />
+      ) : route[0] === 'reports' && route[1] && route[1] !== 'new' ? (
+        <ReportPage key={route[1]} id={route[1]} />
+      ) : route[0] === 'reports' ? (
+        <Reports startNew={route[1] === 'new'} />
       ) : route[0] === 'insights' ? (
         <Insights tab={route[1]} />
       ) : route[0] === 'settings' ? (

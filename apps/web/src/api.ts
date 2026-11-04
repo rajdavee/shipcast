@@ -282,6 +282,7 @@ export interface BrandScore {
 export type { ChannelInfo, ContentPlan, Post, PostChannel, PostStatus } from './calendar-model.ts';
 import type { ChannelId, ChannelInfo, ContentPlan, Post, PostStatus } from './calendar-model.ts';
 export interface PublishConnections {
+  google?: { configured: boolean; connected: boolean; note: string };
   linkedin: { configured: boolean; connected: boolean; expired: boolean; account: string | null; expiresAt: string | null };
   youtube: { configured: boolean; connected: boolean; note: string; stats?: { stats: boolean; analytics: boolean; needsReconnect: boolean } };
   postiz: { configured: boolean; url: string | null; note: string };
@@ -290,6 +291,9 @@ export interface PostizIntegration { id: string; name: string; identifier: strin
 
 export type { AgeBucket, MetricKey, MetricSource, Snapshot, Performance, Effect, PlaybookFinding, HeatCell, ChannelModel, ChannelPlaybook, Playbook, Forecast, Calibration, CriticCalibration, PendingNumbers, ScreenshotReading } from './pulse-model.ts';
 import type { Snapshot, Performance, Playbook, Forecast, Calibration, CriticCalibration, PendingNumbers, ScreenshotReading, MetricKey } from './pulse-model.ts';
+
+export type { Report, ReportSummary, Facts, Kpi, Section, Recommendation, GoalInput, Goal, Note, ShareInfo, AskAnswer, AskChart, ReportSchedule, EmailSettings, RollupItem, SiteState, SiteChoices, ReportVersion, Audience, PeriodKind } from './reports-model.ts';
+import type { Report, ReportSummary, Goal, GoalInput, Note, ShareInfo, AskAnswer, ReportSchedule, EmailSettings, RollupItem, SiteState, SiteChoices, ReportVersion, Audience, PeriodKind, SectionId } from './reports-model.ts';
 
 export type StockProvider = 'pixabay' | 'unsplash' | 'pexels';
 export interface StockState {
@@ -436,8 +440,8 @@ export const api = {
     saveKeys: (provider: 'linkedin' | 'youtube', clientId: string, clientSecret: string) => call<PublishConnections>('PUT', `/api/publish/${provider}`, { clientId, clientSecret }),
     savePostiz: (url: string, apiKey: string) => call<PublishConnections & { integrations: PostizIntegration[] }>('PUT', '/api/publish/postiz', { url, apiKey }),
     postizIntegrations: () => call<PostizIntegration[]>('GET', '/api/publish/postiz/integrations'),
-    connect: (provider: 'linkedin' | 'youtube') => call<{ url: string; redirect: string }>('GET', `/api/publish/${provider}/connect`),
-    disconnect: (provider: 'linkedin' | 'youtube' | 'postiz', keys = false) => call<PublishConnections>('DELETE', `/api/publish/${provider}${keys ? '?keys=1' : ''}`),
+    connect: (provider: 'linkedin' | 'youtube' | 'google') => call<{ url: string; redirect: string }>('GET', `/api/publish/${provider}/connect`),
+    disconnect: (provider: 'linkedin' | 'youtube' | 'google' | 'postiz', keys = false) => call<PublishConnections>('DELETE', `/api/publish/${provider}${keys ? '?keys=1' : ''}`),
   },
   metrics: {
     post: (id: string) => call<{ snapshots: Snapshot[]; performance: Performance[] }>('GET', `/api/metrics/posts/${id}`),
@@ -458,6 +462,39 @@ export const api = {
     suggestedSlots: () => call<Partial<Record<ChannelId, { slots: string[]; why: string[] }>>>('GET', '/api/metrics/suggested-slots'),
     more: (postId: string) => call<Post>('POST', `/api/calendar/posts/${postId}/more`),
     remix: (postId: string, channels?: ChannelId[]) => call<Post[]>('POST', `/api/calendar/posts/${postId}/remix`, channels ? { channels } : {}),
+  },
+  reports: {
+    list: () => call<ReportSummary[]>('GET', '/api/reports'),
+    create: (b: { kind: PeriodKind; audience: Audience; start?: string; end?: string }) => call<Report>('POST', '/api/reports', b),
+    get: (id: string) => call<Report>('GET', `/api/reports/${id}`),
+    edit: (id: string, b: { title?: string; headline?: string; intro?: string; sections?: { id: SectionId; lines?: string[]; hidden?: boolean }[]; status?: Report['status'] }) => call<Report>('PUT', `/api/reports/${id}`, b),
+    rewrite: (id: string, audience?: Audience) => call<Report>('POST', `/api/reports/${id}/rewrite`, audience ? { audience } : {}),
+    versions: (id: string) => call<ReportVersion[]>('GET', `/api/reports/${id}/versions`),
+    restore: (id: string, version: number) => call<Report>('POST', `/api/reports/${id}/restore`, { version }),
+    act: (id: string, rec: string) => call<{ report: Report; created?: Post[]; navigate?: string; result: string }>('POST', `/api/reports/${id}/actions/${rec}`),
+    remove: (id: string) => call<{ ok: true }>('DELETE', `/api/reports/${id}`),
+    goals: () => call<{ goals: Goal[] } | Goal[]>('GET', '/api/reports/goals').then((r) => (Array.isArray(r) ? r : r.goals ?? [])),
+    saveGoals: (goals: GoalInput[]) => call<{ goals: Goal[] } | Goal[]>('PUT', '/api/reports/goals', { goals }).then((r) => (Array.isArray(r) ? r : r.goals ?? [])),
+    notes: () => call<Note[] | { notes: Note[] }>('GET', '/api/reports/notes').then((r) => (Array.isArray(r) ? r : r.notes ?? [])),
+    addNote: (date: string, text: string) => call<Note>('POST', '/api/reports/notes', { date, text }),
+    removeNote: (id: string) => call<unknown>('DELETE', `/api/reports/notes/${id}`),
+    shares: (id: string) => call<ShareInfo[]>('GET', `/api/reports/${id}/shares`),
+    share: (id: string, expiresDays?: number) => call<{ id: string; url: string; expiresAt?: string }>('POST', `/api/reports/${id}/shares`, expiresDays ? { expiresDays } : {}),
+    revokeShare: (id: string, share: string) => call<unknown>('DELETE', `/api/reports/${id}/shares/${share}`),
+    ask: (id: string, question: string) => call<AskAnswer>('POST', `/api/reports/${id}/ask`, { question }),
+    send: (id: string) => call<{ sent: string[]; failed: string[] }>('POST', `/api/reports/${id}/send`),
+    schedule: () => call<ReportSchedule>('GET', '/api/reports/schedule'),
+    saveSchedule: (s: ReportSchedule) => call<ReportSchedule>('PUT', '/api/reports/schedule', s),
+    email: () => call<EmailSettings>('GET', '/api/reports/email'),
+    saveEmail: (e: Partial<EmailSettings>) => call<EmailSettings>('PUT', '/api/reports/email', e),
+    testEmail: (to: string) => call<unknown>('POST', '/api/reports/email/test', { to }),
+    rollup: () => call<RollupItem[]>('GET', '/api/workspaces/reports-rollup'),
+  },
+  site: {
+    status: () => call<SiteState>('GET', '/api/site'),
+    save: (b: { ga4Property?: string; ga4Name?: string; gscSite?: string; domains?: string[]; utm?: boolean }) => call<SiteState>('PUT', '/api/site', b),
+    choices: () => call<SiteChoices>('GET', '/api/site/choices'),
+    sync: () => call<{ days: number; from: string; to: string; ga4: boolean; search: boolean }>('POST', '/api/site/sync'),
   },
   upload: async (id: string, file: File) => {
     const res = await fetch(`/api/campaigns/${id}/uploads?name=${encodeURIComponent(file.name)}`, { method: 'POST', headers: apiHeaders(), body: file });

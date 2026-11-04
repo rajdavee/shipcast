@@ -9,6 +9,7 @@ export const PLACES = [
   { id: 'library', label: 'Library', icon: Nav.library, about: 'Everything you have made', keywords: 'projects campaigns' },
   { id: 'ideas', label: 'Ideas', icon: Nav.ideas, about: "What's working in marketing now", keywords: 'trending trends' },
   { id: 'brand', label: 'Brand', icon: Nav.brand, about: 'How your brand sounds', keywords: 'voice tone' },
+  { id: 'reports', label: 'Reports', icon: Nav.report, about: 'The weekly report that writes itself', keywords: 'report weekly monthly boss client summary results' },
   { id: 'insights', label: 'Insights', icon: Nav.insights, about: 'How posts did, what works for you and why', keywords: 'performance playbook numbers learning quality lessons' },
 ] as const;
 

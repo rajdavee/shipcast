@@ -83,6 +83,9 @@ export const Nav = {
     <svg viewBox="0 0 24 24" {...P}><path d="M19 5v6a3 3 0 01-3 3H6M10 10l-4 4 4 4" /></svg>
   ),
   updown: () => <svg viewBox="0 0 24 24" {...P}><path d="M8 9.5l4-4 4 4M8 14.5l4 4 4-4" /></svg>,
+  report: () => <svg viewBox="0 0 24 24" {...P}><path d="M6.5 3.5h7.5l4 4v13h-11.5z" /><path d="M14 3.5v4h4" /><path d="M9.5 17v-3M12.25 17v-5.5M15 17v-2" /></svg>,
+  pencil: () => <svg viewBox="0 0 24 24" {...P}><path d="M4.5 19.5l1-4.5L15.8 4.7a2 2 0 012.8 0l.7.7a2 2 0 010 2.8L9 18.5z" /><path d="M13.5 7l3.5 3.5" /></svg>,
+  globe: () => <svg viewBox="0 0 24 24" {...P}><circle cx="12" cy="12" r="8.5" /><path d="M3.5 12h17M12 3.5c2.5 2.6 3.5 5.4 3.5 8.5s-1 5.9-3.5 8.5c-2.5-2.6-3.5-5.4-3.5-8.5s1-5.9 3.5-8.5z" /></svg>,
   users: () => <svg viewBox="0 0 24 24" {...P}><circle cx="9" cy="8.5" r="3.5" /><path d="M2.5 19.5a6.5 6.5 0 0113 0M16 5.2a3.5 3.5 0 010 6.6M18 13.6a6.5 6.5 0 013.5 5.9" /></svg>,
   user: () => <svg viewBox="0 0 24 24" {...P}><circle cx="12" cy="8.5" r="4" /><path d="M4.5 20.5a7.5 7.5 0 0115 0" /></svg>,
   signout: () => <svg viewBox="0 0 24 24" {...P}><path d="M14 4.5H6.5a2 2 0 00-2 2v11a2 2 0 002 2H14M10 12h10.5M17 8.5l3.5 3.5-3.5 3.5" /></svg>,

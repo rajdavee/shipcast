@@ -13,6 +13,7 @@ export function commands(campaigns: Campaign[] | null, extra: Command[] = [], ca
     { id: 'a-new', group: 'Actions', label: 'New piece', hint: 'Create', keywords: 'make launch post video carousel', icon: <Nav.create />, run: () => go('/new') },
     { id: 'a-plan', group: 'Actions', label: 'Plan my month', hint: 'Calendar', keywords: 'schedule calendar posts', icon: <Nav.calendar />, run: () => go('/calendar/plan') },
     { id: 'a-idea', group: 'Actions', label: 'Add idea', hint: 'Calendar backlog', keywords: 'trend backlog note', icon: <Nav.ideas />, run: () => go('/calendar/idea') },
+    { id: 'a-report', group: 'Actions', label: 'New weekly report', hint: 'Reports', keywords: 'report week boss client summary friday', icon: <Nav.report />, run: () => go('/reports/new') },
     { id: 'a-post', group: 'Actions', label: 'New post', hint: 'Calendar', keywords: 'schedule linkedin instagram', icon: <Nav.calendar />, run: () => go('/calendar/new') },
   ];
   const actions: Command[] = [
@@ -26,6 +27,7 @@ export function commands(campaigns: Campaign[] | null, extra: Command[] = [], ca
     { id: 'p-agents', group: 'Places', label: 'Settings · Background agents', keywords: 'schedule quiet hours', icon: <Nav.settings />, run: () => go('/settings/agents') },
     { id: 'p-members', group: 'Places', label: 'Settings · Members', keywords: 'team invite roles people workspace', icon: <Nav.settings />, run: () => go('/settings/members') },
     ...(can.install ? [{ id: 'p-skills', group: 'Places' as const, label: 'Settings · Skills', keywords: 'skill hub install', icon: <Nav.settings />, run: () => go('/settings/skills') }] : []),
+    { id: 'p-website', group: 'Places', label: 'Settings · Website', keywords: 'google analytics ga4 search console utm site', icon: <Nav.globe />, run: () => go('/settings/website') },
     { id: 'p-gen', group: 'Places', label: 'Settings · Generation', keywords: 'model timeout review budget', icon: <Nav.settings />, run: () => go('/settings/generation') },
   ];
   const projects: Command[] = [...(campaigns ?? [])]
