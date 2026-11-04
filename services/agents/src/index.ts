@@ -1,4 +1,4 @@
-import { blockedReason, createService, currentContext, primaryWorkspace, runAs, workContexts, foregroundBusy, learnOnce, logRun, refreshPlaybook, refreshTrends, runGolden, redactSecrets, runPublisher, runMetrics, pickDue, readJobs, readSettings, updateJob, type AgentJob, type AgentKind, type MetricsReport, type PublisherReport } from '@shipcast/engine';
+import { blockedReason, createService, currentContext, primaryWorkspace, runAs, workContexts, foregroundBusy, learnOnce, logRun, refreshPlaybook, refreshTrends, runGolden, redactSecrets, runPublisher, runMetrics, syncSiteIfDue, pickDue, readJobs, readSettings, updateJob, type AgentJob, type AgentKind, type MetricsReport, type PublisherReport } from '@shipcast/engine';
 
 /**
  * The agents service: wakes every 20 seconds, starts at most one background
@@ -137,6 +137,15 @@ export async function metricsTick(): Promise<MetricsReport | undefined> {
   }
 }
 
+/** Website numbers (Google Analytics, Search Console): every six hours when set up; no Claude. */
+export async function siteTick() {
+  try {
+    return await syncSiteIfDue();
+  } catch (e) {
+    console.error('[site] sync failed:', (await redactSecrets((e as Error).message ?? '')).slice(0, 200));
+  }
+}
+
 export function createAgentsService() {
   let timer: ReturnType<typeof setInterval> | undefined;
   let busyTick = false;
@@ -165,6 +174,7 @@ export function createAgentsService() {
           for (const ctx of await workContexts()) {
             await runAs(ctx, () => publishTick());
             await runAs(ctx, () => metricsTick());
+            await runAs(ctx, () => siteTick());
           }
         })().finally(() => (busyFast = false));
       }

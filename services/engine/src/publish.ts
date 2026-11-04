@@ -7,6 +7,7 @@ import { channel as channelInfo, claimChannel, listPosts, savePost, updateChanne
 import { notifyDesktop } from './hub.ts';
 import { home } from './paths.ts';
 import { readSettings } from './store.ts';
+import { tagChannel } from './utm.ts';
 import { getSecret, setSecret } from './voices.ts';
 
 /**
@@ -43,7 +44,7 @@ export function setPublishFetch(f: typeof fetch | null) {
 /** The same swappable fetch, for the collectors that read numbers back over these connections. */
 export const providerFetch: typeof fetch = (input, init) => http(input, init);
 
-const SECRET = { linkedinClient: 'publish.linkedin.client', linkedinToken: 'publish.linkedin.token', youtubeClient: 'publish.youtube.client', youtubeToken: 'publish.youtube.token', postiz: 'publish.postiz' };
+const SECRET = { linkedinClient: 'publish.linkedin.client', linkedinToken: 'publish.linkedin.token', youtubeClient: 'publish.youtube.client', youtubeToken: 'publish.youtube.token', postiz: 'publish.postiz', googleToken: 'site.google.token' };
 
 async function secretJson<T>(name: string): Promise<T | undefined> {
   const raw = await getSecret(name);
@@ -88,6 +89,8 @@ export async function redactSecrets(text: string): Promise<string> {
   add((await secretJson<ClientKeys>(SECRET.linkedinClient))?.secret);
   add((await secretJson<ClientKeys>(SECRET.youtubeClient))?.secret);
   add((await secretJson<PostizConfig>(SECRET.postiz))?.key);
+  const g = await secretJson<YoutubeToken>(SECRET.googleToken);
+  add(g?.access), add(g?.refresh);
   let out = text;
   for (const v of vals) out = out.split(v).join('***');
   return out.replace(/(Bearer|access_token|refresh_token|client_secret)(["':=\s]+)[\w.~+/-]{8,}/gi, '$1$2***').slice(0, 400);
@@ -148,12 +151,15 @@ const nameOf = (ch: ChannelId) => channelInfo(ch)?.name ?? ch;
 
 // ── OAuth (LinkedIn, Google) ───────────────────────────────────────────
 
-export type OAuthProvider = 'linkedin' | 'youtube';
-export const OAUTH_PROVIDERS: OAuthProvider[] = ['linkedin', 'youtube'];
+/** "google" is the website connection (Analytics + Search Console, read-only); it shares the YouTube Google app. */
+export type OAuthProvider = 'linkedin' | 'youtube' | 'google';
+export const OAUTH_PROVIDERS: OAuthProvider[] = ['linkedin', 'youtube', 'google'];
+export const PROVIDER_NAMES: Record<OAuthProvider, string> = { linkedin: 'LinkedIn', youtube: 'YouTube', google: 'Google Analytics and Search Console' };
 
 const OAUTH = {
   linkedin: { authorize: 'https://www.linkedin.com/oauth/v2/authorization', token: 'https://www.linkedin.com/oauth/v2/accessToken', scope: 'openid profile w_member_social', client: SECRET.linkedinClient, extra: {} as Record<string, string> },
   youtube: { authorize: 'https://accounts.google.com/o/oauth2/v2/auth', token: 'https://oauth2.googleapis.com/token', scope: 'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/yt-analytics.readonly', client: SECRET.youtubeClient, extra: { access_type: 'offline', prompt: 'consent', include_granted_scopes: 'true' } as Record<string, string> },
+  google: { authorize: 'https://accounts.google.com/o/oauth2/v2/auth', token: 'https://oauth2.googleapis.com/token', scope: 'https://www.googleapis.com/auth/analytics.readonly https://www.googleapis.com/auth/webmasters.readonly', client: SECRET.youtubeClient, extra: { access_type: 'offline', prompt: 'consent' } as Record<string, string> },
 };
 
 // In memory on purpose: a restart simply means clicking Connect again.
@@ -206,15 +212,16 @@ export async function oauthFinish(provider: OAuthProvider, state: string, code: 
     return { account: u.name };
   }
   // Google only sends a refresh token on first consent; keep the old one if this grant has none.
-  const old = await secretJson<YoutubeToken>(SECRET.youtubeToken);
-  await saveSecretJson(SECRET.youtubeToken, { access: tok.access_token, refresh: tok.refresh_token ?? old?.refresh, expiresAt, ...(tok.scope ? { scope: tok.scope } : {}) } satisfies YoutubeToken);
+  const slot = provider === 'google' ? SECRET.googleToken : SECRET.youtubeToken;
+  const old = await secretJson<YoutubeToken>(slot);
+  await saveSecretJson(slot, { access: tok.access_token, refresh: tok.refresh_token ?? old?.refresh, expiresAt, ...(tok.scope ? { scope: tok.scope } : {}) } satisfies YoutubeToken);
   return {};
 }
 
 /** Forget a connection (and with `keys`, the app's client ID/secret too). */
 export async function disconnect(provider: OAuthProvider | 'postiz', keys = false): Promise<void> {
   if (provider === 'postiz') return setSecret(SECRET.postiz, null);
-  await setSecret(provider === 'linkedin' ? SECRET.linkedinToken : SECRET.youtubeToken, null);
+  await setSecret(provider === 'linkedin' ? SECRET.linkedinToken : provider === 'google' ? SECRET.googleToken : SECRET.youtubeToken, null);
   if (keys) await setSecret(OAUTH[provider].client, null);
 }
 
@@ -223,10 +230,12 @@ export async function connections(now = Date.now()) {
   const li = await secretJson<LinkedinToken>(SECRET.linkedinToken);
   const yt = await secretJson<YoutubeToken>(SECRET.youtubeToken);
   const pz = await secretJson<PostizConfig>(SECRET.postiz);
+  const gs = await secretJson<YoutubeToken>(SECRET.googleToken);
   return {
     linkedin: { configured: !!(await getSecret(SECRET.linkedinClient)), connected: !!li && Date.parse(li.expiresAt) > now, expired: !!li && Date.parse(li.expiresAt) <= now, account: li?.name ?? null, expiresAt: li?.expiresAt ?? null },
     youtube: { configured: !!(await getSecret(SECRET.youtubeClient)), connected: !!yt && (!!yt.refresh || Date.parse(yt.expiresAt) > now), stats: youtubeStatsAccess(yt), note: 'Uploads from a Google project that has not passed its audit are kept private by YouTube.' },
     postiz: { configured: !!pz, url: pz?.url ?? null, note: 'Postiz posts at the scheduled time; Shipcast marks the channel sent once Postiz accepts it.' },
+    google: { configured: !!(await getSecret(SECRET.youtubeClient)), connected: !!gs && (!!gs.refresh || Date.parse(gs.expiresAt) > now), note: 'Read-only: website visits and key events (Google Analytics) and search clicks (Search Console). Uses the same Google app as YouTube.' },
   };
 }
 
@@ -333,6 +342,28 @@ export async function youtubeAccess(): Promise<string> {
   await saveSecretJson(SECRET.youtubeToken, { access: tok.access_token, refresh: tok.refresh_token ?? t.refresh, expiresAt: new Date(Date.now() + (Number(tok.expires_in) || 3600) * 1000).toISOString(), scope: tok.scope ?? t.scope } satisfies YoutubeToken);
   return tok.access_token;
 }
+
+/** A fresh access token for the website connection (refreshing it when needed). */
+export async function googleSiteAccess(): Promise<string> {
+  const t = await secretJson<YoutubeToken>(SECRET.googleToken);
+  if (!t) throw new PublishError('Google Analytics is not connected — connect it in Settings → Website.', true);
+  if (Date.parse(t.expiresAt) > Date.now() + 60_000) return t.access;
+  const keys = await secretJson<ClientKeys>(SECRET.youtubeClient);
+  if (!t.refresh || !keys) throw new PublishError('The Google Analytics connection expired — reconnect it in Settings → Website.', true);
+  const r = await http(OAUTH.google.token, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: t.refresh, client_id: keys.id, client_secret: keys.secret }),
+    signal: AbortSignal.timeout(20_000),
+  });
+  if (r.status === 400 || r.status === 401) throw new PublishError('Google no longer accepts the website connection — reconnect it in Settings → Website.', true);
+  if (!r.ok) throw await failure('Google', r, 'token refresh');
+  const tok = (await r.json()) as { access_token?: string; expires_in?: number; refresh_token?: string; scope?: string };
+  if (!tok.access_token) throw new PublishError('Google did not return an access token.');
+  await saveSecretJson(SECRET.googleToken, { access: tok.access_token, refresh: tok.refresh_token ?? t.refresh, expiresAt: new Date(Date.now() + (Number(tok.expires_in) || 3600) * 1000).toISOString(), scope: tok.scope ?? t.scope } satisfies YoutubeToken);
+  return tok.access_token;
+}
+export const googleSiteConnected = async () => !!(await secretJson<YoutubeToken>(SECRET.googleToken));
 
 // YouTube rejects angle brackets in titles and descriptions.
 const ytText = (s: string, max: number) => s.replace(/[<>]/g, '').slice(0, max);
@@ -597,7 +628,7 @@ async function publishOnce(deps: PublisherDeps): Promise<PublisherReport> {
       if (!claimed) continue;
       const tries = (claimed.channel.attempts ?? 0) + 1;
       try {
-        const result = dryRun ? { note: 'Dry run — nothing was posted.' } : await adapter.send(claimed.post, claimed.channel, mediaFiles(claimed.channel));
+        const result = dryRun ? { note: 'Dry run — nothing was posted.' } : await adapter.send(claimed.post, await tagChannel(claimed.post.id, claimed.channel), mediaFiles(claimed.channel));
         await mark({ state: 'sent', url: result.url, remoteId: result.id, note: result.note, sentAt: clock().toISOString(), error: undefined, retryAt: undefined, attempts: tries });
         log(`${label}: sent`);
         report.sent.push(label);

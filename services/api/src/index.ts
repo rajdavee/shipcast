@@ -150,6 +150,13 @@ import {
   oauthFinish,
   oauthStart,
   OAUTH_PROVIDERS,
+  PROVIDER_NAMES,
+  tagChannel,
+  ga4Properties,
+  saveSiteSettings,
+  searchSites,
+  siteStatus,
+  syncSite,
   postizIntegrations,
   PublishError,
   queueSendNow,
@@ -533,7 +540,7 @@ router.get('/oauth/:provider/callback', async (_q, res, p, url) => {
     const provider = oauthProvider(p.provider);
     if (q.get('error')) throw new PublishError(`Sign-in was cancelled (${(q.get('error_description') || q.get('error') || '').slice(0, 120)}).`);
     const { account } = await oauthFinish(provider, q.get('state') ?? '', q.get('code') ?? '');
-    page = callbackPage('Connected — you can close this tab', `${provider === 'linkedin' ? 'LinkedIn' : 'YouTube'}${account ? ` (${account})` : ''} is connected to Shipcast.`);
+    page = callbackPage('Connected — you can close this tab', `${PROVIDER_NAMES[provider]}${account ? ` (${account})` : ''} ${provider === 'google' ? 'are' : 'is'} connected to Shipcast.`);
   } catch (e) {
     status = 400;
     page = callbackPage('Not connected', await redactSecrets((e as Error).message));
@@ -570,7 +577,7 @@ router.get('/api/calendar/posts/:id/kit/:channel', async (_q, res, p) => {
   const files = await publishCall(async () => mediaFiles(c));
   const dir = await mkdtemp(join(tmpdir(), 'shipcast-kit-'));
   try {
-    for (const [name, text] of Object.entries(kitTexts(post, c))) await writeFileP(join(dir, name), text);
+    for (const [name, text] of Object.entries(kitTexts(post, await tagChannel(post.id, c)))) await writeFileP(join(dir, name), text);
     // Numbered links keep the posting order and stop two files with the same name colliding.
     for (const [i, f] of files.entries()) await symlink(f, join(dir, `${String(i + 1).padStart(2, '0')}-${basename(f)}`));
   } catch (e) {
@@ -723,6 +730,23 @@ router.post('/api/reports/:id/actions/:rec', async (_q, _r, p) => {
 router.delete('/api/reports/:id', async (_q, _r, p) => {
   if (!(await deleteReport(p.id))) throw new HttpError(404, 'report not found');
   return { ok: true };
+});
+
+// ── website numbers: Google Analytics and Search Console (read-only) ──
+router.get('/api/site', () => siteStatus());
+router.put('/api/site', async (req) => {
+  const b = (await readJson(req)) ?? {};
+  await publishCall(() => saveSiteSettings({ ...(b.ga4Property !== undefined ? { ga4Property: String(b.ga4Property), ga4Name: String(b.ga4Name ?? '') } : {}), ...(b.gscSite !== undefined ? { gscSite: String(b.gscSite) } : {}), ...(Array.isArray(b.domains) ? { domains: b.domains } : {}), ...(typeof b.utm === 'boolean' ? { utm: b.utm } : {}) }));
+  return siteStatus();
+});
+router.get('/api/site/choices', async () => {
+  const [properties, sites] = await Promise.all([publishCall(() => ga4Properties()).catch((e) => ({ error: (e as Error).message })), publishCall(() => searchSites()).catch((e) => ({ error: (e as Error).message }))]);
+  return { properties, sites };
+});
+router.post('/api/site/sync', async (req) => {
+  const b = (await readJson(req)) ?? {};
+  const days = Number(b.days);
+  return publishCall(() => syncSite(Number.isFinite(days) && days > 0 ? { days: Math.min(400, Math.round(days)) } : {}));
 });
 
 // ── trend radar: cards the trends agent keeps fresh ────────────────────

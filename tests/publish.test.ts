@@ -513,7 +513,7 @@ test('API: connections and keys, connect URL, callback pages — never a secret 
     assert.equal(put.body.linkedin.configured, true);
     assert.equal((await api('/api/publish/youtube', { method: 'PUT', json: { clientId: 'yt-client.apps.googleusercontent.com', clientSecret: CLIENT_SECRET } })).status, 200);
     const conn = await api('/api/publish/connections');
-    assert.deepEqual(Object.keys(conn.body).sort(), ['linkedin', 'postiz', 'youtube']);
+    assert.deepEqual(Object.keys(conn.body).sort(), ['google', 'linkedin', 'postiz', 'youtube']);
     const go = await api('/api/publish/youtube/connect');
     const u = new URL(go.body.url);
     assert.equal(u.searchParams.get('redirect_uri'), `${base}/oauth/youtube/callback`);

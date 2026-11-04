@@ -6,6 +6,7 @@ import { channel, readPlan, savePlan, savePost, type ChannelId, type Post } from
 import { runClaude } from './claude.ts';
 import { withDirLock } from './filelock.ts';
 import { readPlaybook } from './playbook.ts';
+import { googleSiteConnected } from './publish.ts';
 import { moreLikeThis, remix, suggestedSlots } from './pulse.ts';
 import { gatherFacts, KPI_KEYS, periodFor, readGoals, readNotes, reportsDir, type Facts, type Goal, type Kpi, type Note, type PeriodKind, type PostFact } from './report-facts.ts';
 
@@ -432,7 +433,7 @@ export async function createReport(o: CreateReportOptions = {}): Promise<Report>
   const tz = o.tz ?? (await readPlan()).tz;
   const kind = o.kind ?? 'last7';
   const audience = o.audience && AUDIENCES[o.audience] ? o.audience : 'team';
-  const facts = await gatherFacts(periodFor(kind, asOf, tz, o.custom), asOf, { siteConnected: o.siteConnected });
+  const facts = await gatherFacts(periodFor(kind, asOf, tz, o.custom), asOf, { siteConnected: o.siteConnected ?? (await googleSiteConnected().catch(() => false)) });
   const plan = await readPlan();
   const recs = recommend(facts, { cadence: plan.cadence, suggested: suggestedSlots(await readPlaybook()) });
   const words = await writeReport(facts, recs, audience, o.ask === undefined ? askWriter : o.ask ?? undefined);
