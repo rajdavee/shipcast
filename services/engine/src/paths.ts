@@ -28,5 +28,9 @@ export const workspaceDir = (id: string) => join(rootHome(), 'workspaces', id);
 export const userDir = (id: string) => join(rootHome(), 'users', id);
 
 export const campaignsDir = () => join(home(), 'campaigns');
-export const campaignDir = (id: string) => join(campaignsDir(), id);
+/** A campaign's folder. Ids come from URLs, so anything but a plain id is refused before it can become a path. */
+export const campaignDir = (id: string) => {
+  if (!/^[\w-]{1,80}$/.test(String(id))) throw Object.assign(new Error('campaign not found'), { status: 404 });
+  return join(campaignsDir(), id);
+};
 export const settingsFile = () => join(home(), 'settings.json');

@@ -164,3 +164,16 @@ test("each person's Claude: their own credential, isolated config, never someone
   assert.equal((await call(me, 'POST', '/api/connect/claude', {})).status, 403, "signing this machine's Claude in is for the install owner only");
   assert.equal((await call(me, 'DELETE', '/api/account/claude')).body.method, 'none');
 });
+
+test('review fixes: no path escapes through ids or file names, no secrets through the files route', async () => {
+  const s = await call(null, 'POST', '/api/auth/signin', { email: 'ana@test.dev', password: PW });
+  const me = { cookie: s.cookie, ws: ana.ws };
+  for (const id of ['..%2F..%2F..', '..%2F..%2F..%2Fauth', '%2e%2e', 'a%2Fb'])
+    assert.equal((await call(me, 'GET', `/api/campaigns/${id}/files/auth/users.json`)).status, 404, id);
+  assert.equal((await call(me, 'GET', '/api/campaigns/..%2F..%2F..%2Fusers/files/x/claude.json')).status, 404);
+  const { writeFileSync } = await import('node:fs');
+  writeFileSync(join(home, 'workspaces', ana.ws!, 'campaigns', anaProject, 'secrets.env'), 'API_KEY=shh');
+  writeFileSync(join(home, 'workspaces', ana.ws!, 'campaigns', anaProject, '.env.local'), 'X=1');
+  assert.equal((await call(me, 'GET', `/api/campaigns/${anaProject}/files/secrets.env`)).status, 403);
+  assert.equal((await call(me, 'GET', `/api/campaigns/${anaProject}/files/.env.local`)).status, 403);
+});

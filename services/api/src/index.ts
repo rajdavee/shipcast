@@ -1337,7 +1337,8 @@ function safePath(id: string, rel: string): string {
   const root = campaignDir(id);
   const abs = resolve(root, rel);
   if (abs !== root && !abs.startsWith(root + sep)) throw new HttpError(403, 'outside campaign');
-  if (/(^|\/)(source|\.lock)(\/|$)/.test(rel)) throw new HttpError(403, 'not served');
+  // The source checkout, locks, and anything holding secrets (the app's env, dotfiles) are never served.
+  if (/(^|\/)(source|\.lock)(\/|$)/.test(rel) || /(^|\/)(secrets\.env|\.[^/]*)$/.test(rel) || /(^|\/)\.env/.test(rel)) throw new HttpError(403, 'not served');
   if (!insideReal(root, abs)) throw new HttpError(403, 'outside campaign');
   return abs;
 }
@@ -1470,7 +1471,9 @@ export function createApp({ serveWeb = true } = {}): Server {
       const cache = asset && url.pathname.startsWith('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache';
       sendFile(req, res, asset ? file : join(WEB_DIST, 'index.html'), { 'cache-control': cache });
     } catch (e) {
-      const status = e instanceof HttpError ? e.status : 500;
+      // Engine errors may carry a client status (e.g. a malformed id is simply not found).
+      const own = (e as { status?: unknown })?.status;
+      const status = e instanceof HttpError ? e.status : typeof own === 'number' && own >= 400 && own < 500 ? own : 500;
       if (status === 500) console.error(e);
       if (!res.headersSent) json(res, status, { error: e instanceof Error ? e.message : String(e) });
       else res.end();
