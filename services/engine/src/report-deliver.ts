@@ -12,6 +12,7 @@ import { reportsDir, type PeriodKind } from './report-facts.ts';
 import { reportEmailHtml, reportMarkdown } from './report-html.ts';
 import { createShare, reportPdf } from './report-out.ts';
 import { currentContext } from './context.ts';
+import { isInstallOwnerSync } from './claude-account.ts';
 import { AUDIENCES, createReport, getReport, markReportSent, type Audience, type Report } from './report.ts';
 import { readSettings } from './store.ts';
 import { getSecret, setSecret } from './voices.ts';
@@ -174,6 +175,9 @@ export async function saveSmtp(input: Partial<SmtpConfig> | null): Promise<void>
   const from = String(input.from ?? '').trim();
   if (!/^[a-z0-9.-]{3,253}$/.test(host)) throw bad('Enter the mail server’s host name, e.g. smtp.example.com.');
   const local = /^(localhost|127\.0\.0\.1)$/.test(host);
+  // A relay on this machine is the machine owner's to point at (other people could otherwise probe local ports).
+  const uid = currentContext()?.user;
+  if (local && uid && !isInstallOwnerSync(uid)) throw bad('Only the person who set Shipcast up can use a mail relay on this machine.');
   if (!SMTP_PORTS.includes(port) && !(local && Number.isInteger(port) && port > 1024 && port < 65536)) throw bad('Mail servers use port 587, 465, 25 or 2525 (a relay on this machine may use any port above 1024).');
   const addr = /<([^>]+)>\s*$/.exec(from)?.[1] ?? from;
   if (!EMAIL_RE.test(addr) || /[\r\n]/.test(from)) throw bad('“From” must be an email address, optionally with a name: Acme Reports <reports@acme.com>.');
@@ -346,7 +350,9 @@ async function assertPublic(url: string) {
 }
 
 /** The JSON each chat app expects. */
-export function webhookPayload(kind: WebhookKind, r: Report, link?: string): unknown {
+export function webhookPayload(kind: WebhookKind, rIn: Report, link?: string): unknown {
+  // Post titles and notes are people's text: in chat apps they must not ping @channel/@everyone or smuggle links.
+  const r = kind === 'slack' ? mapText(rIn, (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')) : kind === 'discord' ? mapText(rIn, (t) => t.replace(/@/g, '@\u200b')) : rIn;
   const kpis = r.facts.kpis.slice(0, 4).map((k) => `${k.label}: ${k.unit === 'percent' ? `${k.value}%` : Math.round(k.value).toLocaleString('en-US')}${k.change !== undefined ? ` (${k.change >= 0 ? '+' : '−'}${Math.round(Math.abs(k.change) * 100)}%)` : ''}`);
   const summary = r.sections.find((s) => s.id === 'summary')?.lines ?? [];
   const next = r.recommendations.map((x, i) => `${i + 1}. ${x.text}`);
@@ -364,12 +370,17 @@ export function webhookPayload(kind: WebhookKind, r: Report, link?: string): unk
         ],
       };
     case 'discord':
-      return { content: `**${r.headline}**`.slice(0, 1900), embeds: [{ title: r.title, ...(link ? { url: link } : {}), description: [...summary, '', ...kpis, ...(next.length ? ['', '**Next steps**', ...next] : [])].join('\n').slice(0, 4000) }] };
+      return { allowed_mentions: { parse: [] }, content: `**${r.headline}**`.slice(0, 1900), embeds: [{ title: r.title, ...(link ? { url: link } : {}), description: [...summary, '', ...kpis, ...(next.length ? ['', '**Next steps**', ...next] : [])].join('\n').slice(0, 4000) }] };
     case 'teams':
       return { type: 'message', attachments: [{ contentType: 'application/vnd.microsoft.card.adaptive', content: { $schema: 'http://adaptivecards.io/schemas/adaptive-card.json', type: 'AdaptiveCard', version: '1.4', body: [{ type: 'TextBlock', size: 'Large', weight: 'Bolder', wrap: true, text: r.headline }, { type: 'TextBlock', isSubtle: true, wrap: true, text: r.title }, { type: 'FactSet', facts: kpis.map((k) => ({ title: k.split(': ')[0], value: k.split(': ').slice(1).join(': ') })) }, ...summary.map((l) => ({ type: 'TextBlock', wrap: true, text: `• ${l}` })), ...(next.length ? [{ type: 'TextBlock', weight: 'Bolder', text: 'Next steps' }, ...next.map((l) => ({ type: 'TextBlock', wrap: true, text: l }))] : [])], ...(link ? { actions: [{ type: 'Action.OpenUrl', title: 'Open the report', url: link }] } : {}) } }] };
     default:
       return { title: r.title, headline: r.headline, period: r.facts.period.label, kpis: r.facts.kpis.map(({ key, label, value, prev, change, unit }) => ({ key, label, value, prev, change, unit })), summary, nextSteps: r.recommendations.map((x) => ({ text: x.text, why: x.why })), ...(link ? { link } : {}), markdown: reportMarkdown(r, link) };
   }
+}
+
+/** The report with its people-written text passed through `fn` (for chat apps' markup). */
+function mapText(r: Report, fn: (t: string) => string): Report {
+  return { ...r, title: fn(r.title), headline: fn(r.headline), sections: r.sections.map((s) => ({ ...s, lines: s.lines.map(fn) })), recommendations: r.recommendations.map((x) => ({ ...x, text: fn(x.text), why: fn(x.why) })) };
 }
 
 // Swappable for tests.

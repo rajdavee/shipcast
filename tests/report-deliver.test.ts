@@ -139,3 +139,13 @@ test('the scheduled tick: review first by default, auto-send when asked, once pe
   await saveSchedule({ enabled: false });
   assert.equal(await reportTick({ ...deps, now: new Date('2026-11-20T16:05:00Z') }), undefined);
 });
+
+test('chat messages carry no live mentions or links from post titles', async () => {
+  const r = await createReport({ kind: 'last7', ask: null });
+  const evil = { ...r, headline: 'Launch <!channel> <https://evil.com|click> @everyone' };
+  const slack = JSON.stringify(webhookPayload('slack', evil));
+  assert.ok(!slack.includes('<!channel>') && slack.includes('&lt;!channel&gt;'));
+  const discord = webhookPayload('discord', evil) as any;
+  assert.deepEqual(discord.allowed_mentions, { parse: [] });
+  assert.ok(!discord.content.includes('@everyone'));
+});
