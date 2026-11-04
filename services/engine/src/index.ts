@@ -51,3 +51,4 @@ export * from './playbook.ts';
 export * from './filelock.ts';
 export * from './pulse.ts';
 export * from './context.ts';
+export * from './auth.ts';
