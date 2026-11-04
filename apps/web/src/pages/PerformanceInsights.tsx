@@ -7,6 +7,7 @@ import { Dialog, EmptyState, Loading } from '../components/ui.tsx';
 import { Cal, Nav } from '../components/icons.tsx';
 import { ChannelIcon, isImage, mediaUrl } from '../components/CalendarBits.tsx';
 import { ConfidenceChip, EffectBar, HeatMap, LiftBadge } from '../components/PulseBits.tsx';
+import { useAccess } from '../session.ts';
 
 const SAMPLE = /^Sample · /;
 const postLink = (id: string) => `#/calendar/post/${id}`;
@@ -17,6 +18,7 @@ const ago = (iso: string) => {
 
 /** Insights → Performance: what works for this brand on each channel, and why, from its own numbers. */
 export function PerformanceInsights() {
+  const write = useAccess().write;
   const pb = useLoad(() => api.metrics.playbook());
   const perf = useLoad(() => api.metrics.performance());
   const posts = useLoad(() => api.calendar.posts());
@@ -78,7 +80,7 @@ export function PerformanceInsights() {
         </div>
         <span className="pi-refresh">
           <span className="hint" role="status">{refreshing ? `Refreshing — fitting the model and writing the why (${secs} s)…` : pb.data.computedAt ? `Playbook updated ${ago(pb.data.computedAt)}` : 'Not computed yet'}</span>
-          <button className="btn" disabled={refreshing !== null} onClick={refresh}>{refreshing ? <><span className="spinner" aria-hidden="true" />Refreshing…</> : 'Refresh playbook'}</button>
+          {write && <button className="btn" disabled={refreshing !== null} onClick={refresh}>{refreshing ? <><span className="spinner" aria-hidden="true" />Refreshing…</> : 'Refresh playbook'}</button>}
         </span>
       </div>
 
@@ -255,6 +257,7 @@ function Matrix({ channels, name }: { channels: ChannelPlaybook[]; name: (id: Ch
 function BestTimes({ ch, name, plan, suggested, onSaved }: { ch: ChannelId; name: string; plan: ContentPlan | null; suggested?: { slots: string[]; why: string[] }; onSaved: (p: ContentPlan) => void }) {
   const [confirm, setConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
+  const write = useAccess().write;
   const cur = plan?.cadence[ch];
   const same = !!suggested && !!cur && suggested.slots.length === cur.slots.length && suggested.slots.every((s) => cur.slots.includes(s));
   async function apply() {
@@ -283,7 +286,8 @@ function BestTimes({ ch, name, plan, suggested, onSaved }: { ch: ChannelId; name
           </ul>
           <div className="best-foot">
             <span className="hint">{cur?.slots.length ? `Your plan now: ${cur.slots.join(', ')}` : `${name} has no slots in your plan yet.`}</span>
-            <button className="btn primary" disabled={same || !plan} onClick={() => setConfirm(true)}><Cal.clock />{same ? 'Already in your plan' : 'Use these slots'}</button>
+            {write && <button className="btn primary" disabled={same || !plan} onClick={() => setConfirm(true)}><Cal.clock />{same ? 'Already in your plan' : 'Use these slots'}</button>}
+
           </div>
         </>
       )}

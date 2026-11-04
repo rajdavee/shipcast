@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { api, type BrandScore, type ToneProfile, type ToneSliders } from '../api.ts';
 import { toast, useLoad } from '../hooks.ts';
 import { Loading, PageHeader } from '../components/ui.tsx';
+import { Nav } from '../components/icons.tsx';
+import { useAccess } from '../session.ts';
 
 const SLIDERS: { key: keyof ToneSliders; lo: string; hi: string }[] = [
   { key: 'formalCasual', lo: 'Formal', hi: 'Casual' },
@@ -15,6 +17,7 @@ const lines = (s: string) => s.split('\n').map((x) => x.trim()).filter(Boolean);
 
 /** Tone & Voice: how each brand sounds, applied to every material Shipcast writes. */
 export function Voice() {
+  const write = useAccess().write;
   const tones = useLoad(() => api.tones());
   const [sel, setSel] = useState('default');
   const [draft, setDraft] = useState<ToneProfile | null>(null);
@@ -58,7 +61,7 @@ export function Voice() {
       <PageHeader
         title="Brand"
         description="How your brand sounds. Every post, deck, PDF, ad, email and script follows the voice you pick, and each one is scored against it."
-        actions={<button className="btn" onClick={() => { setSel('default'); setDraft({ ...structuredClone(tones.data!.find((t) => t.id === 'default')!), id: '', name: 'New voice', samples: [] }); }}>New voice</button>}
+        actions={write ? <button className="btn" onClick={() => { setSel('default'); setDraft({ ...structuredClone(tones.data!.find((t) => t.id === 'default')!), id: '', name: 'New voice', samples: [] }); }}>New voice</button> : <span className="view-only"><Nav.eye />View only</span>}
       />
 
       <section className="voice-tabs">
@@ -69,7 +72,7 @@ export function Voice() {
         </div>
       </section>
 
-      <section className="setup-section">
+      {write && <section className="setup-section">
         <h2>Learn it from your copy</h2>
         <p>Paste a few paragraphs you’re proud of, or links to your site, blog or a great post. Shipcast listens for the voice and fills in everything below.</p>
         <textarea className="textarea" rows={4} value={samples} onChange={(e) => setSamples(e.target.value)} placeholder={'https://yourproduct.com\n\nOr paste copy here — separate samples with a blank line.'} aria-label="Sample copy or links" />
@@ -77,7 +80,10 @@ export function Voice() {
           <button className="btn primary" disabled={!samples.trim() || !!busy} onClick={() => learn(true)}>{busy === 'learn' ? 'Listening…' : 'Learn a new voice'}</button>
           {draft.id && draft.id !== 'default' && <button className="btn" disabled={!samples.trim() || !!busy} onClick={() => learn(false)}>Update “{draft.name}”</button>}
         </div>
-      </section>
+      </section>}
+
+      {/* Viewers read the voice; only editors change it. */}
+      <fieldset className="plain-set" disabled={!write}>
 
       <section className="setup-section">
         <h2>The voice</h2>
@@ -132,15 +138,17 @@ export function Voice() {
         <label className="check">
           <input type="checkbox" checked={draft.aiDisclosure} onChange={(e) => set({ aiDisclosure: e.target.checked })} /> Label AI-generated people and voices
         </label>
-        <div className="row-actions" style={{ marginTop: 16 }}>
+        {write && <div className="row-actions" style={{ marginTop: 16 }}>
           <button className="btn primary" disabled={!!busy || !draft.name.trim()} onClick={save}>{busy === 'save' ? 'Saving…' : 'Save voice'}</button>
           {draft.id && draft.id !== 'default' && (
             <button className="btn ghost danger" onClick={async () => { await api.deleteTone(draft.id); await tones.reload(); setSel('default'); toast('Voice deleted'); }}>Delete</button>
           )}
-        </div>
+        </div>}
       </section>
+      </fieldset>
 
-      <TryIt toneId={draft.id || 'default'} />
+      {write && <TryIt toneId={draft.id || 'default'} />}
+
     </main>
   );
 }

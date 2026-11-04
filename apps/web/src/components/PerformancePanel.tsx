@@ -18,7 +18,7 @@ function hasCollector(c: PostChannel, conns: PublishConnections | null) {
 }
 
 /** The drawer's Performance tab: per channel, how it did against your usual, the readings behind it, and ways to add more. */
-export function PerformancePanel({ post, channels, conns, addFor, onCreated }: { post: Post; channels: ChannelInfo[]; conns: PublishConnections | null; addFor?: ChannelId; onCreated: (ps: Post[], what: string) => void }) {
+export function PerformancePanel({ post, channels, conns, addFor, onCreated, readOnly }: { post: Post; channels: ChannelInfo[]; conns: PublishConnections | null; addFor?: ChannelId; onCreated: (ps: Post[], what: string) => void; readOnly?: boolean }) {
   const [data, setData] = useState<{ snapshots: Snapshot[]; performance: Performance[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState<ChannelId | null>(addFor ?? null);
@@ -81,7 +81,7 @@ export function PerformancePanel({ post, channels, conns, addFor, onCreated }: {
                         <th scope="row" className="tnum" title={`${ageLabel(s.ageHours)} after posting`}>{bucketOf(s.ageHours) ? BUCKET_LABEL[bucketOf(s.ageHours)!] : ageLabel(s.ageHours)}</th>
                         {fields.map((k) => <td key={k} className="tnum">{s[k] === undefined ? '—' : k === 'avgViewPct' ? `${s[k]}%` : fmtCount(s[k])}</td>)}
                         <td><span className={`src src-${s.source}`}>{SOURCE_LABEL[s.source]}</span></td>
-                        <td><button className="btn ghost icon-btn sm" aria-label={`Delete the ${ageLabel(s.ageHours)} reading`} title="Delete this reading" onClick={() => remove(s)}><Cal.trash /></button></td>
+                        <td>{!readOnly && <button className="btn ghost icon-btn sm" aria-label={`Delete the ${ageLabel(s.ageHours)} reading`} title="Delete this reading" onClick={() => remove(s)}><Cal.trash /></button>}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -90,7 +90,7 @@ export function PerformancePanel({ post, channels, conns, addFor, onCreated }: {
             )}
             {adding === c.channel ? (
               <AddNumbers post={post} ch={c} name={name(c.channel)} onCancel={() => setAdding(null)} onSaved={async () => { setAdding(null); await load(); }} />
-            ) : (
+            ) : readOnly ? null : (
               <div className="perf-actions">
                 <button className="btn sm" onClick={() => setAdding(c.channel)}><Cal.plus />Add numbers</button>
               </div>
@@ -98,7 +98,7 @@ export function PerformancePanel({ post, channels, conns, addFor, onCreated }: {
           </section>
         );
       })}
-      <div className="perf-foot">
+      {!readOnly && <div className="perf-foot">
         {collectable && <button className="btn sm" disabled={!!busy} onClick={() => act('collect', async () => toast((await api.metrics.collectNow(post.id)).note))}>{busy === 'collect' ? 'Asking…' : 'Collect now'}</button>}
         <button className="btn sm" disabled={!!busy} onClick={() => act('more', async () => onCreated([await api.metrics.more(post.id)], 'A follow-up idea is in your backlog'))}><Cal.spark />{busy === 'more' ? 'Adding…' : 'Make more like this'}</button>
         <button className="btn sm" disabled={!!busy} onClick={() => act('remix', async () => {
@@ -106,7 +106,8 @@ export function PerformancePanel({ post, channels, conns, addFor, onCreated }: {
           if (!ps.length) return toast('No other channels in your plan to remix it for');
           onCreated(ps, `${ps.length} remix idea${ps.length === 1 ? '' : 's'} in your backlog`);
         })}>{busy === 'remix' ? 'Adding…' : 'Remix for other channels'}</button>
-      </div>
+      </div>}
+
     </div>
   );
 }

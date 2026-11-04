@@ -3,6 +3,7 @@ import { api, fileUrl, fmtDuration, type Campaign, type CampaignEvent, type Pack
 import { toast, useLoad } from '../hooks.ts';
 import { CopyKit, Docs, MediaStage, isImage, isText, isVideo, useText } from './OutputViewer.tsx';
 import { SpecEditor } from './SpecEditor.tsx';
+import { useAccess } from '../session.ts';
 import { Notes, QualityReport } from './StepDetails.tsx';
 
 type Panel = 'post' | 'edit' | 'checks' | 'activity' | 'takes';
@@ -35,6 +36,8 @@ const label = (f: string) => {
 
 export function Lightbox({ campaign, step, pack, events, onClose, onChange, onPrev, onNext }: { campaign: Campaign; step: Step; pack?: Pack; events: CampaignEvent[]; onClose: () => void; onChange: (c: Campaign) => void; onPrev?: () => void; onNext?: () => void }) {
   const [panel, setPanel] = useState<Panel>('post');
+  // Viewers can look, copy and download; making, editing and choosing takes is for editors.
+  const write = useAccess().write;
   const takes = useLoad(() => (step.status === 'done' ? api.takes(campaign.id, step.id) : Promise.resolve([])), [step.id, step.status, step.endedAt]);
   const [note, setNote] = useState('');
   const prefix = `deliverables/${step.id}/`;
@@ -50,7 +53,7 @@ export function Lightbox({ campaign, step, pack, events, onClose, onChange, onPr
   const postText = useText(post ? url(prefix + post) : null, version);
   const main = mainFile(step);
   const downloads = useMemo(() => files.filter((f) => /\.(gif|mp4|pdf|png|jpg|zip)$/.test(f) && !f.includes('.sheet.') && !/(video|captioned)\.jpg$/.test(f)), [files.join()]);
-  const editable = !!pack?.spec && pack.spec !== 'infographic' && step.outputs.length > 0;
+  const editable = write && !!pack?.spec && pack.spec !== 'infographic' && step.outputs.length > 0;
   const hasQa = step.outputs.some((o) => o.endsWith('qa.json'));
   const images = files.filter((f) => f.startsWith(prefix + 'assets/'));
 
@@ -131,11 +134,11 @@ export function Lightbox({ campaign, step, pack, events, onClose, onChange, onPr
             <div className="lb-actions">
               {main && <a className="btn primary" href={url(prefix + main) + '&download'} download>Download {label(main)}</a>}
               {postText && <button className="btn" onClick={() => navigator.clipboard.writeText(postText).then(() => toast('Post text copied'))}>Copy post text</button>}
-              {step.pack === 'youtube-video' && <button className="btn" onClick={() => act(() => api.addStep(campaign.id, 'shorts', { source: step.id }), 'Cutting 3 Shorts from this video')}>Cut 3 Shorts</button>}
+              {write && step.pack === 'youtube-video' && <button className="btn" onClick={() => act(() => api.addStep(campaign.id, 'shorts', { source: step.id }), 'Cutting 3 Shorts from this video')}>Cut 3 Shorts</button>}
               {editable && step.status === 'done' && !['ad-set', 'landing', 'print', 'infographic', 'hook-variants'].includes(step.pack ?? '') && (
                 <button className="btn" title="The same piece with 4 different openings, rendered side by side for an A/B test" onClick={() => act(() => api.variants(campaign.id, step.id, 4), 'Writing 4 hook variants')}>Hook variants</button>
               )}
-              {step.status === 'done' && step.outputs.some((o) => /\.(mp4|png|jpe?g)$/.test(o)) && !['platform-export', 'hook-variants', 'campaign-hub'].includes(step.pack ?? '') && (
+              {write && step.status === 'done' && step.outputs.some((o) => /\.(mp4|png|jpe?g)$/.test(o)) && !['platform-export', 'hook-variants', 'campaign-hub'].includes(step.pack ?? '') && (
                 <button className="btn" title="Re-cut for TikTok, Reels, Shorts, LinkedIn and X with captions and an upload checklist" onClick={() => act(() => api.addStep(campaign.id, 'platform-export', { source: step.id, platforms: 'tiktok,reels,shorts,linkedin,x' }), 'Exporting for each platform')}>Export for platforms</button>
               )}
             </div>
@@ -172,7 +175,7 @@ export function Lightbox({ campaign, step, pack, events, onClose, onChange, onPr
                     <h4>{t.label}</h4>
                     <div className="take-grid">
                       {t.posters.map((poster, k) => (
-                        <button key={k} className={`take ${k === t.chosen ? 'on' : ''}`} aria-pressed={k === t.chosen} disabled={step.status !== 'done'} onClick={() => act(() => api.chooseTake(campaign.id, step.id, t.id, k), `Take ${k + 1} chosen — re-rendering`)}>
+                        <button key={k} className={`take ${k === t.chosen ? 'on' : ''}`} aria-pressed={k === t.chosen} disabled={step.status !== 'done' || !write} onClick={() => act(() => api.chooseTake(campaign.id, step.id, t.id, k), `Take ${k + 1} chosen — re-rendering`)}>
                           <img src={fileUrl(campaign.id, poster)} alt={`Take ${k + 1}`} loading="lazy" />
                           <span>{k === t.chosen ? 'In use' : `Use take ${k + 1}`}</span>
                         </button>
@@ -198,7 +201,7 @@ export function Lightbox({ campaign, step, pack, events, onClose, onChange, onPr
           </div>
 
           <footer className="lb-foot">
-            {(step.status === 'done' || step.status === 'failed') && (
+            {write && (step.status === 'done' || step.status === 'failed') && (
               <form
                 className="ask"
                 onSubmit={(e) => {
@@ -224,12 +227,13 @@ export function Lightbox({ campaign, step, pack, events, onClose, onChange, onPr
                 <button className="btn primary sm" disabled={!note.trim() || busy}>Send</button>
               </form>
             )}
-            <div className="lb-more">
+            {write && <div className="lb-more">
               {step.status === 'running' && <button className="linkish danger" disabled={step.cancelRequested} onClick={() => act(() => api.cancel(campaign.id, step.id), 'Stopping…')}>Stop</button>}
               {(step.status === 'done' || step.status === 'failed' || step.status === 'canceled') && (
                 <button className="linkish" onClick={() => act(() => api.retry(campaign.id, step.id), 'Making a fresh version')}>Make a fresh version</button>
               )}
-            </div>
+            </div>}
+
           </footer>
         </aside>
       </div>

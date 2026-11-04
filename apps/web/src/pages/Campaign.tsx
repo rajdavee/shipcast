@@ -5,6 +5,7 @@ import { FORMATS, PLAIN, isStudio, relTime, shape } from '../formats.ts';
 import { Lightbox } from '../components/Lightbox.tsx';
 import { OptionInput } from '../components/OptionInput.tsx';
 import { EmptyState, Loading, PageHeader } from '../components/ui.tsx';
+import { useAccess } from '../session.ts';
 
 /** Live campaign state + event log over one SSE connection. */
 function useCampaign(id: string) {
@@ -97,7 +98,7 @@ function CopyPreview({ campaign, step }: { campaign: C; step: Step }) {
   return <div className="copy-preview">{(text.data ?? '').replace(/^#+\s*/gm, '').slice(0, 600)}</div>;
 }
 
-function ResultCard({ campaign, step, pack, now, onOpen, onRetry }: { campaign: C; step: Step; pack?: Pack; now: number; onOpen: () => void; onRetry: () => void }) {
+function ResultCard({ campaign, step, pack, now, onOpen, onRetry }: { campaign: C; step: Step; pack?: Pack; now: number; onOpen: () => void; onRetry?: () => void }) {
   const ratio = shape(pack, step);
   const thumb = step.status === 'done' ? thumbOf(step) : null;
   const isVideo = !thumb?.endsWith('.gif') && step.outputs.some((o) => o.endsWith('.mp4'));
@@ -131,7 +132,7 @@ function ResultCard({ campaign, step, pack, now, onOpen, onRetry }: { campaign: 
         {step.status === 'failed' && (
           <div className="failed">
             <b>Didn't work this time</b>
-            <span
+            {onRetry && <span
               role="button"
               tabIndex={0}
               className="btn sm"
@@ -141,7 +142,7 @@ function ResultCard({ campaign, step, pack, now, onOpen, onRetry }: { campaign: 
               }}
             >
               Try again
-            </span>
+            </span>}
           </div>
         )}
       </div>
@@ -208,6 +209,7 @@ export function Campaign({ id }: { id: string }) {
   const packMap = useMemo(() => new Map((packs.data ?? []).map((p) => [p.id, p])), [packs.data]);
   const [open, setOpen] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const access = useAccess();
   const live = campaign?.steps.some((s) => s.status === 'running' || s.status === 'queued') ?? false;
   const now = useNow(live);
   const upload = useRef<HTMLInputElement>(null);
@@ -255,10 +257,11 @@ export function Campaign({ id }: { id: string }) {
         description={<span className="source">{campaign.source.type === 'text' ? 'From your description' : campaign.source.value.replace(/^https?:\/\//, '')} · {relTime(campaign.createdAt)}</span>}
         actions={<>
           {ready > 0 && <a className="btn primary" href={`/api/campaigns/${id}/export`}>Download all</a>}
-          <details className="menu">
+          {(access.write || access.install) && <details className="menu">
             <summary className="btn ghost icon-btn" aria-label="More actions">⋯</summary>
             <div className="menu-pop">
-              <button onClick={() => api.reveal(id)}>Open folder</button>
+              {access.install && <button onClick={() => api.reveal(id)}>Open folder</button>}
+              {access.write && <>
               <button onClick={() => upload.current?.click()}>Upload a clip or images</button>
               <button
                 title="Videos, carousels and posts re-render with today's engine — same scripts, no new Claude run"
@@ -303,8 +306,9 @@ export function Campaign({ id }: { id: string }) {
               >
                 Delete project
               </button>
+              </>}
             </div>
-          </details>
+          </details>}
         </>}
       />
 
@@ -312,7 +316,7 @@ export function Campaign({ id }: { id: string }) {
 
       {campaign.steps.some((s) => s.pack === 'app-run' || s.pack === 'campaign-plan') && <CampaignProgress campaign={campaign} packMap={packMap} />}
 
-      {campaign.steps.filter((s) => s.status === 'needs-input' && s.question).map((s) => (
+      {access.write && campaign.steps.filter((s) => s.status === 'needs-input' && s.question).map((s) => (
         <NeedsInput key={s.id} campaign={campaign} step={s} packName={(packMap.get(s.pack!)?.name ?? 'This step')} onChange={setCampaign} />
       ))}
 
@@ -333,23 +337,24 @@ export function Campaign({ id }: { id: string }) {
         );
       })}
 
-      {campaign.steps.some((s) => s.pack === 'app-run' && s.status === 'done') && <AppBar id={campaign.id} busyStep={campaign.steps.some((s) => s.status === 'running')} onChange={setCampaign} />}
+      {access.write && campaign.steps.some((s) => s.pack === 'app-run' && s.status === 'done') && <AppBar id={campaign.id} busyStep={campaign.steps.some((s) => s.status === 'running')} onChange={setCampaign} />}
 
       <BriefStrip campaign={campaign} step={brief} />
       {brief.status === 'failed' && (
         <div className="banner">
           Research didn't finish: {brief.error}{' '}
-          <button className="btn sm" onClick={() => act(() => api.retry(id, 'brief'), 'Trying again')}>Try again</button>
+          {access.write && <button className="btn sm" onClick={() => act(() => api.retry(id, 'brief'), 'Trying again')}>Try again</button>}
         </div>
       )}
 
       <div className="results">
         {items.map((s) => (
-          <ResultCard key={s.id} campaign={campaign} step={s} pack={packMap.get(s.pack!)} now={now} onOpen={() => setOpen(s.id)} onRetry={() => act(() => api.retry(id, s.id), 'Trying again')} />
+          <ResultCard key={s.id} campaign={campaign} step={s} pack={packMap.get(s.pack!)} now={now} onOpen={() => setOpen(s.id)} onRetry={access.write ? () => act(() => api.retry(id, s.id), 'Trying again') : undefined} />
         ))}
-        <button className="result add" onClick={() => setAdding(true)}>
+        {access.write && <button className="result add" onClick={() => setAdding(true)}>
           <span className="add-result"><b>+</b>Make something else<small>Uses the same research</small></span>
-        </button>
+        </button>}
+
       </div>
 
       <input
