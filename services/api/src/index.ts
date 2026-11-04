@@ -1,4 +1,4 @@
-import { createServer, type Server } from 'node:http';
+import { createServer, type IncomingMessage, type Server } from 'node:http';
 import { existsSync, createWriteStream, realpathSync } from 'node:fs';
 import { mkdtemp, readdir, readFile, rm, symlink, writeFile as writeFileP } from 'node:fs/promises';
 import { mkdir } from 'node:fs/promises';
@@ -8,6 +8,9 @@ import { homedir, tmpdir } from 'node:os';
 import { pipeline } from 'node:stream/promises';
 import {
   appendEvent,
+  currentContext,
+  runAs,
+  type WorkContext,
   CALENDAR_CHANNELS,
   criticCalibration,
   moreLikeThis,
@@ -151,6 +154,7 @@ import {
   type OAuthProvider,
 } from '@shipcast/engine';
 import { HttpError, json, readBody, readJson, Router, sendFile } from './http.ts';
+import { gate, registerAuthRoutes, type Caller } from './gate.ts';
 import { loginState, startClaudeLogin, startGithubLogin } from './connect.ts';
 
 const router = new Router();
@@ -172,7 +176,8 @@ const packView = (p: Pack) => ({
 });
 
 function makeStep(kind: Step['kind'], pack?: string, options: Record<string, string> = {}): Step {
-  return { id: kind === 'brief' ? 'brief' : newId('d'), kind, pack, options, status: 'queued', outputs: [], revisions: [] };
+  const by = currentContext()?.user;
+  return { id: kind === 'brief' ? 'brief' : newId('d'), kind, pack, options, status: 'queued', outputs: [], revisions: [], ...(by ? { by } : {}) };
 }
 
 async function mustCampaign(id: string): Promise<Campaign> {
@@ -471,10 +476,17 @@ router.put('/api/publish/postiz', async (req) => {
   return { ...(await connections()), integrations: list };
 });
 router.get('/api/publish/postiz/integrations', () => publishCall(() => postizIntegrations()));
+// OAuth state → the workspace and person who started it, so the connection lands in that workspace (10 minutes).
+const oauthOwners = new Map<string, { ctx: WorkContext; at: number }>();
 router.get('/api/publish/:provider/connect', async (req, _r, p) => {
   const provider = oauthProvider(p.provider);
   // The redirect goes to this very server, on the port the browser reached it on.
-  return publishCall(() => oauthStart(provider, req.socket.localPort ?? 4317));
+  const r = await publishCall(() => oauthStart(provider, req.socket.localPort ?? 4317));
+  const state = new URL(r.url).searchParams.get('state');
+  const ctx = currentContext();
+  if (state && ctx) oauthOwners.set(state, { ctx, at: Date.now() });
+  for (const [k, v] of oauthOwners) if (Date.now() - v.at > 10 * 60_000) oauthOwners.delete(k);
+  return r;
 });
 router.delete('/api/publish/:provider', async (_q, _r, p, url) => {
   const provider = p.provider === 'postiz' ? 'postiz' : oauthProvider(p.provider);
@@ -1337,6 +1349,8 @@ function insideReal(root: string, file: string): boolean {
 }
 
 router.get('/api/campaigns/:id/files/*', (req, res, p) => {
+  // A project this workspace doesn't have is simply not found, whatever the path asks for.
+  if (!existsSync(campaignDir(p.id))) throw new HttpError(404, 'campaign not found');
   const file = safePath(p.id, p.rest);
   // Generated files are untrusted: HTML/SVG get an opaque sandboxed origin so
   // they can never script the studio or call this api.
@@ -1394,6 +1408,17 @@ router.post('/api/campaigns/:id/reveal', async (_q, _r, p) => {
 
 // ── server ─────────────────────────────────────────────────────────────
 const LOCAL_HOSTS = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
+// A team server reached by name: SHIPCAST_ALLOWED_HOSTS=shipcast.example.com,10.0.0.5:4317
+const EXTRA_HOSTS = new Set((process.env.SHIPCAST_ALLOWED_HOSTS ?? '').split(',').map((h) => h.trim().toLowerCase()).filter(Boolean));
+const allowedHost = (h: string) => LOCAL_HOSTS.test(h) || EXTRA_HOSTS.has(h.toLowerCase()) || EXTRA_HOSTS.has(h.toLowerCase().replace(/:\d+$/, ''));
+
+const callers = new WeakMap<IncomingMessage, Caller>();
+const callerOf = (req: IncomingMessage): Caller => {
+  const c = callers.get(req);
+  if (!c) throw new HttpError(401, 'Sign in to continue.');
+  return c;
+};
+registerAuthRoutes(router, callerOf);
 
 export function createApp({ serveWeb = true } = {}): Server {
   return createServer(async (req, res) => {
@@ -1401,17 +1426,30 @@ export function createApp({ serveWeb = true } = {}): Server {
     try {
       // The api can make Claude run tools, so only local pages may call it:
       // reject foreign Host headers (DNS rebinding) and cross-site writes.
-      if (!LOCAL_HOSTS.test(req.headers.host ?? '')) throw new HttpError(403, 'forbidden host');
+      if (!allowedHost(req.headers.host ?? '')) throw new HttpError(403, 'forbidden host');
       const origin = req.headers.origin;
       if (req.method !== 'GET' && req.method !== 'HEAD' && origin) {
         const host = new URL(origin).host;
-        if (!LOCAL_HOSTS.test(host)) throw new HttpError(403, 'forbidden origin');
+        if (!allowedHost(host)) throw new HttpError(403, 'forbidden origin');
       }
       // /oauth/* is only the providers' redirect back to this local server.
       if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/oauth/')) {
-        const m = router.match(req.method === 'HEAD' ? 'GET' : req.method!, url.pathname);
+        const method = req.method === 'HEAD' ? 'GET' : req.method!;
+        const m = router.match(method, url.pathname);
         if (!m) throw new HttpError(404, 'no such route');
-        const out = await m.handler(req, res, m.params, url);
+        let ctx: WorkContext | undefined;
+        if (url.pathname.startsWith('/oauth/')) {
+          // The provider's redirect carries no session of ours we can trust for the workspace; the state we issued does.
+          ctx = oauthOwners.get(url.searchParams.get('state') ?? '')?.ctx;
+          if (ctx) oauthOwners.delete(url.searchParams.get('state')!);
+        } else {
+          const caller = await gate(req, method, url.pathname);
+          if (caller) {
+            callers.set(req, caller);
+            if (caller.workspace) ctx = { workspace: caller.workspace, user: caller.user.id, role: caller.role };
+          }
+        }
+        const out = await (ctx ? runAs(ctx, () => m.handler(req, res, m.params, url)) : m.handler(req, res, m.params, url));
         if (out !== undefined && !res.headersSent) json(res, 200, out);
         return;
       }

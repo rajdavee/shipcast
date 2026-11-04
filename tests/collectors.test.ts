@@ -73,9 +73,13 @@ const published = (title: string, channels: Partial<PostChannel>[], over: Partia
 
 let base = '';
 const app = createApp({ serveWeb: false });
+let S: Awaited<ReturnType<typeof import('./helpers/session.ts').signedIn>>;
 before(async () => {
   await new Promise<void>((r) => app.listen(0, '127.0.0.1', r));
   base = `http://localhost:${(app.address() as AddressInfo).port}`;
+  S = await (await import('./helpers/session.ts')).signedIn(base, home);
+  // Direct engine calls in these tests work in the same workspace as the API.
+  (await import('@shipcast/engine')).setProcessContext({ workspace: S.workspace, user: S.user });
 });
 after(() => {
   app.close();
@@ -86,7 +90,7 @@ after(() => {
 });
 beforeEach(async () => {
   for (const p of await listPosts()) await deletePost(p.id);
-  rmSync(join(home, 'metrics'), { recursive: true, force: true });
+  rmSync(join(S.dir, 'metrics'), { recursive: true, force: true });
   // No quiet hours unless a test sets them.
   await writeSettings({ metricsPaused: false, agentsQuietStart: '00:00', agentsQuietEnd: '00:00' });
   await youtubeConnected();
@@ -96,7 +100,7 @@ beforeEach(async () => {
 
 const seen: string[] = [];
 const api = async (path: string, init: RequestInit & { json?: unknown } = {}) => {
-  const res = await fetch(base + path, { ...init, headers: { 'content-type': 'application/json', ...(init.headers ?? {}) }, body: init.json !== undefined ? JSON.stringify(init.json) : init.body });
+  const res = await fetch(base + path, { ...init, headers: { 'content-type': 'application/json', ...S.headers, ...(init.headers ?? {}) }, body: init.json !== undefined ? JSON.stringify(init.json) : init.body });
   const text = await res.text();
   seen.push(text);
   let body: any = text;
@@ -215,7 +219,7 @@ test('Postiz queue: 25 reads an hour, the 26th waits for the oldest to age out, 
   assert.equal(read.length, 25);
   assert.deepEqual(read.slice(0, 3), ['pz-0', 'pz-1', 'pz-2'], 'oldest first');
   assert.equal(r1.waiting, 1);
-  assert.equal(JSON.parse(readFileSync(join(home, 'metrics', 'postiz-queue.json'), 'utf8')).items[0].remoteId, 'pz-25');
+  assert.equal(JSON.parse(readFileSync(join(S.dir, 'metrics', 'postiz-queue.json'), 'utf8')).items[0].remoteId, 'pz-25');
   await runMetrics({ now: () => at(2.5), readers: { postiz }, maxReads: 40, notify: async () => {} });
   assert.equal(read.length, 25, 'still inside the hour: the 26th waits');
   const r3 = await runMetrics({ now: () => at(3.01), readers: { postiz }, maxReads: 40, notify: async () => {} });
@@ -269,7 +273,7 @@ test('schedule: each published channel is read or asked about once per bucket, f
   assert.match(pings[3], /How did your LinkedIn carousel from 2 Nov do\?/);
 
   // The real YouTube reader on the same path, through the fake network.
-  rmSync(join(home, 'metrics'), { recursive: true, force: true });
+  rmSync(join(S.dir, 'metrics'), { recursive: true, force: true });
   use(...ytRoutes());
   await runMetrics({ now: () => at(24.5), readers: { postiz: readers.postiz }, notify: async () => {} });
   assert.equal(calls.filter((c) => /youtube\/v3\/videos/.test(c.url)).length, 1);
@@ -293,7 +297,7 @@ test('catch-up: a window missed while the computer was off is read on the next p
   assert.equal(reads.length, 2, 'the 3-day read comes on time');
 
   // A failing read is retried, then turns into an ask.
-  rmSync(join(home, 'metrics'), { recursive: true, force: true });
+  rmSync(join(S.dir, 'metrics'), { recursive: true, force: true });
   let n = 0;
   const flaky = { youtube: async () => (n++, Promise.reject(new Error('Google 503'))) };
   for (const h of [72.1, 72.2, 73.2, 75.3]) await runMetrics({ now: () => at(h), readers: flaky, notify: async () => {} });
@@ -408,9 +412,13 @@ test('API: pending, collect-now, read-screenshot, metricsPaused — and no secre
     assert.equal(up.status, 200);
     assert.deepEqual(up.body.values, { impressions: 2500, likes: 61 });
     assert.deepEqual(up.body.seen, { title: 'Tuesday carousel' });
-    assert.deepEqual(readdirSync(join(home, 'metrics', 'screenshots')), [], 'the upload is not kept');
+    assert.deepEqual(readdirSync(join(S.dir, 'metrics', 'screenshots')), [], 'the upload is not kept');
+    mkdirSync(join(S.dir, 'uploads'), { recursive: true });
+    writeFileSync(join(S.dir, 'uploads', 'ig.jpg'), png);
+    // A file in the install but outside this workspace is someone else's.
     mkdirSync(join(home, 'uploads'), { recursive: true });
-    writeFileSync(join(home, 'uploads', 'ig.jpg'), png);
+    writeFileSync(join(home, 'uploads', 'other.jpg'), png);
+    assert.equal((await api('/api/metrics/read-screenshot', { method: 'POST', json: { path: '../../uploads/other.jpg', channel: 'instagram' } })).status, 403);
     assert.equal((await api('/api/metrics/read-screenshot', { method: 'POST', json: { path: 'uploads/ig.jpg', channel: 'instagram' } })).status, 200);
     assert.equal((await api('/api/metrics/read-screenshot', { method: 'POST', json: { path: '/etc/hosts', channel: 'instagram' } })).status, 403);
     assert.equal((await api('/api/metrics/read-screenshot', { method: 'POST', json: { path: 'uploads/ig.jpg' } })).status, 400);
@@ -423,7 +431,7 @@ test('API: pending, collect-now, read-screenshot, metricsPaused — and no secre
     Object.assign(console, orig);
     setScreenshotAsk(null);
   }
-  const files = ['collect-state.json', 'postiz-queue.json', 'snapshots.json'].map((f) => readFileSync(join(home, 'metrics', f), 'utf8'));
+  const files = ['collect-state.json', 'postiz-queue.json', 'snapshots.json'].map((f) => readFileSync(join(S.dir, 'metrics', f), 'utf8'));
   const everything = [...seen, ...logs, ...files].join('\n');
   for (const s of SECRETS) assert.equal(everything.includes(s), false, `secret leaked: ${s.slice(0, 8)}…`);
 });

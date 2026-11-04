@@ -24,6 +24,8 @@ export interface Revision {
 }
 
 export interface Step {
+  /** Who queued it (their Claude account runs it). */
+  by?: string;
   /** Brand-voice score of the copy this step produced (0–100), with the top issues. */
   brandScore?: { score: number; voice: string; issues: string[] };
   id: string;

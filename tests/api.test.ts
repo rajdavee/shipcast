@@ -17,15 +17,18 @@ for (const s of ['RENDER', 'STILLS', 'MEDIA', 'QA', 'GEN', 'AGENTS']) process.en
 process.env.SHIPCAST_SERVICE_RETRY_MS = '1500';
 
 const { createApp } = await import('@shipcast/api');
+const { signedIn } = await import('./helpers/session.ts');
 const { startWorker } = await import('@shipcast/worker');
 
 let base = '';
 const app = createApp({ serveWeb: false });
 const worker = startWorker({ intervalMs: 50, log: () => {} });
 
+let S: Awaited<ReturnType<typeof signedIn>>;
 before(async () => {
   await new Promise<void>((r) => app.listen(0, '127.0.0.1', r));
   base = `http://localhost:${(app.address() as AddressInfo).port}`;
+  S = await signedIn(base, home);
 });
 after(async () => {
   await worker.stop();
@@ -36,7 +39,7 @@ after(async () => {
 const api = async (path: string, init: RequestInit & { json?: unknown } = {}) => {
   const res = await fetch(base + path, {
     ...init,
-    headers: { 'content-type': 'application/json', ...(init.headers ?? {}) },
+    headers: { 'content-type': 'application/json', ...S.headers, ...(init.headers ?? {}) },
     body: init.json !== undefined ? JSON.stringify(init.json) : init.body,
   });
   const text = await res.text();
@@ -97,12 +100,12 @@ test('campaign runs brief then deliverable, then revises with --resume', async (
   assert.ok(calls[1].args.includes('--plugin-dir'));
 
   // Files are served with a sandbox CSP and range support.
-  const f = await fetch(`${base}/api/campaigns/${id}/files/deliverables/${step.id}/out/copy.md`, { headers: { range: 'bytes=0-1' } });
+  const f = await fetch(`${base}/api/campaigns/${id}/files/deliverables/${step.id}/out/copy.md`, { headers: { ...S.headers, range: 'bytes=0-1' } });
   assert.equal(f.status, 206);
   assert.equal(await f.text(), '# ');
   assert.match(f.headers.get('content-security-policy') ?? '', /sandbox/);
-  assert.equal((await fetch(`${base}/api/campaigns/${id}/files/../../settings.json`)).status, 404);
-  assert.equal((await fetch(`${base}/api/campaigns/${id}/files/%2e%2e%2f%2e%2e%2fx`)).status, 403);
+  assert.equal((await fetch(`${base}/api/campaigns/${id}/files/../../settings.json`, { headers: S.headers })).status, 404);
+  assert.equal((await fetch(`${base}/api/campaigns/${id}/files/%2e%2e%2f%2e%2e%2fx`, { headers: S.headers })).status, 403);
 
   const rev = await api(`/api/campaigns/${id}/steps/${step.id}/revise`, { method: 'POST', json: { note: 'bigger headline' } });
   assert.equal(rev.status, 200);
@@ -110,11 +113,11 @@ test('campaign runs brief then deliverable, then revises with --resume', async (
   assert.equal(revised.steps[1].revisions[0].note, 'bigger headline');
   const last = readFileSync(log, 'utf8').trim().split('\n').map((l) => JSON.parse(l)).at(-1);
   assert.equal(last.args[last.args.indexOf('--resume') + 1], step.sessionId);
-  const notes = await fetch(`${base}/api/campaigns/${id}/files/deliverables/${step.id}/out/NOTES.md`);
+  const notes = await fetch(`${base}/api/campaigns/${id}/files/deliverables/${step.id}/out/NOTES.md`, { headers: S.headers });
   assert.equal(await notes.text(), 'revised');
 
   // Event log captured the stream.
-  const sse = await fetch(`${base}/api/campaigns/${id}/events`);
+  const sse = await fetch(`${base}/api/campaigns/${id}/events`, { headers: S.headers });
   const reader = sse.body!.getReader();
   const { value } = await reader.read();
   await reader.cancel();
@@ -159,10 +162,10 @@ test('files route refuses symlinks that point outside the campaign', async () =>
   const { body } = await api('/api/campaigns', { method: 'POST', json: { source: { type: 'text', value: 'A tool that does something useful for people' }, deliverables: [{ pack: 'copy-kit' }] } });
   const secret = join(home, 'secret.txt');
   writeFileSync(secret, 'top secret');
-  const dir = join(home, 'campaigns', body.id, 'uploads');
+  const dir = join(S.dir, 'campaigns', body.id, 'uploads');
   mkdirSync(dir, { recursive: true });
   symlinkSync(secret, join(dir, 'link.txt'));
-  assert.equal((await fetch(`${base}/api/campaigns/${body.id}/files/uploads/link.txt`)).status, 403);
+  assert.equal((await fetch(`${base}/api/campaigns/${body.id}/files/uploads/link.txt`, { headers: S.headers })).status, 403);
   await waitFor(body.id, (c) => c.steps.every((s: any) => s.status === 'done'));
 });
 
@@ -234,9 +237,9 @@ test('content calendar: create, refuse an unready schedule, schedule, ICS, CSV r
   assert.equal(ok.body.status, 'scheduled');
   assert.equal(ok.body.channels[0].state, 'pending');
   assert.deepEqual((await api(`/api/calendar/posts/${p.id}/check`)).body.problems, []);
-  const ics = await fetch(base + '/api/calendar.ics').then((r) => r.text());
+  const ics = await fetch(base + '/api/calendar.ics', { headers: S.headers }).then((r) => r.text());
   assert.match(ics, /SUMMARY:\[Instagram\] Launch carousel/);
-  const csv = await fetch(base + '/api/calendar/export.csv').then((r) => r.text());
+  const csv = await fetch(base + '/api/calendar/export.csv', { headers: S.headers }).then((r) => r.text());
   const imp = await api('/api/calendar/import', { method: 'POST', json: { csv } });
   assert.equal(imp.body.created, 1);
   assert.equal((await api(`/api/calendar/posts/${p.id}`, { method: 'DELETE' })).status, 200);

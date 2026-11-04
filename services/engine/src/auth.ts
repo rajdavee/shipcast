@@ -454,3 +454,12 @@ export function revokeInvite(wid: string, inviteId: string): Promise<boolean> {
     return left.length < all.length;
   });
 }
+
+/** What an invite link is for, without using it up (for the join page). */
+export async function inviteInfo(token: string): Promise<{ valid: boolean; problem?: string; workspace?: string; role?: string; email?: string }> {
+  const inv = (await read<Invite[]>('invites', [])).find((i) => i.hash === sha(String(token)));
+  if (!inv) return { valid: false, problem: 'That invite link is not valid.' };
+  const problem = inv.usedAt ? 'That invite has already been used.' : Date.parse(inv.expiresAt) <= Date.now() ? 'That invite has expired — ask for a new one.' : undefined;
+  const w = (await listWorkspaces()).find((x) => x.id === inv.workspace);
+  return { valid: !problem && !!w, ...(problem ? { problem } : {}), workspace: w?.name, role: inv.role, ...(inv.email ? { email: inv.email } : {}) };
+}

@@ -68,11 +68,13 @@ const POSTIZ_KEY = 'postiz-KEY-0123456789';
 const SECRETS = [LI_TOKEN, YT_ACCESS, YT_REFRESH, CLIENT_SECRET, POSTIZ_KEY];
 const future = () => new Date(Date.now() + 30 * 86400_000).toISOString();
 
-const outDir = join(home, 'campaigns', 'c1', 'deliverables', 's1', 'out');
-mkdirSync(outDir, { recursive: true });
-for (const f of ['a.png', 'b.png', 'c.png']) writeFileSync(join(outDir, f), Buffer.alloc(64, 1));
-writeFileSync(join(outDir, 'deck.pdf'), '%PDF-1.4 test');
-writeFileSync(join(outDir, 'video.mp4'), Buffer.alloc(2048, 2));
+// Written before anyone signs up; the first account's sign-up moves them into its workspace.
+const outDir = () => join(S.dir, 'campaigns', 'c1', 'deliverables', 's1', 'out');
+const preOut = join(home, 'campaigns', 'c1', 'deliverables', 's1', 'out');
+mkdirSync(preOut, { recursive: true });
+for (const f of ['a.png', 'b.png', 'c.png']) writeFileSync(join(preOut, f), Buffer.alloc(64, 1));
+writeFileSync(join(preOut, 'deck.pdf'), '%PDF-1.4 test');
+writeFileSync(join(preOut, 'video.mp4'), Buffer.alloc(2048, 2));
 const rel = (f: string) => `campaigns/c1/deliverables/s1/out/${f}`;
 
 const basePost = (over: Partial<import('@shipcast/engine').Post> = {}) =>
@@ -272,7 +274,7 @@ test('media outside the Shipcast home, or not media, is never published', () => 
   const outside = join(tmpdir(), `outside-${process.pid}.png`);
   writeFileSync(outside, 'x');
   assert.throws(() => mediaFiles(ch({ media: [outside] })), /Not a publishable/);
-  writeFileSync(join(home, 'notes.txt'), 'x');
+  writeFileSync(join(S.dir, 'notes.txt'), 'x');
   assert.throws(() => mediaFiles(ch({ media: ['notes.txt'] })), /Not a publishable/);
   assert.throws(() => mediaFiles(ch({ media: ['secrets.json'] })), /Not a publishable|missing/);
   assert.throws(() => mediaFiles(ch({ media: ['../../etc/hosts'] })), /Not a publishable|missing/);
@@ -474,9 +476,13 @@ test('OAuth: state is single-use, provider-bound and expires after 10 minutes; a
 
 let base = '';
 const app = createApp({ serveWeb: false });
+let S: Awaited<ReturnType<typeof import('./helpers/session.ts').signedIn>>;
 before(async () => {
   await new Promise<void>((r) => app.listen(0, '127.0.0.1', r));
   base = `http://localhost:${(app.address() as AddressInfo).port}`;
+  S = await (await import('./helpers/session.ts')).signedIn(base, home);
+  // Direct engine calls in these tests work in the same workspace as the API.
+  (await import('@shipcast/engine')).setProcessContext({ workspace: S.workspace, user: S.user });
 });
 after(() => {
   app.close();
@@ -486,7 +492,7 @@ after(() => {
 });
 const seen: string[] = [];
 const api = async (path: string, init: RequestInit & { json?: unknown } = {}) => {
-  const res = await fetch(base + path, { ...init, headers: { 'content-type': 'application/json', ...(init.headers ?? {}) }, body: init.json !== undefined ? JSON.stringify(init.json) : init.body });
+  const res = await fetch(base + path, { ...init, headers: { 'content-type': 'application/json', ...S.headers, ...(init.headers ?? {}) }, body: init.json !== undefined ? JSON.stringify(init.json) : init.body });
   const text = await res.text();
   seen.push(text);
   let body: any = text;
@@ -557,10 +563,10 @@ test('API: connections and keys, connect URL, callback pages — never a secret 
   } finally {
     Object.assign(console, orig);
   }
-  const everything = [...seen, ...logs, readFileSync(join(home, 'calendar', 'posts.json'), 'utf8')].join('\n');
+  const everything = [...seen, ...logs, readFileSync(join(S.dir, 'calendar', 'posts.json'), 'utf8')].join('\n');
   for (const s of SECRETS) assert.ok(!everything.includes(s), `a secret leaked: ${s.slice(0, 8)}…`);
   // …and they are in the secrets store where they belong.
-  assert.ok(readFileSync(join(home, 'secrets.json'), 'utf8').includes(CLIENT_SECRET));
+  assert.ok(readFileSync(join(S.dir, 'secrets.json'), 'utf8').includes(CLIENT_SECRET));
 });
 
 test('API: mark sent, send now, post kit zip, publishingPaused setting', async () => {
@@ -568,7 +574,7 @@ test('API: mark sent, send now, post kit zip, publishingPaused setting', async (
   const draft = await savePost({ title: 'Kit post', status: 'ready', at: future(), tz: 'UTC', channels: [ch({ via: 'manual', media: [rel('a.png'), rel('deck.pdf')], firstComment: 'First!' })] });
   assert.equal((await api(`/api/calendar/posts/${draft.id}/send-now`, { method: 'POST' })).status, 400);
 
-  const res = await fetch(`${base}/api/calendar/posts/${draft.id}/kit/linkedin`);
+  const res = await fetch(`${base}/api/calendar/posts/${draft.id}/kit/linkedin`, { headers: S.headers });
   assert.equal(res.status, 200);
   assert.equal(res.headers.get('content-type'), 'application/zip');
   const zip = join(home, 'kit.zip');

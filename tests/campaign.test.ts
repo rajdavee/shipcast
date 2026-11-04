@@ -18,15 +18,18 @@ delete process.env.TEST_LICENSE_KEY;
 
 const { createApp } = await import('@shipcast/api');
 const { startWorker } = await import('@shipcast/worker');
+const { signedIn } = await import('./helpers/session.ts');
 
 let base = '';
 const app = createApp({ serveWeb: false });
 const worker = startWorker({ intervalMs: 50, log: () => {} });
 const src = mkdtempSync(join(tmpdir(), 'shipcast-src-'));
 
+let S: Awaited<ReturnType<typeof signedIn>>;
 before(async () => {
   await new Promise<void>((r) => app.listen(0, '127.0.0.1', r));
   base = `http://localhost:${(app.address() as AddressInfo).port}`;
+  S = await signedIn(base, home);
 });
 after(async () => {
   await worker.stop();
@@ -36,7 +39,7 @@ after(async () => {
 });
 
 const api = async (path: string, init: RequestInit & { json?: unknown } = {}) => {
-  const res = await fetch(base + path, { ...init, headers: { 'content-type': 'application/json' }, body: init.json !== undefined ? JSON.stringify(init.json) : init.body });
+  const res = await fetch(base + path, { ...init, headers: { 'content-type': 'application/json', ...S.headers }, body: init.json !== undefined ? JSON.stringify(init.json) : init.body });
   const text = await res.text();
   return { status: res.status, body: text ? JSON.parse(text) : null };
 };
@@ -69,7 +72,7 @@ test('an app step asks for a secret, resumes with it, and the secret never lands
 
   const done = await waitFor(id, (x) => x.steps[1].status === 'done');
   assert.ok(done.steps[1].outputs.includes('out/app.json'));
-  const dir = join(home, 'campaigns', id);
+  const dir = join(S.dir, 'campaigns', id);
   const setup = readFileSync(join(dir, 'deliverables', step.id, 'out', 'setup.md'), 'utf8');
   assert.ok(setup.includes('•••') && !setup.includes(secret), 'secret scrubbed from outputs');
   for (const f of walk(join(dir, 'deliverables')).concat(join(dir, 'campaign.json'), join(dir, 'events.ndjson'))) {
@@ -89,13 +92,13 @@ test('a campaign plan becomes one job per valid asset, then a hub that packages 
   assert.equal(copy.options.voice, 'brand');
   assert.equal(copy.options.bogus, undefined, 'unknown options dropped');
   assert.equal(typeof copy.brandScore?.score, 'number', 'copy is scored against the brand voice');
-  assert.ok(existsSync(join(home, 'campaigns', id, 'deliverables', copy.id, 'out', 'brand-score.json')));
+  assert.ok(existsSync(join(S.dir, 'campaigns', id, 'deliverables', copy.id, 'out', 'brand-score.json')));
   const hub = done.steps.find((s: any) => s.pack === 'campaign-hub');
   const index = hub.outputs.find((o: string) => o.endsWith('index.html'));
   assert.ok(index && hub.outputs.some((o: string) => o.endsWith('.zip')));
-  const html = readFileSync(join(home, 'campaigns', id, 'deliverables', hub.id, index), 'utf8');
+  const html = readFileSync(join(S.dir, 'campaigns', id, 'deliverables', hub.id, index), 'utf8');
   assert.ok(html.includes('One line.') && html.includes('Launch copy') && html.includes('Calendar'));
-  assert.ok(existsSync(join(home, 'campaigns', id, 'brief', 'CAMPAIGN-BRIEF.md')), 'campaign brief promoted for later steps');
+  assert.ok(existsSync(join(S.dir, 'campaigns', id, 'brief', 'CAMPAIGN-BRIEF.md')), 'campaign brief promoted for later steps');
 
   // Nothing here has a spec to re-render.
   assert.equal((await api(`/api/campaigns/${id}/rerender`, { method: 'POST', json: {} })).status, 400);
@@ -110,8 +113,10 @@ test("Claude's usage limit pauses the step until the window resets instead of fa
   const brief = paused.steps[0];
   assert.ok(Date.parse(brief.notBefore) > Date.now() + 30 * 60_000, 'waits for the reset');
   assert.ok(String(brief.pendingNote).startsWith('[resume]'), 'resumes its own session');
-  assert.ok(existsSync(join(home, 'usage-pause.json')));
-  rmSync(join(home, 'usage-pause.json'));
+  // Usage belongs to the Claude account of the person who queued the step.
+  const pause = join(home, 'users', S.user, 'usage-pause.json');
+  assert.ok(existsSync(pause));
+  rmSync(pause);
   await api(`/api/campaigns/${id}/steps/brief/cancel`, { method: 'POST', json: {} });
 });
 
@@ -119,7 +124,7 @@ test('the app can be started and stopped from its recorded commands, with the ca
   const list = (await api('/api/campaigns')).body;
   const c = list.find((x: any) => x.name === 'Ask');
   const step = c.steps.find((s: any) => s.pack === 'app-run');
-  const dir = join(home, 'campaigns', c.id, 'deliverables', step.id);
+  const dir = join(S.dir, 'campaigns', c.id, 'deliverables', step.id);
   const port = 40000 + Math.floor(Math.random() * 20000);
   const { writeFileSync, mkdirSync } = await import('node:fs');
   mkdirSync(join(dir, 'work', 'app'), { recursive: true });
@@ -194,14 +199,14 @@ test('choosing a take swaps it into the spec and re-renders without Claude', asy
   const done = await waitFor(id, (x) => x.steps[1].status === 'done' || x.steps[1].status === 'failed', 30_000);
   const step = done.steps[1];
   const { writeFileSync, mkdirSync, readFileSync } = await import('node:fs');
-  const out = join(home, 'campaigns', id, 'deliverables', step.id, 'out');
+  const out = join(S.dir, 'campaigns', id, 'deliverables', step.id, 'out');
   mkdirSync(out, { recursive: true });
   const t1 = join(out, 'gen-video-hero-t1.mp4');
   const t2 = join(out, 'gen-video-hero-t2.mp4');
   writeFileSync(join(out, 'storyboard.json'), JSON.stringify({ preset: 'vertical', scenes: [{ scene: 'broll', fields: { query: 'x', video: t1 } }] }));
   writeFileSync(join(out, 'takes.json'), JSON.stringify([{ id: 'hero', label: 'Hero', kind: 'video', files: [t1, t2], posters: [t1, t2], chosen: 0 }]));
   // No render service in tests: mark the piece finished so the swap path runs for real.
-  const cf = join(home, 'campaigns', id, 'campaign.json');
+  const cf = join(S.dir, 'campaigns', id, 'campaign.json');
   const cj = JSON.parse(readFileSync(cf, 'utf8'));
   cj.steps.find((x: any) => x.id === step.id).status = 'done';
   writeFileSync(cf, JSON.stringify(cj));
