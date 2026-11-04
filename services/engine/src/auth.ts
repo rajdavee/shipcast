@@ -307,8 +307,13 @@ export async function sessionsOf(uid: string, current?: string) {
 }
 
 export async function changePassword(uid: string, current: string, next: string, keepToken?: string): Promise<void> {
+  // A stolen session mustn't be able to guess the current password at full speed.
+  const key = `p:${uid}`;
+  if (tooMany(key)) throw new AuthError(429, 'Too many attempts — wait a few minutes and try again.');
+  failed(key);
   const u = await getUser(uid);
   if (!u || !(await verifyPassword(current, u.passHash))) throw new AuthError(401, 'Your current password is wrong.');
+  attempts.delete(key);
   const weak = passwordProblem(next, u.email);
   if (weak) throw new AuthError(400, weak);
   const hash = await hashPassword(next);

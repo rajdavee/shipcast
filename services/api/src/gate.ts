@@ -58,6 +58,8 @@ const MANAGE: [string, RegExp][] = [
   ['PUT', /^\/api\/voice$/],
   ['DELETE', /^\/api\/voice\//],
   ['PUT', /^\/api\/agents\//],
+  // Running a background job spends the workspace owner's Claude.
+  ['POST', /^\/api\/agents\/[^/]+\/run$/],
   ['*', /^\/api\/campaigns\/[^/]+\/env$/],
 ];
 const hit = (list: [string, RegExp][], method: string, path: string) => list.some(([m, re]) => (m === '*' || m === method) && re.test(path));
