@@ -1,5 +1,7 @@
-import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { randomBytes } from 'node:crypto';
+import { chmod, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { withDirLock } from './filelock.ts';
 import { home } from './paths.ts';
 
 /**
@@ -23,13 +25,25 @@ export async function getSecret(name: string): Promise<string | undefined> {
   return (await readSecrets())[name] || undefined;
 }
 
-export async function setSecret(name: string, value: string | null): Promise<void> {
-  const all = await readSecrets();
-  if (value) all[name] = value;
-  else delete all[name];
-  await mkdir(home(), { recursive: true });
-  await writeFile(secretsFile(), JSON.stringify(all, null, 2) + '\n', { mode: 0o600 });
-  await chmod(secretsFile(), 0o600);
+// Read-modify-write of one file shared by every connection: one at a time in this process, a folder
+// lock across processes, and an atomic replace so a reader never sees a half-written file.
+let secretChain: Promise<unknown> = Promise.resolve();
+export function setSecret(name: string, value: string | null): Promise<void> {
+  const go = async () => {
+    await mkdir(home(), { recursive: true });
+    await withDirLock(join(home(), '.secrets-lock'), async () => {
+      const all = await readSecrets();
+      if (value) all[name] = value;
+      else delete all[name];
+      const tmp = `${secretsFile()}.${process.pid}.${randomBytes(3).toString('hex')}.tmp`;
+      await writeFile(tmp, JSON.stringify(all, null, 2) + '\n', { mode: 0o600 });
+      await chmod(tmp, 0o600);
+      await rename(tmp, secretsFile());
+    });
+  };
+  const next = secretChain.then(go, go);
+  secretChain = next.catch(() => {});
+  return next;
 }
 
 const EL = 'https://api.elevenlabs.io/v1';

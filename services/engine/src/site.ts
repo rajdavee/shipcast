@@ -194,6 +194,8 @@ export async function syncSite(opts: { days?: number; now?: Date } = {}): Promis
   const from = iso(now - span * 86_400_000), to = iso(now);
   const fresh = new Map<string, SiteDay>();
   try {
+    // One token refresh up front, not one per parallel request.
+    await googleSiteAccess();
     if (s.ga4Property) {
       const range = { dateRanges: [{ startDate: from, endDate: to }] };
       const [totals, bySource, byCampaign] = await Promise.all([

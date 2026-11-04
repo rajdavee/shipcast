@@ -126,6 +126,8 @@ export interface RunOptions {
   allowSubagents?: boolean;
   /** Extra environment for this run (e.g. MAX_THINKING_TOKENS=0 for quick chats). */
   env?: Record<string, string>;
+  /** A text-only run: no built-in tools at all (`--tools ""`). */
+  noTools?: boolean;
   onEvent: (e: StreamEvent) => void;
 }
 
@@ -133,14 +135,22 @@ export function buildArgs(o: Omit<RunOptions, 'onEvent' | 'cwd'>): string[] {
   const args = ['-p', o.prompt, '--output-format', 'stream-json', '--verbose'];
   args.push('--allowedTools', o.allowedTools.join(','));
   // Sub-agents multiply usage; only workflows that are built around them get them.
+  if (o.noTools) args.push('--tools', '');
+  // One --disallowedTools flag: the CLI keeps only the last one given, so a caller's list is merged with ours.
+  const extra = [...(o.extraArgs ?? [])];
+  const deny = new Set(o.allowSubagents ? [] : ['Task', 'Agent']);
+  for (let i = extra.indexOf('--disallowedTools'); i >= 0; i = extra.indexOf('--disallowedTools')) {
+    for (const t of String(extra[i + 1] ?? '').split(',')) if (t.trim()) deny.add(t.trim());
+    extra.splice(i, 2);
+  }
   if (o.allowSubagents) args[args.indexOf('--allowedTools') + 1] += ',Task,Agent';
-  else args.push('--disallowedTools', 'Task,Agent');
+  if (deny.size) args.push('--disallowedTools', [...deny].join(','));
   for (const d of [o.pluginDir ?? []].flat()) args.push('--plugin-dir', d);
   for (const d of o.addDirs ?? []) args.push('--add-dir', d);
   if (o.model) args.push('--model', o.model);
   if (o.resume) args.push('--resume', o.resume);
   if (o.appendSystemPrompt) args.push('--append-system-prompt', o.appendSystemPrompt);
-  args.push(...(o.extraArgs ?? []));
+  args.push(...extra);
   return args;
 }
 

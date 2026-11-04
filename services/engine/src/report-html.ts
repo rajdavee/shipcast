@@ -136,7 +136,7 @@ ${goals(r)}
 ${shown.map((s) => `<section class="sec"><h2>${escHtml(s.title)}</h2><ul>${s.lines.map((l) => `<li>${escHtml(l)}</li>`).join('')}</ul></section>`).join('')}
 ${next}
 ${cover?.lines.length ? `<div class="cover"><b>What this report can’t see:</b> ${cover.lines.map(escHtml).join(' ')}</div>` : ''}
-<div class="foot">Made with Shipcast · every number checked against your data · ${escHtml(new Date(r.updatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }))}${o.note ? ` · ${escHtml(o.note)}` : ''}</div>
+<div class="foot">Made with Shipcast · ${r.edited ? 'written from your data, edited by the team' : 'every number checked against your data'} · ${escHtml(new Date(r.updatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }))}${o.note ? ` · ${escHtml(o.note)}` : ''}</div>
 </main></body></html>`;
 }
 
@@ -156,7 +156,7 @@ ${r.intro ? `<p style="white-space:pre-wrap">${escHtml(r.intro)}</p>` : ''}
 ${shown.map((s) => `<h2 style="font:700 16px ${FONT};margin:22px 0 6px">${escHtml(s.title)}</h2><ul style="margin:0;padding-left:18px">${s.lines.map((l) => `<li style="margin:4px 0">${escHtml(l)}</li>`).join('')}</ul>`).join('')}
 ${r.recommendations.length ? `<h2 style="font:700 16px ${FONT};margin:22px 0 6px">Next steps</h2><ol style="margin:0;padding-left:18px">${r.recommendations.map((x) => `<li style="margin:6px 0"><b>${escHtml(x.text)}</b><br><span style="color:${C.muted};font-size:13px">${escHtml(x.why)}</span></li>`).join('')}</ol>` : ''}
 ${link ? `<p style="margin:26px 0 0"><a href="${escHtml(link)}" style="display:inline-block;background:${C.accent};color:#fff;text-decoration:none;font-weight:600;padding:10px 18px;border-radius:10px">Open the full report</a></p>` : ''}
-<p style="font-size:12px;color:${C.muted};margin-top:24px">Made with Shipcast · every number checked against your data</p>
+<p style="font-size:12px;color:${C.muted};margin-top:24px">Made with Shipcast · ${r.edited ? 'written from your data, edited by the team' : 'every number checked against your data'}</p>
 </td></tr></table></td></tr></table></body></html>`;
 }
 

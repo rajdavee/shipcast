@@ -79,6 +79,7 @@ export function createShare(workspace: string, report: string, o: { expiresDays?
 }
 
 export async function listShares(workspace: string, report: string): Promise<ReturnType<typeof publicShare>[]> {
+  await flushViews();
   const now = Date.now();
   return (await readShares()).filter((s) => s.workspace === workspace && s.report === report && (!s.expiresAt || Date.parse(s.expiresAt) > now)).map(publicShare);
 }
@@ -89,6 +90,16 @@ export function revokeShare(workspace: string, id: string): Promise<boolean> {
     const rest = all.filter((s) => !(s.id === id && s.workspace === workspace));
     await writeShares(rest);
     return rest.length !== all.length;
+  });
+}
+
+/** Links to a report made by one source (e.g. the delivery's own link, replaced on each send). */
+export function revokeSharesBy(workspace: string, report: string, by: string): Promise<number> {
+  return serial(async () => {
+    const all = await readShares();
+    const rest = all.filter((s) => !(s.workspace === workspace && s.report === report && s.by === by));
+    await writeShares(rest);
+    return all.length - rest.length;
   });
 }
 
@@ -114,15 +125,29 @@ export async function resolveShare(token: string, now = new Date()): Promise<Sha
   return hit;
 }
 
-export function countView(id: string, now = new Date()): Promise<void> {
+// Views are counted in memory and written at most every few seconds, not on every page load.
+const pendingViews = new Map<string, { n: number; at: string }>();
+let flushTimer: ReturnType<typeof setTimeout> | undefined;
+export function flushViews(): Promise<void> {
+  if (flushTimer) clearTimeout(flushTimer);
+  flushTimer = undefined;
+  if (!pendingViews.size) return Promise.resolve();
+  const batch = new Map(pendingViews);
+  pendingViews.clear();
   return serial(async () => {
     const all = await readShares();
-    const s = all.find((x) => x.id === id);
-    if (!s) return;
-    s.views++;
-    s.lastViewedAt = now.toISOString();
+    for (const s of all) {
+      const v = batch.get(s.id);
+      if (v) (s.views += v.n), (s.lastViewedAt = v.at);
+    }
     await writeShares(all);
   });
+}
+export function countView(id: string, now = new Date()): void {
+  const cur = pendingViews.get(id);
+  pendingViews.set(id, { n: (cur?.n ?? 0) + 1, at: now.toISOString() });
+  flushTimer ??= setTimeout(() => void flushViews().catch(() => {}), 5_000);
+  flushTimer.unref?.();
 }
 
 /** The image of top post `i` in the current workspace, when it is a readable image (for share pages). */
@@ -136,7 +161,8 @@ export function topPostImage(r: Report, i: number): string | undefined {
 // ── rendering through Chrome ───────────────────────────────────────────
 
 let renderChain: Promise<unknown> = Promise.resolve();
-/** One render at a time: the shared browser reuses a single tab. */
+let rendersWaiting = 0;
+/** One render at a time (the shared browser reuses a single tab), and only a few waiting. */
 function render<T>(html: string, size: { width: number; height: number }, fn: (page: Awaited<ReturnType<ReturnType<typeof browser>['open']>>) => Promise<T>): Promise<T> {
   const go = async () => {
     const dir = await mkdtemp(join(tmpdir(), 'shipcast-report-'));
@@ -150,7 +176,9 @@ function render<T>(html: string, size: { width: number; height: number }, fn: (p
       await rm(dir, { recursive: true, force: true });
     }
   };
-  const next = renderChain.then(go, go);
+  if (rendersWaiting >= 4) return Promise.reject(Object.assign(new Error('Busy making other files — try again in a moment.'), { status: 503 }));
+  rendersWaiting++;
+  const next = renderChain.then(go, go).finally(() => rendersWaiting--);
   renderChain = next.catch(() => {});
   return next;
 }
@@ -235,8 +263,8 @@ export async function reportPptx(r: Report, outFile: string): Promise<void> {
 const cell = (v: unknown) => {
   const s = String(v ?? '');
   // A leading = + - @ would be a formula in a spreadsheet.
-  const safe = /^[=+\-@\t\r]/.test(s) && !/^-?\d/.test(s) ? `'${s}` : s;
-  return /[",\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+  const safe = /^[=+\-@\t\r]/.test(s) && !/^-?\d+(\.\d+)?(e[+-]?\d+)?$/i.test(s) ? `'${s}` : s;
+  return /[",\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 };
 
 /** The report's numbers as rows: KPIs, channels, and every post in the period. */

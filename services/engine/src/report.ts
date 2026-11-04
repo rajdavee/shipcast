@@ -75,6 +75,8 @@ export interface Report {
   sentAt?: string;
   /** The person's own words added at the top. */
   intro?: string;
+  /** Someone changed the written words (so they're no longer all checked against the facts). */
+  edited?: boolean;
   version: number;
 }
 
@@ -198,7 +200,8 @@ export function templateSections(f: Facts, recs: Recommendation[], audience: Aud
   for (const p of f.top.slice(0, 2)) if (p.why.length) why.push(`${quote(p.title)} had what usually wins for you: ${list(p.why.map(winName))}.`);
   for (const p of f.bottom.slice(0, 1)) why.push(`${quote(p.title)} did ${times(p.lift!)} your usual on ${chName(p.channel)} — worth a look at its format and timing.`);
   if (!why.length) for (const c of f.playbook.slice(0, 2)) if (c.wins[0]) why.push(`What wins for you on ${chName(c.channel)}: ${c.wins[0].replace(/^[^·]+· /, '')}.`);
-  for (const n of f.notes.slice(0, 3)) why.push(`Note from the team (${n.date}): ${n.text}`);
+  // Timeline notes are the team's own; a client's report doesn't quote them.
+  if (audience !== 'client') for (const n of f.notes.slice(0, 3)) why.push(`Note from the team (${n.date}): ${n.text}`);
   s.why = why;
 
   // Website
@@ -235,23 +238,36 @@ function assemble(s: Partial<Record<SectionId, string[]>>, audience: Audience): 
 const NUM_RE = /\d[\d,]*(?:\.\d+)?/g;
 export const numbersIn = (s: string) => (s.match(NUM_RE) ?? []).map((x) => Number(x.replace(/,/g, ''))).filter(Number.isFinite);
 
-/** Every number a sentence may use: the facts' numbers in all the ways they get written (rounded, as %, in thousands), and the numbers in their text. */
-export function allowedNumbers(f: Facts, recs: Recommendation[] = []): Set<number> {
-  const out = new Set<number>();
+/** Numbers a line may use, by how they're written: as is, in thousands ("8.8k") or in millions ("1.2m"). */
+export class AllowedNumbers extends Set<number> {
+  k = new Set<number>();
+  m = new Set<number>();
+}
+
+/**
+ * Every number a sentence may use: the facts' numeric values in the ways they get written (rounded, as a
+ * percentage, in thousands or millions), changes people naturally say, and numbers inside the facts' own
+ * labels (periods, playbook findings, goals, notes, next steps). Not post titles or links: a sentence may
+ * quote a title, and quoted text isn't checked, but a title's "9" can't vouch for "9 million".
+ */
+export function allowedNumbers(f: Facts, recs: Recommendation[] = []): AllowedNumbers {
+  const out = new AllowedNumbers();
   const addVariants = (v: number) => {
     for (const x of [v, Math.abs(v)]) {
       out.add(x);
       for (const d of [0, 1, 2]) out.add(Math.round(x * 10 ** d) / 10 ** d);
       if (Math.abs(x) < 10) for (const d of [0, 1]) out.add(Math.round(x * 100 * 10 ** d) / 10 ** d);
-      if (Math.abs(x) >= 1000) for (const d of [0, 1]) out.add(Math.round((x / 1000) * 10 ** d) / 10 ** d);
-      if (Math.abs(x) >= 1_000_000) for (const d of [0, 1]) out.add(Math.round((x / 1_000_000) * 10 ** d) / 10 ** d);
+      if (Math.abs(x) >= 1000) for (const d of [0, 1, 2]) out.k.add(Math.round((x / 1000) * 10 ** d) / 10 ** d);
+      if (Math.abs(x) >= 1_000_000) for (const d of [0, 1, 2]) out.m.add(Math.round((x / 1_000_000) * 10 ** d) / 10 ** d);
     }
   };
-  const walk = (x: unknown) => {
+  const SKIP = new Set(['title', 'url', 'media', 'post', 'id', 'at', 'start', 'end', 'asOf', 'tz', 'query', 'createdAt', 'by']);
+  const walk = (x: unknown, key = '') => {
     if (typeof x === 'number' && Number.isFinite(x)) addVariants(x);
-    else if (typeof x === 'string') for (const n of numbersIn(x)) out.add(n);
-    else if (Array.isArray(x)) x.forEach(walk);
-    else if (x && typeof x === 'object') Object.values(x).forEach(walk);
+    else if (typeof x === 'string') {
+      if (!SKIP.has(key)) for (const n of numbersIn(x)) out.add(n);
+    } else if (Array.isArray(x)) x.forEach((v) => walk(v, key));
+    else if (x && typeof x === 'object') for (const [k, v] of Object.entries(x)) walk(v, k);
   };
   walk(f);
   walk(recs);
@@ -263,14 +279,31 @@ export function allowedNumbers(f: Facts, recs: Recommendation[] = []): Set<numbe
   return out;
 }
 
+/** Spelled-out numbers past ten can't be checked, so they aren't allowed. */
+const NUMBER_WORDS = /\b(eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundreds?|thousands?|millions?|billions?|dozens?)\b/i;
+const SCALED_RE = /(\d[\d,]*(?:\.\d+)?)(\s*(?:k|m|bn|thousand|million|billion)\b)?/gi;
+/** Quoted text (a post's title, a search) is the source's own words, not a claim. */
+const unquoted = (line: string) => line.replace(/“[^”]*”|"[^"]*"/g, ' ');
+
 export function checkLine(line: string, allowed: Set<number>): boolean {
-  return line.length > 0 && line.length <= 400 && numbersIn(line).every((n) => allowed.has(n));
+  if (!line || line.length > 400) return false;
+  const text = unquoted(line);
+  if (NUMBER_WORDS.test(text)) return false;
+  const a = allowed instanceof AllowedNumbers ? allowed : Object.assign(new AllowedNumbers(allowed), {});
+  for (const m of text.matchAll(SCALED_RE)) {
+    const n = Number(m[1].replace(/,/g, ''));
+    if (!Number.isFinite(n)) return false;
+    const unit = (m[2] ?? '').trim().toLowerCase();
+    const ok = !unit ? a.has(n) : unit === 'k' || unit === 'thousand' ? a.k.has(n) : unit === 'm' || unit === 'million' ? a.m.has(n) : false;
+    if (!ok) return false;
+  }
+  return true;
 }
 
 // ── Claude writer ──────────────────────────────────────────────────────
 
 /** What the writer sees: the facts without bulky or private bits. */
-export function writerInput(f: Facts, recs: Recommendation[]): string {
+export function writerInput(f: Facts, recs: Recommendation[], audience: Audience = 'team'): string {
   const p = (x: PostFact) => ({ title: x.title.replace(/^Sample · /, ''), channel: x.channel, ...(x.lift !== undefined ? { timesUsual: x.lift } : {}), ...(x.audience !== undefined ? { reached: x.audience } : {}), ...(x.visits ? { siteVisits: x.visits, keyEvents: x.keyEvents } : {}), ...(x.why.length ? { hadWhatWins: x.why } : {}), ...(x.experiment ? { experiment: x.experiment } : {}) });
   return JSON.stringify({
     period: f.period.label,
@@ -285,7 +318,7 @@ export function writerInput(f: Facts, recs: Recommendation[]): string {
     website: f.site && { visits: f.site.sessions, previousVisits: f.site.prev.sessions, keyEvents: f.site.keyEvents, previousKeyEvents: f.site.prev.keyEvents, fromSocial: f.site.social, search: f.site.search, topSearches: f.site.topQueries },
     notable: f.notable.map((n) => n.text),
     whatWinsForThisBrand: f.playbook,
-    teamNotes: f.notes.map((n) => `${n.date}: ${n.text}`),
+    teamNotes: audience === 'client' ? [] : f.notes.map((n) => `${n.date}: ${n.text}`),
     nextSteps: recs.map((r) => ({ id: r.id, text: r.text, why: r.why })),
     cannotSee: f.coverage.messages,
   });
@@ -296,7 +329,7 @@ export function writerPrompt(f: Facts, recs: Recommendation[], audience: Audienc
   return `Write a marketing report for ${f.period.label} from these facts (JSON). The reader: ${AUDIENCES[audience].style}
 
 FACTS
-${writerInput(f, recs)}
+${writerInput(f, recs, audience)}
 
 Rules:
 - Use only numbers that appear in the facts (you may round them, write them as a percentage when the fact is a change, or write thousands as "8.8k"). Never compute a new number, total or percentage. Never guess.
@@ -315,7 +348,7 @@ export async function askWriter(prompt: string, timeoutMs = 240_000): Promise<st
   const cwd = await mkdtemp(join(tmpdir(), 'shipcast-report-'));
   try {
     let text = '';
-    const run = runClaude({ prompt, cwd, allowedTools: [], model: 'sonnet', appendSystemPrompt: WRITER_ROLE, extraArgs: ['--max-turns', '2', '--disallowedTools', 'WebFetch,WebSearch,Bash,Read,Write,Edit,Task', '--setting-sources', 'project', '--strict-mcp-config'], env: { MAX_THINKING_TOKENS: '0' }, onEvent: (e) => { if (e.kind === 'result' && e.text) text = e.text; else if (e.kind === 'text') text = text || e.text; } });
+    const run = runClaude({ prompt, cwd, allowedTools: [], noTools: true, model: 'sonnet', appendSystemPrompt: WRITER_ROLE, extraArgs: ['--max-turns', '2', '--disallowedTools', 'WebFetch,WebSearch,Bash,Read,Write,Edit,Task', '--setting-sources', 'project', '--strict-mcp-config'], env: { MAX_THINKING_TOKENS: '0' }, onEvent: (e) => { if (e.kind === 'result' && e.text) text = e.text; else if (e.kind === 'text') text = text || e.text; } });
     const timer = setTimeout(run.kill, timeoutMs);
     const r = await run.done;
     clearTimeout(timer);
@@ -432,7 +465,7 @@ export async function createReport(o: CreateReportOptions = {}): Promise<Report>
   const asOf = o.asOf ?? new Date();
   const tz = o.tz ?? (await readPlan()).tz;
   const kind = o.kind ?? 'last7';
-  const audience = o.audience && AUDIENCES[o.audience] ? o.audience : 'team';
+  const audience = o.audience && Object.hasOwn(AUDIENCES, o.audience) ? o.audience : 'team';
   const facts = await gatherFacts(periodFor(kind, asOf, tz, o.custom), asOf, { siteConnected: o.siteConnected ?? (await googleSiteConnected().catch(() => false)) });
   const plan = await readPlan();
   const recs = recommend(facts, { cadence: plan.cadence, suggested: suggestedSlots(await readPlaybook()) });
@@ -447,9 +480,9 @@ export async function createReport(o: CreateReportOptions = {}): Promise<Report>
 export async function rewriteReport(id: string, o: { audience?: Audience; ask?: ((p: string) => Promise<string>) | null } = {}): Promise<Report> {
   const cur = await getReport(id);
   if (!cur) throw Object.assign(new Error('report not found'), { status: 404 });
-  const audience = o.audience && AUDIENCES[o.audience] ? o.audience : cur.audience;
+  const audience = o.audience && Object.hasOwn(AUDIENCES, o.audience) ? o.audience : cur.audience;
   const words = await writeReport(cur.facts, cur.recommendations, audience, o.ask === undefined ? askWriter : o.ask ?? undefined);
-  return patchReport(id, () => ({ audience, headline: words.headline, sections: words.sections, writer: words.writer }));
+  return patchReport(id, () => ({ audience, headline: words.headline, sections: words.sections, writer: words.writer, edited: false }));
 }
 
 export interface ReportEdit {
@@ -465,6 +498,7 @@ export function editReport(id: string, e: ReportEdit): Promise<Report> {
     const out: Partial<Report> = {};
     if (typeof e.title === 'string' && e.title.trim()) out.title = e.title.trim().slice(0, 140);
     if (typeof e.headline === 'string' && e.headline.trim()) out.headline = e.headline.trim().slice(0, 200);
+    if ((out.headline && out.headline !== cur.headline) || e.sections?.some((x) => Array.isArray(x.lines))) out.edited = true;
     if (typeof e.intro === 'string') out.intro = e.intro.slice(0, 2000);
     if (e.status && ['draft', 'ready', 'sent'].includes(e.status)) out.status = e.status;
     if (Array.isArray(e.sections))
@@ -683,7 +717,7 @@ export async function askReport(id: string, question: string, ask: ((p: string) 
   const lines = (Array.isArray(reply.answer) ? reply.answer : []).map((x) => String(x).trim()).filter((l) => checkLine(l, allowed)).slice(0, 5);
   if (!lines.length) return fallback;
   const c = reply.chart;
-  const chartOk = c && typeof c.title === 'string' && Array.isArray(c.labels) && Array.isArray(c.series) && c.labels.length <= 24 && c.series.length <= 4 && c.series.every((x) => Array.isArray(x.values) && x.values.length === c.labels.length && x.values.every((v) => typeof v === 'number' && allowed.has(Math.round(v * 100) / 100)));
+  const chartOk = c && typeof c.title === 'string' && Array.isArray(c.labels) && Array.isArray(c.series) && c.labels.length <= 24 && c.series.length <= 4 && [c.title, ...c.labels.map(String), ...c.series.map((x) => String(x?.name ?? ''))].every((t) => !t || checkLine(t, allowed)) && c.series.every((x) => Array.isArray(x.values) && x.values.length === c.labels.length && x.values.every((v) => typeof v === 'number' && allowed.has(Math.round(v * 100) / 100)));
   return { by: 'claude', answer: lines, ...(chartOk ? { chart: { title: c!.title.slice(0, 80), labels: c!.labels.map((l) => String(l).slice(0, 30)), series: c!.series.map((x) => ({ name: String(x.name).slice(0, 40), values: x.values })) } } : fallback.chart ? { chart: fallback.chart } : {}) };
 }
 

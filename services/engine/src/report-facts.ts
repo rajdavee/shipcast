@@ -54,7 +54,8 @@ export function labelFor(kind: PeriodKind, start: string, end: string, tz: strin
 export function periodFor(kind: PeriodKind, asOf: Date, tz: string, custom?: { start: string; end: string }): Period {
   const make = (start: string, end: string): Period => ({ kind, start, end, tz, label: labelFor(kind, start, end, tz) });
   if (kind === 'custom') {
-    if (!custom || !(Date.parse(custom.start) < Date.parse(custom.end))) throw new Error('A custom period needs a start before its end.');
+    if (!custom || !(Date.parse(custom.start) < Date.parse(custom.end))) throw Object.assign(new Error('A custom period needs a start before its end.'), { status: 400 });
+    if (Date.parse(custom.start) < Date.parse('2000-01-01') || Date.parse(custom.end) > asOf.getTime() + 366 * DAY || Date.parse(custom.end) - Date.parse(custom.start) > 3 * 366 * DAY) throw Object.assign(new Error('A custom period is at most three years, after 2000.'), { status: 400 });
     return make(new Date(custom.start).toISOString(), new Date(custom.end).toISOString());
   }
   if (kind === 'last7' || kind === 'last30') {

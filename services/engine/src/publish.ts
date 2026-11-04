@@ -343,8 +343,17 @@ export async function youtubeAccess(): Promise<string> {
   return tok.access_token;
 }
 
-/** A fresh access token for the website connection (refreshing it when needed). */
-export async function googleSiteAccess(): Promise<string> {
+/** A fresh access token for the website connection; concurrent callers share one refresh (per workspace). */
+const siteRefresh = new Map<string, Promise<string>>();
+export function googleSiteAccess(): Promise<string> {
+  const key = home();
+  const cur = siteRefresh.get(key);
+  if (cur) return cur;
+  const p = googleSiteAccessOnce().finally(() => siteRefresh.delete(key));
+  siteRefresh.set(key, p);
+  return p;
+}
+async function googleSiteAccessOnce(): Promise<string> {
   const t = await secretJson<YoutubeToken>(SECRET.googleToken);
   if (!t) throw new PublishError('Google Analytics is not connected — connect it in Settings → Website.', true);
   if (Date.parse(t.expiresAt) > Date.now() + 60_000) return t.access;

@@ -727,7 +727,7 @@ router.put('/api/reports/schedule', async (req) => {
   const b = (await readJson(req)) ?? {};
   const cur = await readSchedule();
   // Webhooks come back from the UI as host-only entries; ones without a URL keep the saved address.
-  const hooks = Array.isArray(b.webhooks) ? b.webhooks.map((w: any, i: number) => (w?.url ? w : cur.webhooks.find((c) => c.kind === w?.kind && new URL(c.url).hostname === w?.host) ?? cur.webhooks[i])).filter(Boolean) : undefined;
+  const hooks = Array.isArray(b.webhooks) ? b.webhooks.map((w: any) => (w?.url ? w : cur.webhooks.find((c) => c.kind === w?.kind && new URL(c.url).hostname === w?.host))).filter(Boolean) : undefined;
   return publicSchedule(await saveSchedule({ ...b, ...(hooks ? { webhooks: hooks } : {}) }).catch(reportError));
 });
 router.get('/api/reports/email', () => publicSmtp());
@@ -1673,12 +1673,18 @@ registerAuthRoutes(router, callerOf);
 const shareHits = new Map<string, number[]>();
 /** /r/<token> (the page) and /r/<token>/img/<n> (a top post's image). Rate-limited per address; the same answer for every bad link. */
 async function serveShare(req: IncomingMessage, res: ServerResponse, url: URL) {
-  const ip = String(req.socket.remoteAddress ?? '');
+  // Behind a proxy you control (SHIPCAST_TRUST_PROXY=1) the visitor's address is the forwarded one.
+  const ip = String((process.env.SHIPCAST_TRUST_PROXY === '1' && req.headers['x-forwarded-for']) || req.socket.remoteAddress || '').split(',')[0].trim();
   const now = Date.now();
   const hits = (shareHits.get(ip) ?? []).filter((t) => now - t < 60_000);
   hits.push(now);
+  shareHits.delete(ip);
   shareHits.set(ip, hits);
-  if (shareHits.size > 5000) shareHits.clear();
+  // Forget the quietest (oldest-touched) addresses rather than everyone's counts.
+  for (const k of shareHits.keys()) {
+    if (shareHits.size <= 5000) break;
+    shareHits.delete(k);
+  }
   const headers = { 'cache-control': 'no-store', 'x-robots-tag': 'noindex, nofollow', 'referrer-policy': 'no-referrer', 'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'" };
   const gone = () => {
     res.writeHead(404, { ...headers, 'content-type': 'text/html; charset=utf-8' });
@@ -1699,7 +1705,7 @@ async function serveShare(req: IncomingMessage, res: ServerResponse, url: URL) {
       if (!img) return gone();
       return sendFile(req, res, img, { 'cache-control': 'private, max-age=3600', 'x-content-type-options': 'nosniff' });
     }
-    await countView(share.id);
+    countView(share.id);
     res.writeHead(200, { ...headers, 'content-type': 'text/html; charset=utf-8' });
     res.end(reportHtml(r, { media: (_p, i) => (topPostImage(r, i) ? `/r/${m[1]}/img/${i}` : undefined), note: share.expiresAt ? `Link expires ${new Date(share.expiresAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` : 'Shared link' }));
   });

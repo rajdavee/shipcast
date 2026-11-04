@@ -130,3 +130,27 @@ test('asking a report: checked answers with a chart, or the facts alone when the
   const ch = factsAnswer(sampleFacts(), 'which channel did best?', []);
   assert.equal(ch.chart!.labels.length, 2);
 });
+
+test('review fixes: the checker refuses number words, unscaled claims and title numbers; odd audiences fall back; edits change the footer', async () => {
+  const { reportCsv, reportHtml, AllowedNumbers, buildArgs } = await import('@shipcast/engine');
+  const f = sampleFacts();
+  const allowed = allowedNumbers(f, []);
+  assert.ok(allowed instanceof AllowedNumbers);
+  assert.equal(checkLine('Reach grew forty percent.', allowed), false);
+  assert.equal(checkLine('Revenue hit 9 million.', allowed), false);
+  assert.equal(checkLine('Reach reached 3.4k.', allowed), true, '3,400 in thousands');
+  assert.equal(checkLine('Reach reached 3.4m.', allowed), false);
+  assert.equal(checkLine('“Five launch mistakes 2026” did best.', allowed), true, 'quoted titles are not claims');
+  const r = await createReport({ kind: 'last7', ask: null, audience: 'toString' as any });
+  assert.equal(r.audience, 'team');
+  assert.match(reportHtml(r), /every number checked/);
+  const e = await editReport(r.id, { sections: [{ id: 'summary', lines: ['We grew 400%.'] }] });
+  assert.equal(e.edited, true);
+  assert.match(reportHtml(e), /edited by the team/);
+  const csv = reportCsv({ ...e, facts: { ...e.facts, work: { ...e.facts.work, posts: [{ post: 'p', title: "-2+3+cmd|' /C calc'!A0", channel: 'linkedin', at: 'x', why: [] }] } } } as any);
+  assert.match(csv, /'-2\+3\+cmd/);
+  const args = buildArgs({ prompt: 'x', allowedTools: [], noTools: true, extraArgs: ['--disallowedTools', 'Bash,Read', '--max-turns', '2'] } as any);
+  assert.equal(args.filter((a: string) => a === '--disallowedTools').length, 1, 'one deny list');
+  assert.equal(args[args.indexOf('--disallowedTools') + 1], 'Task,Agent,Bash,Read');
+  assert.equal(args[args.indexOf('--tools') + 1], '');
+});

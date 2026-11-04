@@ -149,3 +149,11 @@ test('chat messages carry no live mentions or links from post titles', async () 
   assert.deepEqual(discord.allowed_mentions, { parse: [] });
   assert.ok(!discord.content.includes('@everyone'));
 });
+
+test('review fixes: private address forms, Bcc recipients', async () => {
+  for (const ip of ['127.0.0.2', '0.0.0.0', '::ffff:127.0.0.1', '::ffff:7f00:1', '64:ff9b::a00:1', '2002:c0a8:0101::1', 'fec0::1', '198.18.0.1', '224.0.0.1']) assert.equal(isPrivateAddress(ip), true, ip);
+  for (const ip of ['8.8.8.8', '2606:4700:4700::1111', '::ffff:8.8.8.8']) assert.equal(isPrivateAddress(ip), false, ip);
+  const m = buildMessage('r@acme.com', { to: ['a@x.co', 'b@y.co'], subject: 's', text: 't' });
+  assert.match(m, /^To: undisclosed-recipients:;/m);
+  assert.ok(!m.includes('a@x.co'));
+});

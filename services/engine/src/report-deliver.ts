@@ -1,7 +1,9 @@
 import { randomBytes } from 'node:crypto';
 import { lookup } from 'node:dns/promises';
 import { readFile, rename, writeFile, mkdir } from 'node:fs/promises';
-import { isIP, Socket, connect as netConnect } from 'node:net';
+import { BlockList, isIP, Socket, connect as netConnect } from 'node:net';
+import { request as httpsRequest } from 'node:https';
+import { request as httpRequest } from 'node:http';
 import { join } from 'node:path';
 import { connect as tlsConnect, type TLSSocket } from 'node:tls';
 import { readPlan } from './calendar.ts';
@@ -10,7 +12,7 @@ import { notifyDesktop } from './hub.ts';
 import { localParts, zonedToUtc } from './calendar.ts';
 import { reportsDir, type PeriodKind } from './report-facts.ts';
 import { reportEmailHtml, reportMarkdown } from './report-html.ts';
-import { createShare, reportPdf } from './report-out.ts';
+import { createShare, reportPdf, revokeSharesBy } from './report-out.ts';
 import { currentContext } from './context.ts';
 import { isInstallOwnerSync } from './claude-account.ts';
 import { AUDIENCES, createReport, getReport, markReportSent, type Audience, type Report } from './report.ts';
@@ -109,7 +111,7 @@ export function saveSchedule(patch: Partial<Schedule>): Promise<Schedule> {
     const next: Schedule = { ...cur };
     if (typeof patch.enabled === 'boolean') next.enabled = patch.enabled;
     if (patch.kind && ['last7', 'last30', 'lastMonth', 'lastQuarter'].includes(patch.kind)) next.kind = patch.kind;
-    if (patch.audience && AUDIENCES[patch.audience]) next.audience = patch.audience;
+    if (patch.audience && Object.hasOwn(AUDIENCES, patch.audience)) next.audience = patch.audience;
     if (patch.weekday !== undefined && Number.isInteger(Number(patch.weekday)) && Number(patch.weekday) >= 0 && Number(patch.weekday) <= 6) next.weekday = Number(patch.weekday);
     if (patch.time !== undefined) {
       if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(String(patch.time))) throw bad('Time is HH:MM, e.g. 16:00.');
@@ -149,6 +151,8 @@ export interface SmtpConfig {
   user?: string;
   pass?: string;
   from: string;
+  /** Saved by the install owner pointing at this machine or its network (only they may). */
+  privateOk?: boolean;
 }
 const SMTP_SECRET = 'reports.smtp';
 const SMTP_PORTS = [25, 465, 587, 2525];
@@ -174,17 +178,21 @@ export async function saveSmtp(input: Partial<SmtpConfig> | null): Promise<void>
   const port = Number(input.port ?? 587);
   const from = String(input.from ?? '').trim();
   if (!/^[a-z0-9.-]{3,253}$/.test(host)) throw bad('Enter the mail server’s host name, e.g. smtp.example.com.');
-  const local = /^(localhost|127\.0\.0\.1)$/.test(host);
-  // A relay on this machine is the machine owner's to point at (other people could otherwise probe local ports).
+  // A server on this machine or its network is the machine owner's to point at (others could probe local ports).
   const uid = currentContext()?.user;
-  if (local && uid && !isInstallOwnerSync(uid)) throw bad('Only the person who set Shipcast up can use a mail relay on this machine.');
+  const owner = !uid || isInstallOwnerSync(uid);
+  // A name that doesn't resolve right now is saved as public; sending checks the address again anyway.
+  const ip = await publicAddress(host, true).then((a) => a.address).catch(() => '');
+  const priv = !!ip && isPrivateAddress(ip);
+  if (priv && !owner) throw bad('Only the person who set Shipcast up can use a mail server on this machine or its network.');
+  const local = priv && /^(127\.|::1$)/.test(ip);
   if (!SMTP_PORTS.includes(port) && !(local && Number.isInteger(port) && port > 1024 && port < 65536)) throw bad('Mail servers use port 587, 465, 25 or 2525 (a relay on this machine may use any port above 1024).');
   const addr = /<([^>]+)>\s*$/.exec(from)?.[1] ?? from;
   if (!EMAIL_RE.test(addr) || /[\r\n]/.test(from)) throw bad('“From” must be an email address, optionally with a name: Acme Reports <reports@acme.com>.');
   const user = input.user === undefined ? cur?.user : String(input.user).trim() || undefined;
   // An empty password field keeps the saved one.
   const pass = input.pass ? String(input.pass) : cur?.pass;
-  await setSecret(SMTP_SECRET, JSON.stringify({ host, port, secure: input.secure === undefined ? port === 465 : !!input.secure, from, ...(user ? { user } : {}), ...(pass ? { pass } : {}) } satisfies SmtpConfig));
+  await setSecret(SMTP_SECRET, JSON.stringify({ host, port, secure: input.secure === undefined ? port === 465 : !!input.secure, from, ...(user ? { user } : {}), ...(pass ? { pass } : {}), ...(priv ? { privateOk: true } : {}) } satisfies SmtpConfig));
 }
 
 // ── SMTP client ────────────────────────────────────────────────────────
@@ -208,7 +216,8 @@ export function buildMessage(from: string, m: Mail, now = new Date()): string {
   const fromHdr = /^(.*?)\s*<([^>]+)>$/.exec(from);
   const head = [
     `From: ${fromHdr ? `${encWord(fromHdr[1].replace(/"/g, ''))} <${fromHdr[2]}>` : from}`,
-    `To: ${m.to.join(', ')}`,
+    // Recipients go on the envelope only, so clients never see each other's addresses.
+    'To: undisclosed-recipients:;',
     `Subject: ${encWord(m.subject.replace(/[\r\n]+/g, ' ').slice(0, 200))}`,
     `Date: ${now.toUTCString()}`,
     `Message-ID: <${id}@${domain}>`,
@@ -240,6 +249,9 @@ class SmtpConn {
     this.attach(sock);
   }
   attach(sock: Socket | TLSSocket) {
+    // Anything buffered before TLS came in the clear and must not be read as a reply after it.
+    this.buf = '';
+    this.lines = [];
     this.sock = sock;
     sock.setEncoding('utf8');
     sock.on('data', (d: string) => {
@@ -283,18 +295,22 @@ class SmtpConn {
   }
 }
 
-function openSocket(host: string, port: number, secure: boolean, timeoutMs: number): Promise<Socket | TLSSocket> {
+function openSocket(host: string, address: string, port: number, secure: boolean, timeoutMs: number): Promise<Socket | TLSSocket> {
   return new Promise((resolve, reject) => {
-    const s = secure ? tlsConnect({ host, port, servername: isIP(host) ? undefined : host }) : netConnect({ host, port });
+    const s = secure ? tlsConnect({ host: address, port, servername: isIP(host) ? undefined : host }) : netConnect({ host: address, port });
     const t = setTimeout(() => (s.destroy(), reject(new Error(`Couldn’t reach ${host}:${port}`))), timeoutMs);
     s.once(secure ? 'secureConnect' : 'connect', () => (clearTimeout(t), resolve(s)));
     s.once('error', (e) => (clearTimeout(t), reject(new Error(`Couldn’t reach ${host}:${port}: ${e.message}`))));
   });
 }
 
-export async function sendMail(cfg: SmtpConfig, m: Mail, opts: { timeoutMs?: number; tls?: { rejectUnauthorized?: boolean } } = {}): Promise<void> {
-  if (!m.to.length) return;
-  const sock = await openSocket(cfg.host, cfg.port, cfg.secure, opts.timeoutMs ?? 20_000);
+/** Send one message to every recipient (all on Bcc). Refused recipients are reported, the rest still get it. */
+export async function sendMail(cfg: SmtpConfig, m: Mail, opts: { timeoutMs?: number; tls?: { rejectUnauthorized?: boolean } } = {}): Promise<{ accepted: string[]; refused: { to: string; error: string }[] }> {
+  if (!m.to.length) return { accepted: [], refused: [] };
+  // Connect to the address that was checked; a private one only if the owner saved it that way.
+  const addr = await publicAddress(cfg.host, true);
+  if (isPrivateAddress(addr.address) && !cfg.privateOk) throw new Error(`${cfg.host} is not a public address.`);
+  const sock = await openSocket(cfg.host, addr.address, cfg.port, cfg.secure, opts.timeoutMs ?? 20_000);
   sock.setTimeout(opts.timeoutMs ?? 60_000, () => sock.destroy(new Error('mail server timed out')));
   const c = new SmtpConn(sock);
   try {
@@ -302,7 +318,7 @@ export async function sendMail(cfg: SmtpConfig, m: Mail, opts: { timeoutMs?: num
     if (hello.code !== 220) throw new Error(`Mail server said: ${hello.text.slice(0, 160)}`);
     let caps = await c.cmd('EHLO shipcast.local', [250]);
     // A relay on this machine (Mailpit, a local Postfix) may speak plain SMTP; anything else must offer TLS.
-    const localRelay = /^(localhost|127\.0\.0\.1|::1)$/.test(cfg.host);
+    const localRelay = !!cfg.privateOk && /^(127\.|::1$)/.test(addr.address);
     if (!cfg.secure && !(localRelay && !/STARTTLS/i.test(caps))) {
       if (!/STARTTLS/i.test(caps)) throw new Error('This mail server doesn’t offer STARTTLS; use port 465 (TLS) instead.');
       await c.cmd('STARTTLS', [220]);
@@ -323,14 +339,27 @@ export async function sendMail(cfg: SmtpConfig, m: Mail, opts: { timeoutMs?: num
         await c.cmd(Buffer.from(cfg.pass).toString('base64'), [235], 'the password');
       }
     }
-    const addr = /<([^>]+)>\s*$/.exec(cfg.from)?.[1] ?? cfg.from;
-    await c.cmd(`MAIL FROM:<${addr}>`, [250]);
-    for (const to of m.to) await c.cmd(`RCPT TO:<${to}>`, [250, 251], `the recipient ${to}`);
+    const fromAddr = /<([^>]+)>\s*$/.exec(cfg.from)?.[1] ?? cfg.from;
+    await c.cmd(`MAIL FROM:<${fromAddr}>`, [250]);
+    const accepted: string[] = [], refused: { to: string; error: string }[] = [];
+    for (const to of m.to) {
+      try {
+        await c.cmd(`RCPT TO:<${to}>`, [250, 251], `the recipient ${to}`);
+        accepted.push(to);
+      } catch (e) {
+        refused.push({ to, error: (e as Error).message.slice(0, 200) });
+      }
+    }
+    if (!accepted.length) {
+      await c.cmd('QUIT', [221]).catch(() => {});
+      return { accepted, refused };
+    }
     await c.cmd('DATA', [354]);
     // Dot-stuffing: a line starting with "." gets another.
     const body = buildMessage(cfg.from, m).replace(/\r\n\./g, '\r\n..');
     await c.cmd(`${body}\r\n.`, [250], 'the message');
     await c.cmd('QUIT', [221]).catch(() => {});
+    return { accepted, refused };
   } finally {
     c.sock.destroy();
   }
@@ -338,21 +367,46 @@ export async function sendMail(cfg: SmtpConfig, m: Mail, opts: { timeoutMs?: num
 
 // ── webhooks ───────────────────────────────────────────────────────────
 
-const PRIVATE_V4 = [/^10\./, /^127\./, /^169\.254\./, /^172\.(1[6-9]|2\d|3[01])\./, /^192\.168\./, /^0\./, /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./];
-export const isPrivateAddress = (ip: string) => (isIP(ip) === 4 ? PRIVATE_V4.some((re) => re.test(ip)) : /^(::1?|f[cd]|fe80|::ffff:(10|127|169\.254|192\.168)\.)/i.test(ip));
+// Addresses that reach this machine or a private network (including IPv6 forms that embed an IPv4 address).
+const BLOCKED = new BlockList();
+for (const [net, bits] of [['0.0.0.0', 8], ['10.0.0.0', 8], ['100.64.0.0', 10], ['127.0.0.0', 8], ['169.254.0.0', 16], ['172.16.0.0', 12], ['192.0.0.0', 24], ['192.168.0.0', 16], ['198.18.0.0', 15], ['224.0.0.0', 4], ['240.0.0.0', 4]] as const) BLOCKED.addSubnet(net, bits, 'ipv4');
+for (const [net, bits] of [['::', 128], ['::1', 128], ['fc00::', 7], ['fe80::', 10], ['fec0::', 10], ['ff00::', 8]] as const) BLOCKED.addSubnet(net, bits, 'ipv6');
 
-/** Refuse webhooks that resolve into this machine or its network (they'd reach local services). */
-async function assertPublic(url: string) {
-  if (process.env.SHIPCAST_ALLOW_PRIVATE_WEBHOOKS === '1') return;
-  const host = new URL(url).hostname.replace(/^\[|\]$/g, '');
-  const addrs = isIP(host) ? [host] : (await lookup(host, { all: true })).map((a) => a.address);
-  if (!addrs.length || addrs.some(isPrivateAddress)) throw new Error(`${host} is not a public address.`);
+/** The IPv4 address inside an IPv6 one (mapped ::ffff:a.b.c.d, NAT64 64:ff9b::/96, 6to4 2002::/16), if any. */
+function embeddedV4(ip: string): string | undefined {
+  const s = ip.toLowerCase();
+  const dotted = /(?:^::ffff:|^64:ff9b::)(\d+\.\d+\.\d+\.\d+)$/.exec(s);
+  if (dotted) return dotted[1];
+  const hex = /^(?:::ffff:|64:ff9b::)([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(s) ?? /^2002:([0-9a-f]{1,4}):([0-9a-f]{1,4}):/.exec(s);
+  if (!hex) return undefined;
+  const a = parseInt(hex[1], 16), b = parseInt(hex[2], 16);
+  return `${a >> 8}.${a & 255}.${b >> 8}.${b & 255}`;
+}
+
+export function isPrivateAddress(ip: string): boolean {
+  const v = isIP(ip);
+  if (v === 4) return BLOCKED.check(ip, 'ipv4');
+  if (v === 6) {
+    const inner = embeddedV4(ip);
+    return BLOCKED.check(ip, 'ipv6') || (inner !== undefined && BLOCKED.check(inner, 'ipv4'));
+  }
+  return true;
+}
+
+/** Resolve a host to the one address a connection will use, refusing private ones unless allowed. */
+export async function publicAddress(host: string, allowPrivate = false): Promise<{ address: string; family: number }> {
+  const h = host.replace(/^\[|\]$/g, '');
+  const all = isIP(h) ? [{ address: h, family: isIP(h) }] : await lookup(h, { all: true });
+  if (!all.length) throw new Error(`${host} has no address.`);
+  if (!allowPrivate && all.some((a) => isPrivateAddress(a.address))) throw new Error(`${host} is not a public address.`);
+  return all[0];
 }
 
 /** The JSON each chat app expects. */
 export function webhookPayload(kind: WebhookKind, rIn: Report, link?: string): unknown {
   // Post titles and notes are people's text: in chat apps they must not ping @channel/@everyone or smuggle links.
-  const r = kind === 'slack' ? mapText(rIn, (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')) : kind === 'discord' ? mapText(rIn, (t) => t.replace(/@/g, '@\u200b')) : rIn;
+  const noLinks = (t: string) => t.replace(/[[\]]/g, (c) => `\\${c}`);
+  const r = kind === 'slack' ? mapText(rIn, (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')) : kind === 'discord' ? mapText(rIn, (t) => noLinks(t).replace(/@/g, '@\u200b')) : kind === 'teams' ? mapText(rIn, noLinks) : rIn;
   const kpis = r.facts.kpis.slice(0, 4).map((k) => `${k.label}: ${k.unit === 'percent' ? `${k.value}%` : Math.round(k.value).toLocaleString('en-US')}${k.change !== undefined ? ` (${k.change >= 0 ? '+' : '−'}${Math.round(Math.abs(k.change) * 100)}%)` : ''}`);
   const summary = r.sections.find((s) => s.id === 'summary')?.lines ?? [];
   const next = r.recommendations.map((x, i) => `${i + 1}. ${x.text}`);
@@ -383,16 +437,35 @@ function mapText(r: Report, fn: (t: string) => string): Report {
   return { ...r, title: fn(r.title), headline: fn(r.headline), sections: r.sections.map((s) => ({ ...s, lines: s.lines.map(fn) })), recommendations: r.recommendations.map((x) => ({ ...x, text: fn(x.text), why: fn(x.why) })) };
 }
 
+/** POST JSON, connecting only to the address that was checked (no second lookup to rebind), no redirects. */
+async function postJson(url: string, body: unknown): Promise<number> {
+  const u = new URL(url);
+  const addr = await publicAddress(u.hostname, process.env.SHIPCAST_ALLOW_PRIVATE_WEBHOOKS === '1');
+  const data = Buffer.from(JSON.stringify(body));
+  const req = u.protocol === 'https:' ? httpsRequest : httpRequest;
+  return new Promise((resolve, reject) => {
+    const r = req(
+      { method: 'POST', hostname: u.hostname, port: u.port || undefined, path: `${u.pathname}${u.search}`, headers: { 'content-type': 'application/json', 'content-length': data.length }, timeout: 20_000, lookup: ((_h: string, _o: unknown, cb: (e: Error | null, a: string, f: number) => void) => cb(null, addr.address, addr.family)) as never },
+      (res) => {
+        res.resume();
+        res.on('end', () => resolve(res.statusCode ?? 0));
+      },
+    );
+    r.on('timeout', () => r.destroy(new Error('timed out')));
+    r.on('error', reject);
+    r.end(data);
+  });
+}
+
 // Swappable for tests.
-let http: typeof fetch = (i, init) => fetch(i, init);
+let http: ((url: string, body: unknown) => Promise<number>) | null = null;
 export function setDeliverFetch(f: typeof fetch | null) {
-  http = f ?? ((i, init) => fetch(i, init));
+  http = f ? async (url, body) => (await f(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })).status : null;
 }
 
 export async function postWebhook(w: Webhook, r: Report, link?: string): Promise<void> {
-  await assertPublic(w.url);
-  const res = await http(w.url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(webhookPayload(w.kind, r, link)), redirect: 'error', signal: AbortSignal.timeout(20_000) });
-  if (!res.ok) throw new Error(`${w.kind} answered ${res.status}`);
+  const status = await (http ?? postJson)(w.url, webhookPayload(w.kind, r, link));
+  if (status < 200 || status >= 300) throw new Error(`${w.kind} answered ${status}`);
 }
 
 // ── sending ────────────────────────────────────────────────────────────
@@ -415,20 +488,26 @@ export async function sendReport(id: string, o: { emails?: string[]; webhooks?: 
   if (!emails.length && !hooks.length) throw bad('Add someone to send it to: an email address or a webhook (Reports → Delivery).');
   const now = o.now ?? new Date();
   const day = now.toISOString().slice(0, 10);
-  const log = await readJson<{ at: string; report: string; to: string; ok: boolean; error?: string }[]>(sendsFile(), []);
-  const today = log.filter((x) => x.at.startsWith(day)).length;
+  const log = await readJson<{ at: string; report: string; to: string; ok: boolean; error?: string; send?: string; kind?: 'email' | 'webhook' }[]>(sendsFile(), []);
+  // The cap counts messages: one email (however many recipients) plus one per webhook.
+  const today = new Set(log.filter((x) => x.at.startsWith(day)).map((x) => (x.kind === 'email' ? `${x.send ?? x.at}|email` : `${x.send ?? x.at}|${x.to}`))).size;
   if (today + (emails.length ? 1 : 0) + hooks.length > SENDS_PER_DAY) throw Object.assign(new Error(`That would go over ${SENDS_PER_DAY} sends today — try again tomorrow.`), { status: 429 });
 
   // On a server people can reach (SHIPCAST_PUBLIC_URL), the message links to a 30-day share of the report.
   let link = o.link;
   const pub = process.env.SHIPCAST_PUBLIC_URL?.replace(/\/+$/, '');
   const ws = currentContext()?.workspace;
-  if (link === undefined && pub && /^https?:\/\//.test(pub) && ws) link = `${pub}/r/${(await createShare(ws, id, { expiresDays: 30, by: 'delivery' })).token}`;
+  if (link === undefined && pub && /^https?:\/\//.test(pub) && ws) {
+    // One live delivery link per report: the new one replaces the last.
+    await revokeSharesBy(ws, id, 'delivery');
+    link = `${pub}/r/${(await createShare(ws, id, { expiresDays: 30, by: 'delivery' })).token}`;
+  }
+  const send = randomBytes(4).toString('hex');
   const out: ReportSendResult = { sent: [], failed: [] };
   const entries: typeof log = [];
-  const note = (to: string, err?: unknown) => {
+  const note = (to: string, err?: unknown, kind: 'email' | 'webhook' = 'email') => {
     const error = err ? String((err as Error).message ?? err).slice(0, 200) : undefined;
-    entries.push({ at: now.toISOString(), report: id, to, ok: !err, ...(error ? { error } : {}) });
+    entries.push({ at: now.toISOString(), report: id, to, ok: !err, send, kind, ...(error ? { error } : {}) });
     if (err) out.failed.push({ to, error: error! });
     else out.sent.push(to);
   };
@@ -444,9 +523,10 @@ export async function sendReport(id: string, o: { emails?: string[]; webhooks?: 
         } catch {}
       }
       try {
-        // One message, every recipient on it: the report is the same for all.
-        await sendMail(cfg, { to: emails, subject: `${r.title}: ${r.headline}`, text: reportMarkdown(r, link), html: reportEmailHtml(r, link), attachments });
-        for (const e of emails) note(e);
+        // One message, every recipient on Bcc: the report is the same for all.
+        const res = await sendMail(cfg, { to: emails, subject: `${r.title}: ${r.headline}`, text: reportMarkdown(r, link), html: reportEmailHtml(r, link), attachments });
+        for (const e of res.accepted) note(e);
+        for (const x of res.refused) note(x.to, new Error(x.error));
       } catch (e) {
         for (const to of emails) note(to, e);
       }
@@ -456,9 +536,9 @@ export async function sendReport(id: string, o: { emails?: string[]; webhooks?: 
     const label = `${w.kind} (${new URL(w.url).hostname})`;
     try {
       await postWebhook(w, r, link);
-      note(label);
+      note(label, undefined, 'webhook');
     } catch (e) {
-      note(label, e);
+      note(label, e, 'webhook');
     }
   }
   await serial(async () => writeJson(sendsFile(), [...(await readJson<typeof log>(sendsFile(), [])), ...entries].slice(-500)));
@@ -466,11 +546,17 @@ export async function sendReport(id: string, o: { emails?: string[]; webhooks?: 
   return out;
 }
 
+const testSends = new Map<string, number[]>();
 export async function testEmail(to: string): Promise<void> {
   if (!EMAIL_RE.test(to)) throw bad('Enter an email address to send the test to.');
+  const key = currentContext()?.workspace ?? '';
+  const recent = (testSends.get(key) ?? []).filter((t) => Date.now() - t < 3_600_000);
+  if (recent.length >= 5) throw Object.assign(new Error('Five test emails an hour — try again later.'), { status: 429 });
+  testSends.set(key, [...recent, Date.now()]);
   const cfg = await readSmtp();
   if (!cfg) throw bad('Save the mail server settings first.');
-  await sendMail(cfg, { to: [to], subject: 'Shipcast test email', text: 'Email from Shipcast works. Reports will arrive like this.', html: '<p>Email from <b>Shipcast</b> works. Reports will arrive like this.</p>' });
+  const res = await sendMail(cfg, { to: [to], subject: 'Shipcast test email', text: 'Email from Shipcast works. Reports will arrive like this.', html: '<p>Email from <b>Shipcast</b> works. Reports will arrive like this.</p>' });
+  if (res.refused.length) throw new Error(res.refused[0].error);
 }
 
 // ── the schedule ───────────────────────────────────────────────────────
@@ -510,7 +596,9 @@ export async function reportTick(deps: ReportTickDeps = {}): Promise<{ made?: st
   if ((await readSettings()).agentsPaused) return undefined;
   const now = deps.now ?? new Date();
   const tz = (await readPlan()).tz;
-  const notify = deps.notify ?? notifyDesktop;
+  // Desktop notices show on the machine's own screen: only for the workspaces of the person who owns it.
+  const uid = currentContext()?.user;
+  const notify = deps.notify ?? (uid && !isInstallOwnerSync(uid) ? async () => {} : notifyDesktop);
   const slot = lastSlot(s, now, tz);
   if (slot.getTime() > 0 && (!s.lastRun || Date.parse(s.lastRun) < slot.getTime()) && now.getTime() - slot.getTime() < 2 * 86_400_000) {
     await markSchedule({ lastRun: now.toISOString() });

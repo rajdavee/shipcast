@@ -784,7 +784,7 @@ async function askClaude(prompt: string, timeoutMs = 180_000): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), 'shipcast-playbook-'));
   try {
     let text = '';
-    const run = runClaude({ prompt, cwd, allowedTools: [], model: 'sonnet', appendSystemPrompt: ROLE, extraArgs: ['--max-turns', '2', '--disallowedTools', 'WebFetch,WebSearch,Bash,Read,Write,Edit,Task', '--setting-sources', 'project', '--strict-mcp-config'], env: { MAX_THINKING_TOKENS: '0' }, onEvent: (e) => { if (e.kind === 'result' && e.text) text = e.text; else if (e.kind === 'text') text = text || e.text; } });
+    const run = runClaude({ prompt, cwd, allowedTools: [], noTools: true, model: 'sonnet', appendSystemPrompt: ROLE, extraArgs: ['--max-turns', '2', '--disallowedTools', 'WebFetch,WebSearch,Bash,Read,Write,Edit,Task', '--setting-sources', 'project', '--strict-mcp-config'], env: { MAX_THINKING_TOKENS: '0' }, onEvent: (e) => { if (e.kind === 'result' && e.text) text = e.text; else if (e.kind === 'text') text = text || e.text; } });
     const timer = setTimeout(run.kill, timeoutMs);
     const r = await run.done;
     clearTimeout(timer);
