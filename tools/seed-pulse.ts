@@ -12,12 +12,12 @@
  * what the "Sample" label says — so it refuses to touch ~/.shipcast unless
  * --force. Re-running replaces the earlier sample.
  */
-import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { crc32, deflateSync } from 'node:zlib';
-import { addSnapshot, campaignDir, deletePost, deleteSnapshot, listPosts, localParts, readPlan, readSnapshots, recordForecast, refreshPlaybook, runMetrics, savePlan, savePost, seededRng, zonedToUtc, type ChannelId, type MetricSource, type Post } from '@shipcast/engine';
+import { addSnapshot, addNote, campaignDir, computePerformance, deleteNote, deletePost, deleteSnapshot, headline, listPosts, localParts, readNotes, saveGoals, siteDir, readPlan, readSnapshots, recordForecast, refreshPlaybook, runMetrics, savePlan, savePost, seededRng, zonedToUtc, type ChannelId, type MetricSource, type Post } from '@shipcast/engine';
 
 export const SAMPLE_PREFIX = 'Sample · ';
 const CAMPAIGN = 'sample-pulse';
@@ -310,7 +310,54 @@ export async function seedPulse(opts: { home: string; days?: number; now?: Date;
   // A metrics pass turns the open readings into "Numbers wanted" (no desktop notifications from a seeder).
   await runMetrics({ now: () => now, notify: async () => {}, log: () => {} });
   log(`playbook: ${pb.channels.map((c) => `${c.channel} ${c.ready ? `ready, top win ${c.wins[0]?.level ?? '—'}` : `${c.n} posts`}`).join(' · ')}`);
+  const site = await seedReports(now, rng, gauss, tz);
+  log(`reports: ${site} website days, goals and notes`);
   return { published: planned.length, upcoming, snapshots: snaps, playbook: pb };
+}
+
+/**
+ * For reports: sample website days (visits with a weekly rhythm and slow growth, key events,
+ * sources, search) with visits credited to the sample posts that did best, two goals and two notes.
+ * The website settings say "Sample site"; there is no Google connection behind them.
+ */
+async function seedReports(now: Date, rng: () => number, gauss: () => number, tz: string): Promise<number> {
+  const posts = (await listPosts()).filter((p) => p.title.startsWith(SAMPLE_PREFIX) && p.status === 'published');
+  const perf = computePerformance(await readSnapshots());
+  const days: Record<string, unknown>[] = [];
+  const span = 120;
+  for (let d = span; d >= 1; d--) {
+    const date = new Date(now.getTime() - d * 86_400_000).toISOString().slice(0, 10);
+    const dow = new Date(`${date}T12:00:00Z`).getUTCDay();
+    const base = (420 + (span - d) * 1.6) * (dow === 0 || dow === 6 ? 0.55 : 1) * Math.exp(0.08 * gauss());
+    const sessions = Math.round(base);
+    const li = Math.round(sessions * (0.07 + 0.02 * rng())), ig = Math.round(sessions * (0.03 + 0.015 * rng())), google = Math.round(sessions * 0.46);
+    const keyEvents = Math.round(sessions * (0.021 + 0.006 * rng()));
+    const byCampaign: Record<string, { sessions: number; keyEvents: number; source: string }> = {};
+    for (const p of posts) {
+      const c = p.channels[0];
+      const sent = Date.parse(c.sentAt ?? p.at ?? '');
+      const age = (Date.parse(`${date}T12:00:00Z`) - sent) / 86_400_000;
+      if (!(age >= 0 && age < 4) || c.channel === 'youtube') continue;
+      const lift = headline(perf, p.id, c.channel)?.lift ?? 1;
+      const v = Math.round((c.channel === 'linkedin' ? 14 : 6) * lift * Math.exp(-age) * Math.exp(0.2 * gauss()));
+      if (v > 0) byCampaign[p.id] = { sessions: v, keyEvents: Math.round(v * 0.04 * lift), source: c.channel === 'linkedin' ? 'linkedin.com' : 'instagram.com' };
+    }
+    const clicks = Math.round(google * 0.9);
+    days.push({ date, sessions, users: Math.round(sessions * 0.82), keyEvents, bySource: { google: { sessions: google, keyEvents: Math.round(keyEvents * 0.45) }, 'linkedin.com': { sessions: li, keyEvents: Math.round(keyEvents * 0.2) }, 'instagram.com': { sessions: ig, keyEvents: Math.round(keyEvents * 0.06) }, '(direct)': { sessions: sessions - google - li - ig, keyEvents: Math.round(keyEvents * 0.29) } }, byCampaign, search: { clicks, impressions: Math.round(clicks * (24 + 4 * rng())), position: Math.round((14 - (span - d) * 0.02 + gauss()) * 10) / 10 }, topQueries: [{ query: 'sample product name', clicks: Math.round(clicks * 0.3), impressions: Math.round(clicks * 2) }, { query: 'sample how to launch', clicks: Math.round(clicks * 0.08), impressions: Math.round(clicks * 6) }, { query: 'sample alternatives', clicks: Math.round(clicks * 0.05), impressions: Math.round(clicks * 4) }] });
+  }
+  await mkdir(siteDir(), { recursive: true });
+  await writeFile(join(siteDir(), 'days.json'), JSON.stringify(days));
+  let settings: Record<string, unknown> = {};
+  try {
+    settings = JSON.parse(await readFile(join(siteDir(), 'settings.json'), 'utf8'));
+  } catch {}
+  await writeFile(join(siteDir(), 'settings.json'), JSON.stringify({ domains: [], utm: true, ...settings, ga4Name: 'Sample site', lastSync: now.toISOString() }));
+  await saveGoals([{ metric: 'posts', target: 14, per: 'month', label: 'Sample · Posts this month' }, { metric: 'keyEvents', target: 380, per: 'month', label: 'Sample · Signups from the site' }]);
+  for (const n of await readNotes()) if (n.text.startsWith(SAMPLE_PREFIX)) await deleteNote(n.id);
+  const day = (back: number) => localParts(new Date(now.getTime() - back * 86_400_000).toISOString(), tz).date;
+  await addNote({ date: day(9), text: `${SAMPLE_PREFIX}New pricing page went live` });
+  await addNote({ date: day(3), text: `${SAMPLE_PREFIX}Team at a conference, fewer posts` });
+  return days.length;
 }
 
 async function makeMedia(kind: Kind, step: string | undefined, i: number): Promise<string[]> {

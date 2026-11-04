@@ -235,6 +235,8 @@ export interface SiteFacts {
   search?: { clicks: number; impressions: number; ctr?: number; position?: number; prev: { clicks: number; impressions: number } };
   topQueries: { query: string; clicks: number; impressions: number }[];
   days: number;
+  /** Website data is complete only up to this day; both periods were moved back to match. */
+  through?: string;
 }
 
 export interface Facts {
@@ -325,9 +327,26 @@ export function channelOfSource(src: string): ChannelId | undefined {
   return (Object.entries(SOCIAL_SOURCES) as [ChannelId, RegExp][]).find(([, re]) => re.test(s))?.[0];
 }
 
-function siteDaysIn(site: SiteDay[], p: Period): SiteDay[] {
-  const a = localParts(p.start, p.tz).date;
-  const b = localParts(new Date(Date.parse(p.end) - 1).toISOString(), p.tz).date;
+const addDays = (date: string, n: number) => new Date(Date.parse(`${date}T12:00:00Z`) + n * DAY).toISOString().slice(0, 10);
+
+/**
+ * Website data arrives a day or more late (Analytics settles over ~2 days, Search Console ~3). When the
+ * newest day is before the period's end, every website window moves back by that lag (up to a week),
+ * so this period and the one before are compared on the same number of complete days.
+ */
+export function siteLag(site: SiteDay[], p: Period): number {
+  const last = site.reduce((m, d) => (d.date > m ? d.date : m), '');
+  if (!last) return 0;
+  const endDay = localParts(new Date(Date.parse(p.end) - 1).toISOString(), p.tz).date;
+  const lag = Math.round((Date.parse(`${endDay}T12:00:00Z`) - Date.parse(`${last}T12:00:00Z`)) / DAY);
+  return lag > 0 && lag <= 7 ? lag : 0;
+}
+
+function siteDaysIn(site: SiteDay[], p: Period, lag = 0): SiteDay[] {
+  // Whole days only: a rolling period that starts mid-day begins with the next full day.
+  const sp = localParts(p.start, p.tz);
+  const a = addDays(sp.time === '00:00' ? sp.date : addDays(sp.date, 1), -lag);
+  const b = addDays(localParts(new Date(Date.parse(p.end) - 1).toISOString(), p.tz).date, -lag);
   return site.filter((d) => d.date >= a && d.date <= b);
 }
 
@@ -345,10 +364,10 @@ function searchTotals(days: SiteDay[]) {
   return { clicks, impressions, ...(impressions ? { ctr: clicks / impressions } : {}), ...(position !== undefined ? { position: Math.round(position * 10) / 10 } : {}) };
 }
 
-function siteFacts(site: SiteDay[], p: Period, prev: Period): SiteFacts | undefined {
-  const days = siteDaysIn(site, p);
+function siteFacts(site: SiteDay[], p: Period, prev: Period, lag: number): SiteFacts | undefined {
+  const days = siteDaysIn(site, p, lag);
   if (!days.length) return undefined;
-  const pdays = siteDaysIn(site, prev);
+  const pdays = siteDaysIn(site, prev, lag);
   const social = new Map<ChannelId, { sessions: number; keyEvents: number }>();
   for (const d of days)
     for (const [src, v] of Object.entries(d.bySource ?? {})) {
@@ -368,6 +387,7 @@ function siteFacts(site: SiteDay[], p: Period, prev: Period): SiteFacts | undefi
     ...(search ? { search: { ...search, prev: { clicks: psearch?.clicks ?? 0, impressions: psearch?.impressions ?? 0 } } } : {}),
     topQueries: [...q.entries()].map(([query, v]) => ({ query, ...v })).sort((a, b) => b.clicks - a.clicks || b.impressions - a.impressions).slice(0, 5),
     days: days.length,
+    ...(lag ? { through: days.reduce((m, d) => (d.date > m ? d.date : m), '') } : {}),
   };
 }
 
@@ -509,17 +529,19 @@ export function buildFacts(input: FactsInput, period: Period, asOf: Date = new D
   const perf = computePerformance(input.snapshots.filter((s) => s.at <= asOfIso));
   const lag = (p: Period) => new Date(asOf.getTime() - (Date.parse(period.end) - Date.parse(p.end))).toISOString();
   const readsNow = readingsAsOf(input.snapshots, asOfIso);
+  const siteShift = siteLag(site, period);
 
   // Per period (this one and the history before it), read as of the same lag after its end.
   const history = Array.from({ length: SERIES }, (_, i) => {
     const p = i === 0 ? period : shiftPeriod(period, -i);
     const reads = i === 0 ? readsNow : readingsAsOf(input.snapshots, lag(p));
     const items = publishedIn(input.posts, p);
-    const st = siteTotals(siteDaysIn(site, p));
-    const sc = searchTotals(siteDaysIn(site, p));
+    const sd = siteDaysIn(site, p, siteShift);
+    const st = siteTotals(sd);
+    const sc = searchTotals(sd);
     const byChannel = new Map<ChannelId, Totals>();
     for (const ch of new Set(items.map((x) => x.channel))) byChannel.set(ch, totalsFor(items.filter((x) => x.channel === ch), reads));
-    return { p, items, totals: totalsFor(items, reads), byChannel, site: { sessions: st.sessions, keyEvents: st.keyEvents, ...(sc ? { searchClicks: sc.clicks } : {}) }, siteDays: siteDaysIn(site, p).length };
+    return { p, items, totals: totalsFor(items, reads), byChannel, site: { sessions: st.sessions, keyEvents: st.keyEvents, ...(sc ? { searchClicks: sc.clicks } : {}) }, siteDays: sd.length };
   }).reverse();
   const cur = history[history.length - 1];
   const prev = history[history.length - 2];
@@ -656,7 +678,7 @@ export function buildFacts(input: FactsInput, period: Period, asOf: Date = new D
     goals,
     notable: notableTop,
     ...(hasSite ? (() => {
-      const s = siteFacts(site, period, prevPeriod);
+      const s = siteFacts(site, period, prevPeriod, siteShift);
       return s ? { site: s } : {};
     })() : {}),
     notes,

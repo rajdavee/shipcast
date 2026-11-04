@@ -159,3 +159,15 @@ test('a run of growing weeks is notable', () => {
   assert.ok(kinds.includes('high:audience:all'), kinds.join(', '));
   assert.ok(kinds.some((k) => k.startsWith('streak-up:audience')), kinds.join(', '));
 });
+
+test('website data that arrives late is compared on the same complete days', () => {
+  n = 0;
+  const day = (date: string, sessions: number) => ({ date, sessions, users: sessions, keyEvents: 1 });
+  // Data stops two days before the report; a naive window would show a fake drop.
+  const site = Array.from({ length: 30 }, (_, i) => day(new Date(Date.parse('2026-10-04T12:00:00Z') + i * D).toISOString().slice(0, 10), 100));
+  const f = buildFacts({ posts: [], snapshots: [], campaigns: [], site }, periodFor('last7', NOW, 'UTC'), NOW);
+  assert.equal(f.site!.through, '2026-11-02');
+  assert.equal(f.site!.sessions, 700);
+  assert.equal(f.site!.prev.sessions, 700);
+  assert.equal(f.kpis.find((k) => k.key === 'sessions')!.change, 0);
+});

@@ -204,7 +204,7 @@ export function templateSections(f: Facts, recs: Recommendation[], audience: Aud
   // Website
   if (f.site) {
     const w = f.site;
-    const web: string[] = [`Website visits: ${num(w.sessions)}${w.prev.sessions ? ` (was ${num(w.prev.sessions)})` : ''}, with ${plural(w.keyEvents, 'key event')}${w.prev.keyEvents ? ` (was ${num(w.prev.keyEvents)})` : ''}.`];
+    const web: string[] = [`Website visits${w.through ? ` (complete to ${new Date(`${w.through}T12:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}, compared over the same days before)` : ''}: ${num(w.sessions)}${w.prev.sessions ? ` (was ${num(w.prev.sessions)})` : ''}, with ${plural(w.keyEvents, 'key event')}${w.prev.keyEvents ? ` (was ${num(w.prev.keyEvents)})` : ''}.`];
     if (w.social.length) web.push(`From social: ${list(w.social.slice(0, 3).map((x) => `${chName(x.channel)} ${num(x.sessions)} visits${x.keyEvents ? ` and ${plural(x.keyEvents, 'key event')}` : ''}`))}.`);
     const tagged = f.work.posts.filter((p) => p.visits).sort((a, b) => b.visits! - a.visits!);
     if (tagged[0]) web.push(`Top post for the site: ${quote(tagged[0].title)} sent ${plural(tagged[0].visits!, 'visit')}${tagged[0].keyEvents ? ` and ${plural(tagged[0].keyEvents, 'key event')}` : ''}.`);
