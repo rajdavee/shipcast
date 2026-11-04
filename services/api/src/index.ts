@@ -159,6 +159,7 @@ import {
   updateChannel,
   type OAuthProvider,
 } from '@shipcast/engine';
+import { addNote, createReport, deleteNote, deleteReport, editReport, getReport, listReports, readGoals, readNotes, reportVersions, restoreVersion, rewriteReport, runRecommendation, saveGoals } from '@shipcast/engine';
 import { HttpError, json, readBody, readJson, Router, sendFile } from './http.ts';
 import { cookieToken, gate, registerAuthRoutes, type Caller } from './gate.ts';
 import { loginState, startClaudeLogin, startGithubLogin } from './connect.ts';
@@ -673,6 +674,55 @@ router.post('/api/calendar/posts/:id/remix', async (req, _r, p) => {
   } catch (e) {
     throw new HttpError(404, (e as Error).message);
   }
+});
+
+// ── reports: the weekly (or monthly) report that writes itself ─────────
+const reportError = (e: unknown): never => {
+  const st = (e as { status?: number }).status;
+  throw new HttpError(st && st >= 400 && st < 500 ? st : 500, (e as Error).message);
+};
+router.get('/api/reports', () => listReports());
+router.get('/api/reports/goals', () => readGoals());
+router.put('/api/reports/goals', async (req) => saveGoals((await readJson(req))?.goals));
+router.get('/api/reports/notes', () => readNotes());
+router.post('/api/reports/notes', async (req) => addNote(await readJson(req), callerOf(req).user.id).catch(reportError));
+router.delete('/api/reports/notes/:id', async (_q, _r, p) => {
+  if (!(await deleteNote(p.id))) throw new HttpError(404, 'note not found');
+  return { ok: true };
+});
+router.post('/api/reports', async (req) => {
+  const b = (await readJson(req)) ?? {};
+  const kind = ['last7', 'last30', 'lastMonth', 'lastQuarter', 'custom'].includes(b.kind) ? b.kind : 'last7';
+  const custom = kind === 'custom' ? { start: String(b.start ?? ''), end: String(b.end ?? '') } : undefined;
+  if (custom && !(Date.parse(custom.start) < Date.parse(custom.end))) throw new HttpError(400, 'A custom report needs a start before its end.');
+  return createReport({ kind, audience: b.audience, custom, by: callerOf(req).user.id, ...(b.writer === 'template' ? { ask: null } : {}) }).catch(reportError);
+});
+const mustReport = async (id: string) => (await getReport(id)) ?? reportError(Object.assign(new Error('report not found'), { status: 404 }));
+router.get('/api/reports/:id', (_q, _r, p) => mustReport(p.id));
+router.put('/api/reports/:id', async (req, _r, p) => {
+  await mustReport(p.id);
+  return editReport(p.id, (await readJson(req)) ?? {}).catch(reportError);
+});
+router.post('/api/reports/:id/rewrite', async (req, _r, p) => {
+  await mustReport(p.id);
+  const b = (await readJson(req)) ?? {};
+  return rewriteReport(p.id, { audience: b.audience, ...(b.writer === 'template' ? { ask: null } : {}) }).catch(reportError);
+});
+router.get('/api/reports/:id/versions', async (_q, _r, p) => {
+  await mustReport(p.id);
+  return reportVersions(p.id);
+});
+router.post('/api/reports/:id/restore', async (req, _r, p) => {
+  await mustReport(p.id);
+  return restoreVersion(p.id, Number((await readJson(req))?.version)).catch(reportError);
+});
+router.post('/api/reports/:id/actions/:rec', async (_q, _r, p) => {
+  await mustReport(p.id);
+  return runRecommendation(p.id, p.rec).catch(reportError);
+});
+router.delete('/api/reports/:id', async (_q, _r, p) => {
+  if (!(await deleteReport(p.id))) throw new HttpError(404, 'report not found');
+  return { ok: true };
 });
 
 // ── trend radar: cards the trends agent keeps fresh ────────────────────
