@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useFocusTrap, useStoredFlag, useTheme, type ThemePref } from '../hooks.ts';
 import { Mark, Nav } from './icons.tsx';
+import { AccountMenu, WorkspaceSwitcher } from './Workspace.tsx';
 
 export const PLACES = [
   { id: 'new', label: 'Create', icon: Nav.create, about: 'Make posts, videos and carousels', keywords: 'new home make' },
@@ -39,7 +40,7 @@ function StatusPills({ status }: { status: ShellStatus }) {
   );
 }
 
-function ThemeSwitch() {
+export function ThemeSwitch() {
   const [theme, setTheme] = useTheme();
   return (
     <div className="theme-switch" role="radiogroup" aria-label="Theme">
@@ -96,6 +97,7 @@ export function Shell({ place, status, onSearch, children }: { place: string; st
           </button>
           <button className="btn ghost icon-btn side-close" onClick={() => setDrawer(false)} aria-label="Close navigation"><Nav.close /></button>
         </div>
+        <WorkspaceSwitcher />
         <button className="side-search" onClick={onSearch} title={`Search (${MOD}K)`}>
           <Nav.search />
           <span className="side-label">Search</span>
@@ -108,6 +110,7 @@ export function Shell({ place, status, onSearch, children }: { place: string; st
           <StatusPills status={status} />
           <ThemeSwitch />
           {link('settings', 'Settings', Nav.settings)}
+          <AccountMenu />
         </div>
       </aside>
       <div className="main">{children}</div>

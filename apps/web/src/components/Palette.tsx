@@ -7,20 +7,25 @@ import { PLACES } from './Shell.tsx';
 
 export interface Command { id: string; group: 'Actions' | 'Places' | 'Projects'; label: string; hint?: string; keywords?: string; icon: ReactNode; run: () => void }
 
-export function commands(campaigns: Campaign[] | null, extra: Command[] = []): Command[] {
-  const actions: Command[] = [
+export function commands(campaigns: Campaign[] | null, extra: Command[] = [], can: { write: boolean; install: boolean } = { write: true, install: true }): Command[] {
+  // Viewers can't make or schedule anything, so those actions aren't offered.
+  const making: Command[] = !can.write ? [] : [
     { id: 'a-new', group: 'Actions', label: 'New piece', hint: 'Create', keywords: 'make launch post video carousel', icon: <Nav.create />, run: () => go('/new') },
     { id: 'a-plan', group: 'Actions', label: 'Plan my month', hint: 'Calendar', keywords: 'schedule calendar posts', icon: <Nav.calendar />, run: () => go('/calendar/plan') },
     { id: 'a-idea', group: 'Actions', label: 'Add idea', hint: 'Calendar backlog', keywords: 'trend backlog note', icon: <Nav.ideas />, run: () => go('/calendar/idea') },
     { id: 'a-post', group: 'Actions', label: 'New post', hint: 'Calendar', keywords: 'schedule linkedin instagram', icon: <Nav.calendar />, run: () => go('/calendar/new') },
+  ];
+  const actions: Command[] = [
+    ...making,
     { id: 'a-settings', group: 'Actions', label: 'Open settings', hint: 'Settings', keywords: 'setup preferences keys', icon: <Nav.settings />, run: () => go('/settings') },
     ...extra,
   ];
   const places: Command[] = [
     ...PLACES.map((p) => ({ id: `p-${p.id}`, group: 'Places' as const, label: p.label, hint: p.about, keywords: p.keywords, icon: <p.icon />, run: () => go(`/${p.id}`) })),
-    { id: 'p-settings', group: 'Places', label: 'Settings', hint: 'Connections, generation, agents, skills', icon: <Nav.settings />, run: () => go('/settings') },
+    { id: 'p-settings', group: 'Places', label: 'Settings', hint: 'Connections, generation, agents, members', icon: <Nav.settings />, run: () => go('/settings') },
     { id: 'p-agents', group: 'Places', label: 'Settings · Background agents', keywords: 'schedule quiet hours', icon: <Nav.settings />, run: () => go('/settings/agents') },
-    { id: 'p-skills', group: 'Places', label: 'Settings · Skills', keywords: 'skill hub install', icon: <Nav.settings />, run: () => go('/settings/skills') },
+    { id: 'p-members', group: 'Places', label: 'Settings · Members', keywords: 'team invite roles people workspace', icon: <Nav.settings />, run: () => go('/settings/members') },
+    ...(can.install ? [{ id: 'p-skills', group: 'Places' as const, label: 'Settings · Skills', keywords: 'skill hub install', icon: <Nav.settings />, run: () => go('/settings/skills') }] : []),
     { id: 'p-gen', group: 'Places', label: 'Settings · Generation', keywords: 'model timeout review budget', icon: <Nav.settings />, run: () => go('/settings/generation') },
   ];
   const projects: Command[] = [...(campaigns ?? [])]

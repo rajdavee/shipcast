@@ -82,6 +82,15 @@ export const Nav = {
   enter: () => (
     <svg viewBox="0 0 24 24" {...P}><path d="M19 5v6a3 3 0 01-3 3H6M10 10l-4 4 4 4" /></svg>
   ),
+  updown: () => <svg viewBox="0 0 24 24" {...P}><path d="M8 9.5l4-4 4 4M8 14.5l4 4 4-4" /></svg>,
+  users: () => <svg viewBox="0 0 24 24" {...P}><circle cx="9" cy="8.5" r="3.5" /><path d="M2.5 19.5a6.5 6.5 0 0113 0M16 5.2a3.5 3.5 0 010 6.6M18 13.6a6.5 6.5 0 013.5 5.9" /></svg>,
+  user: () => <svg viewBox="0 0 24 24" {...P}><circle cx="12" cy="8.5" r="4" /><path d="M4.5 20.5a7.5 7.5 0 0115 0" /></svg>,
+  signout: () => <svg viewBox="0 0 24 24" {...P}><path d="M14 4.5H6.5a2 2 0 00-2 2v11a2 2 0 002 2H14M10 12h10.5M17 8.5l3.5 3.5-3.5 3.5" /></svg>,
+  plus: () => <svg viewBox="0 0 24 24" {...P}><path d="M12 5v14M5 12h14" /></svg>,
+  check: () => <svg viewBox="0 0 24 24" {...P}><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>,
+  eye: () => <svg viewBox="0 0 24 24" {...P}><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" /><circle cx="12" cy="12" r="3" /></svg>,
+  eyeOff: () => <svg viewBox="0 0 24 24" {...P}><path d="M4 4l16 16M9.9 5.8A9 9 0 0112 5.5c6 0 9.5 6.5 9.5 6.5a16 16 0 01-2.7 3.4M6.5 7.6A16 16 0 002.5 12S6 18.5 12 18.5a9 9 0 004.3-1.1M9.9 9.9a3 3 0 004.2 4.2" /></svg>,
+  key: () => <svg viewBox="0 0 24 24" {...P}><circle cx="8" cy="15" r="4.5" /><path d="M11.2 11.8L20 3M16.5 6.5l2.5 2.5M14 9l2 2" /></svg>,
 };
 
 /** Generic glyphs per channel — what the channel is for, never a platform's logo. */
