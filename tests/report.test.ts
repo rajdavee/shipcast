@@ -113,3 +113,20 @@ test('reports are stored, edited with versions, restored, acted on and deleted',
   assert.equal(await getReport(r.id), null);
   assert.equal(await getReport('../etc'), null);
 });
+
+test('asking a report: checked answers with a chart, or the facts alone when the model strays', async () => {
+  const { askReport, factsAnswer, seriesLabels } = await import('@shipcast/engine');
+  const r = await createReport({ kind: 'last7', ask: null });
+  const good = await askReport(r.id, 'Which channel grew?', async () => JSON.stringify({ answer: [`LinkedIn reached ${r.facts.totals.audience} people.`], chart: { title: 'Reach', labels: ['now'], series: [{ name: 'Reach', values: [r.facts.totals.audience] }] } }));
+  assert.equal(good.by, 'claude');
+  assert.equal(good.chart!.series[0].values[0], r.facts.totals.audience);
+  const strayed = await askReport(r.id, 'Which channel grew?', async () => JSON.stringify({ answer: ['LinkedIn reached 987,654 people.'] }));
+  assert.equal(strayed.by, 'facts');
+  assert.ok(strayed.answer.length > 0);
+  const madeUpChart = await askReport(r.id, 'How did we do?', async () => JSON.stringify({ answer: ['Fine.'], chart: { title: 'x', labels: ['a'], series: [{ name: 'x', values: [424242] }] } }));
+  assert.notEqual(madeUpChart.chart?.series[0].values[0], 424242, 'a chart with invented values is replaced');
+  await assert.rejects(askReport(r.id, '   '), /Ask a question/);
+  assert.equal(seriesLabels(r.facts).length, r.facts.kpis[0].series.length);
+  const ch = factsAnswer(sampleFacts(), 'which channel did best?', []);
+  assert.equal(ch.chart!.labels.length, 2);
+});

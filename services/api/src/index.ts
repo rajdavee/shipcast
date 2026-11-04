@@ -178,6 +178,8 @@ import {
   saveSmtp,
   sendReport,
   testEmail,
+  askReport,
+  workspacesFor,
   type Report,
   postizIntegrations,
   PublishError,
@@ -777,6 +779,35 @@ router.delete('/api/reports/:id', async (_q, _r, p) => {
   if (!(await deleteReport(p.id))) throw new HttpError(404, 'report not found');
   await revokeSharesFor(currentContext()?.workspace ?? '', p.id);
   return { ok: true };
+});
+
+// Ask the report: anyone who can read it may ask; the model only runs for people who can make things (it spends Claude).
+router.post('/api/reports/:id/ask', async (req, _r, p) => {
+  await mustReport(p.id);
+  const q = String((await readJson(req))?.question ?? '');
+  return askReport(p.id, q, can(currentContext()?.role, 'write') ? undefined : null).catch(reportError);
+});
+
+// Every workspace the person is in, latest report first-hand: the agency view. Each workspace is read in its own context.
+router.get('/api/workspaces/reports-rollup', async (req) => {
+  const me = callerOf(req).user.id;
+  const out = [];
+  for (const w of await workspacesFor(me)) {
+    const latest = await runAs({ workspace: w.id, user: me, role: w.role }, async () => {
+      const [summary] = await listReports();
+      return summary ? { summary, full: await getReport(summary.id) } : undefined;
+    });
+    const why: string[] = [];
+    const age = latest ? Date.now() - Date.parse(latest.summary.createdAt) : Infinity;
+    if (!latest) why.push('No report yet');
+    else if (age > 8 * 86_400_000) why.push(`Last report ${Math.round(age / 86_400_000)} days ago`);
+    const reach = latest?.summary.kpis.find((k) => k.key === 'audience');
+    if (reach?.change !== undefined && reach.change <= -0.15) why.push(`Reach down ${Math.round(-reach.change * 100)}%`);
+    if (latest?.full?.facts.goals.some((g) => g.onTrack === false)) why.push('A goal is behind');
+    if (latest?.full?.facts.coverage.missing.length) why.push(`${latest.full.facts.coverage.missing.length} posts without numbers`);
+    out.push({ workspace: { id: w.id, name: w.name, personal: !!w.personalOf }, role: w.role, ...(latest ? { report: latest.summary } : {}), needsAttention: why.length > 0, ...(why.length ? { why: why.join(' · ') } : {}) });
+  }
+  return out.sort((a, b) => Number(b.needsAttention) - Number(a.needsAttention));
 });
 
 // Share links, exports and the week card.

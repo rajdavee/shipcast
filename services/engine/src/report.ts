@@ -8,7 +8,7 @@ import { withDirLock } from './filelock.ts';
 import { readPlaybook } from './playbook.ts';
 import { googleSiteConnected } from './publish.ts';
 import { moreLikeThis, remix, suggestedSlots } from './pulse.ts';
-import { gatherFacts, KPI_KEYS, periodFor, readGoals, readNotes, reportsDir, type Facts, type Goal, type Kpi, type Note, type PeriodKind, type PostFact } from './report-facts.ts';
+import { gatherFacts, KPI_KEYS, periodFor, shiftPeriod, readGoals, readNotes, reportsDir, type Facts, type Goal, type Kpi, type Note, type PeriodKind, type PostFact } from './report-facts.ts';
 
 /**
  * A report: a frozen fact sheet, the words written from it, and three
@@ -611,3 +611,83 @@ export function deleteNote(id: string): Promise<boolean> {
   });
 }
 
+
+// ── ask the report ─────────────────────────────────────────────────────
+
+export interface AskChart {
+  title: string;
+  labels: string[];
+  series: { name: string; values: number[] }[];
+}
+export interface AskAnswer {
+  answer: string[];
+  chart?: AskChart;
+  /** 'claude': written and checked; 'facts': answered from the facts without a model. */
+  by: 'claude' | 'facts';
+}
+
+/** Labels for each KPI series point (oldest first, ending with this period). */
+export function seriesLabels(f: Facts): string[] {
+  const n = f.kpis[0]?.series.length ?? 0;
+  return Array.from({ length: n }, (_, i) => shiftPeriod(f.period, i - (n - 1)).label);
+}
+
+/** Charts the facts can always draw, by question shape. */
+export function factsAnswer(f: Facts, q: string, recs: Recommendation[]): AskAnswer {
+  const s = q.toLowerCase();
+  const labels = seriesLabels(f);
+  const kpiChart = (k: Kpi): AskChart => ({ title: `${k.label} by period`, labels, series: [{ name: k.label, values: k.series }] });
+  const aud = kpi(f, 'audience');
+  if (/channel|platform|linkedin|instagram|youtube|where/.test(s) && f.channels.length) {
+    const best = [...f.waterfall].sort((a, b) => b.delta - a.delta)[0];
+    return { by: 'facts', answer: [best ? `${best.name} changed most: ${best.delta >= 0 ? '+' : '−'}${num(Math.abs(best.delta))} people reached.` : 'No channel changed.', ...f.channels.map((c) => `${c.name}: ${num(c.audience)} reached from ${plural(c.posts, 'post')} (was ${num(c.prev.audience)}).`)], chart: { title: 'People reached by channel', labels: f.channels.map((c) => c.name), series: [{ name: f.prevPeriod.label, values: f.channels.map((c) => c.prev.audience) }, { name: f.period.label, values: f.channels.map((c) => c.audience) }] } };
+  }
+  if (/next|should|do |plan|idea/.test(s) && recs.length) return { by: 'facts', answer: recs.map((r) => `${r.text} ${r.why}`) };
+  if (/site|web|visit|signup|key event|search/.test(s) && f.site) return { by: 'facts', answer: templateSections(f, recs, 'team').find((x) => x.id === 'website')?.lines ?? [], ...(kpi(f, 'sessions') ? { chart: kpiChart(kpi(f, 'sessions')!) } : {}) };
+  if (/goal|target|pace/.test(s) && f.goals.length) return { by: 'facts', answer: templateSections(f, recs, 'team').find((x) => x.id === 'goals')?.lines ?? [] };
+  if (/best|top|work|win/.test(s) && f.top.length) return { by: 'facts', answer: [...f.top.map((p) => `${postLine(p)}.`), ...(templateSections(f, recs, 'team').find((x) => x.id === 'why')?.lines.slice(0, 2) ?? [])] };
+  return { by: 'facts', answer: [templateHeadline(f) + '.', ...(templateSections(f, recs, 'team').find((x) => x.id === 'why')?.lines ?? [])].slice(0, 5), ...(aud ? { chart: kpiChart(aud) } : {}) };
+}
+
+export function askPrompt(r: Report, question: string): string {
+  return `A marketer asks about their report for ${r.facts.period.label}: "${question.replace(/"/g, "'")}"
+
+FACTS (JSON)
+${writerInput(r.facts, r.recommendations)}
+HISTORY (one value per period, oldest first; periods: ${JSON.stringify(seriesLabels(r.facts))})
+${JSON.stringify(Object.fromEntries(r.facts.kpis.map((k) => [k.label, k.series])))}
+POSTS THIS PERIOD
+${JSON.stringify(r.facts.work.posts.map((p) => ({ title: p.title.replace(/^Sample · /, ''), channel: p.channel, date: p.at.slice(0, 10), reached: p.audience, engagement: p.engagement, timesUsual: p.lift, format: p.format, pillar: p.pillar, siteVisits: p.visits })))}
+
+Answer in 1–4 short plain sentences, using only numbers from the data above (you may round them or show a change as a percentage). If the data can't answer, say what's missing. Optionally add one small chart built only from values above.
+
+Reply with JSON only: {"answer": ["sentence", ...], "chart": {"title": "...", "labels": ["..."], "series": [{"name": "...", "values": [numbers]}]} }  (omit "chart" if it doesn't help)`;
+}
+
+/** Answer a question about a report: Claude, checked against the data; the facts alone when that fails. */
+export async function askReport(id: string, question: string, ask: ((p: string) => Promise<string>) | null = askWriter): Promise<AskAnswer> {
+  const r = await getReport(id);
+  if (!r) throw Object.assign(new Error('report not found'), { status: 404 });
+  const q = String(question ?? '').trim().slice(0, 300);
+  if (!q) throw Object.assign(new Error('Ask a question.'), { status: 400 });
+  const fallback = factsAnswer(r.facts, q, r.recommendations);
+  if (!ask) return fallback;
+  let reply: { answer?: unknown; chart?: AskChart };
+  try {
+    reply = JSON.parse((await ask(askPrompt(r, q))).replace(/^[^{]*/s, '').replace(/[^}]*$/s, ''));
+  } catch {
+    return fallback;
+  }
+  const allowed = allowedNumbers(r.facts, r.recommendations);
+  for (const k of r.facts.kpis) for (const v of k.series) allowed.add(Math.round(v * 100) / 100), allowed.add(Math.round(v));
+  const lines = (Array.isArray(reply.answer) ? reply.answer : []).map((x) => String(x).trim()).filter((l) => checkLine(l, allowed)).slice(0, 5);
+  if (!lines.length) return fallback;
+  const c = reply.chart;
+  const chartOk = c && typeof c.title === 'string' && Array.isArray(c.labels) && Array.isArray(c.series) && c.labels.length <= 24 && c.series.length <= 4 && c.series.every((x) => Array.isArray(x.values) && x.values.length === c.labels.length && x.values.every((v) => typeof v === 'number' && allowed.has(Math.round(v * 100) / 100)));
+  return { by: 'claude', answer: lines, ...(chartOk ? { chart: { title: c!.title.slice(0, 80), labels: c!.labels.map((l) => String(l).slice(0, 30)), series: c!.series.map((x) => ({ name: String(x.name).slice(0, 40), values: x.values })) } } : fallback.chart ? { chart: fallback.chart } : {}) };
+}
+
+// ── time saved ─────────────────────────────────────────────────────────
+
+/** Hours a person would spend assembling this report by hand (an estimate, from the research in the sprint plan). */
+export const HOURS_SAVED: Record<PeriodKind, number> = { last7: 2.5, last30: 4, lastMonth: 4, lastQuarter: 6, custom: 3 };

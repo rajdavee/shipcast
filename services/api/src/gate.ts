@@ -76,7 +76,7 @@ const hit = (list: [string, RegExp][], method: string, path: string) => list.som
 
 /** What a request needs: reads need read; writes need write; the lists above need more. */
 /** POSTs that change nothing and spend nothing (scoring text against the brand voice): readers may use them. */
-const READ_POSTS = [/^\/api\/tones\/score$/];
+const READ_POSTS = [/^\/api\/tones\/score$/, /^\/api\/reports\/[^/]+\/ask$/];
 
 export function levelFor(method: string, path: string): Action | 'install' {
   if (method === 'POST' && READ_POSTS.some((re) => re.test(path))) return 'read';

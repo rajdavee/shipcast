@@ -101,6 +101,13 @@ test('reports: an editor makes, edits and acts on a report; a viewer reads; othe
   assert.equal((await call(benTeam, 'POST', `/api/reports/${teamRep.id}/shares`, {})).status, 403);
   assert.equal((await call(benTeam, 'GET', '/api/reports/schedule')).body.enabled, false);
   assert.equal((await call(anaTeam, 'POST', `/api/reports/${teamRep.id}/send`)).status, 400, 'nobody to send to yet');
+  const asked = await call(benTeam, 'POST', `/api/reports/${teamRep.id}/ask`, { question: 'How did we do?' });
+  assert.equal(asked.status, 200, 'viewers may ask');
+  assert.equal(asked.body.by, 'facts', 'but without spending Claude');
+  const roll = (await call(benTeam, 'GET', '/api/workspaces/reports-rollup')).body;
+  assert.deepEqual(roll.map((x: any) => x.workspace.name).sort(), ['Acme', roll.find((x: any) => x.workspace.personal).workspace.name].sort());
+  assert.equal(roll.find((x: any) => x.workspace.id === team).report.id, teamRep.id);
+  assert.ok(!JSON.stringify(roll).includes(rep.id), "Ana's personal report isn't in Ben's rollup");
   assert.equal((await call(benTeam, 'GET', `/api/reports/${rep.id}`)).status, 404, "Ana's personal report means nothing in the team");
   assert.equal((await call(anaTeam, 'GET', `/api/reports/${rep.id}`)).status, 404);
   assert.equal((await call(ana, 'GET', '/api/reports/..%2F..%2Fauth%2Fusers')).status, 404);
