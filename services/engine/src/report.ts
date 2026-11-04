@@ -495,6 +495,14 @@ function patchReport(id: string, fn: (cur: Report) => Partial<Report>): Promise<
   });
 }
 
+/** Sent: a status, not an edit (no new version). */
+export function markReportSent(id: string, at = new Date()): Promise<void> {
+  return serial(async () => {
+    const cur = await getReport(id);
+    if (cur) await writeJson(file(id), { ...cur, status: 'sent', sentAt: at.toISOString() });
+  });
+}
+
 export async function reportVersions(id: string): Promise<{ version: number; updatedAt: string; headline: string }[]> {
   if (!isReportId(id)) return [];
   try {

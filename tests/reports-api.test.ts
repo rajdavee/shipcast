@@ -95,6 +95,12 @@ test('reports: an editor makes, edits and acts on a report; a viewer reads; othe
   assert.equal((await call(benTeam, 'POST', '/api/reports', { writer: 'template' })).status, 403);
   assert.equal((await call(benTeam, 'PUT', `/api/reports/${teamRep.id}`, { headline: 'x' })).status, 403);
   assert.equal((await call(benTeam, 'DELETE', `/api/reports/${teamRep.id}`)).status, 403);
+  assert.equal((await call(benTeam, 'PUT', '/api/reports/schedule', { enabled: true })).status, 403, 'delivery is for admins');
+  assert.equal((await call(benTeam, 'PUT', '/api/reports/email', { host: 'x' })).status, 403);
+  assert.equal((await call(benTeam, 'POST', `/api/reports/${teamRep.id}/send`)).status, 403);
+  assert.equal((await call(benTeam, 'POST', `/api/reports/${teamRep.id}/shares`, {})).status, 403);
+  assert.equal((await call(benTeam, 'GET', '/api/reports/schedule')).body.enabled, false);
+  assert.equal((await call(anaTeam, 'POST', `/api/reports/${teamRep.id}/send`)).status, 400, 'nobody to send to yet');
   assert.equal((await call(benTeam, 'GET', `/api/reports/${rep.id}`)).status, 404, "Ana's personal report means nothing in the team");
   assert.equal((await call(anaTeam, 'GET', `/api/reports/${rep.id}`)).status, 404);
   assert.equal((await call(ana, 'GET', '/api/reports/..%2F..%2Fauth%2Fusers')).status, 404);

@@ -66,6 +66,10 @@ const MANAGE: [string, RegExp][] = [
   // Sharing a report outside the workspace.
   ['POST', /^\/api\/reports\/[^/]+\/shares$/],
   ['DELETE', /^\/api\/reports\/[^/]+\/shares\//],
+  // Report delivery: who gets it, the mail server, sending it out.
+  ['PUT', /^\/api\/reports\/(schedule|email)$/],
+  ['*', /^\/api\/reports\/email(\/|$)/],
+  ['POST', /^\/api\/reports\/[^/]+\/send$/],
   ['*', /^\/api\/site\//],
 ];
 const hit = (list: [string, RegExp][], method: string, path: string) => list.some(([m, re]) => (m === '*' || m === method) && re.test(path));

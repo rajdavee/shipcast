@@ -1,4 +1,4 @@
-import { blockedReason, createService, currentContext, primaryWorkspace, runAs, workContexts, foregroundBusy, learnOnce, logRun, refreshPlaybook, refreshTrends, runGolden, redactSecrets, runPublisher, runMetrics, syncSiteIfDue, pickDue, readJobs, readSettings, updateJob, type AgentJob, type AgentKind, type MetricsReport, type PublisherReport } from '@shipcast/engine';
+import { blockedReason, createService, currentContext, primaryWorkspace, runAs, workContexts, foregroundBusy, learnOnce, logRun, refreshPlaybook, refreshTrends, runGolden, redactSecrets, runPublisher, runMetrics, syncSiteIfDue, reportTick, pickDue, readJobs, readSettings, updateJob, type AgentJob, type AgentKind, type MetricsReport, type PublisherReport } from '@shipcast/engine';
 
 /**
  * The agents service: wakes every 20 seconds, starts at most one background
@@ -181,7 +181,11 @@ export function createAgentsService() {
       if (busyTick) return;
       busyTick = true;
       (async () => {
-        for (const ctx of await workContexts()) await runAs(ctx, () => tick()).catch((e) => console.error(`[agents] tick failed${ctx.workspace ? ` (${ctx.workspace})` : ''}:`, e));
+        for (const ctx of await workContexts()) {
+          await runAs(ctx, () => tick()).catch((e) => console.error(`[agents] tick failed${ctx.workspace ? ` (${ctx.workspace})` : ''}:`, e));
+          // The scheduled report (and the day-before reminder for missing numbers).
+          await runAs(ctx, () => reportTick()).catch(async (e) => console.error(`[reports] scheduled report failed${ctx.workspace ? ` (${ctx.workspace})` : ''}:`, (await redactSecrets((e as Error).message ?? '')).slice(0, 200)));
+        }
       })().finally(() => (busyTick = false));
     }, 20_000);
   };

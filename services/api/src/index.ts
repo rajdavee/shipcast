@@ -171,6 +171,13 @@ import {
   revokeShare,
   revokeSharesFor,
   topPostImage,
+  publicSchedule,
+  publicSmtp,
+  readSchedule,
+  saveSchedule,
+  saveSmtp,
+  sendReport,
+  testEmail,
   type Report,
   postizIntegrations,
   PublishError,
@@ -712,6 +719,30 @@ router.delete('/api/reports/notes/:id', async (_q, _r, p) => {
   if (!(await deleteNote(p.id))) throw new HttpError(404, 'note not found');
   return { ok: true };
 });
+// Delivery: schedule, email and webhooks (admins), sending (admins).
+router.get('/api/reports/schedule', async () => publicSchedule(await readSchedule()));
+router.put('/api/reports/schedule', async (req) => {
+  const b = (await readJson(req)) ?? {};
+  const cur = await readSchedule();
+  // Webhooks come back from the UI as host-only entries; ones without a URL keep the saved address.
+  const hooks = Array.isArray(b.webhooks) ? b.webhooks.map((w: any, i: number) => (w?.url ? w : cur.webhooks.find((c) => c.kind === w?.kind && new URL(c.url).hostname === w?.host) ?? cur.webhooks[i])).filter(Boolean) : undefined;
+  return publicSchedule(await saveSchedule({ ...b, ...(hooks ? { webhooks: hooks } : {}) }).catch(reportError));
+});
+router.get('/api/reports/email', () => publicSmtp());
+router.put('/api/reports/email', async (req) => {
+  const b = await readJson(req);
+  await saveSmtp(b === null || b?.remove ? null : b).catch(reportError);
+  return publicSmtp();
+});
+router.post('/api/reports/email/test', async (req) => {
+  await testEmail(String((await readJson(req))?.to ?? '')).catch((e) => reportError(Object.assign(new Error(String((e as Error).message).slice(0, 200)), { status: (e as { status?: number }).status ?? 502 })));
+  return { ok: true };
+});
+router.post('/api/reports/:id/send', async (_q, _r, p) => {
+  await mustReport(p.id);
+  return sendReport(p.id).catch(reportError);
+});
+
 router.post('/api/reports', async (req) => {
   const b = (await readJson(req)) ?? {};
   const kind = ['last7', 'last30', 'lastMonth', 'lastQuarter', 'custom'].includes(b.kind) ? b.kind : 'last7';

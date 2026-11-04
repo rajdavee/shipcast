@@ -60,3 +60,4 @@ export * from './utm.ts';
 export * from './site.ts';
 export * from './report-html.ts';
 export * from './report-out.ts';
+export * from './report-deliver.ts';
