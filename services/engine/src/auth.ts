@@ -406,6 +406,9 @@ export const INVITE_DAYS = 7;
 export function createInvite(wid: string, role: Invite['role'], by: string, email?: string): Promise<{ token: string; invite: Omit<Invite, 'hash'> }> {
   return locked(async () => {
     if (!['admin', 'editor', 'viewer'].includes(role)) throw new AuthError(400, 'Invite as admin, editor or viewer.');
+    const w = (await listWorkspaces()).find((x) => x.id === wid);
+    if (!w) throw new AuthError(404, 'Workspace not found.');
+    if (w.personalOf) throw new AuthError(409, "Personal workspaces can't be shared — make a team workspace and invite people there.");
     const token = randomBytes(24).toString('base64url');
     const inv: Invite = { hash: sha(token), workspace: wid, role, ...(email ? { email: normEmail(email) } : {}), by, createdAt: now(), expiresAt: new Date(Date.now() + INVITE_DAYS * 86_400_000).toISOString() };
     await write('invites', [...(await read<Invite[]>('invites', [])), inv]);

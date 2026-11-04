@@ -115,6 +115,7 @@ test('team workspaces: invites, roles and their limits', async () => {
   await assert.rejects(removeMember(team.id, owner.id, { user: owner.id, role: 'owner' }), /last owner/);
 
   const personal = (await workspacesFor(owner.id)).find((w) => w.personalOf === owner.id)!;
+  await assert.rejects(createInvite(personal.id, 'viewer', owner.id), /Personal workspaces can't be shared/, 'nobody can be invited into a personal workspace');
   await assert.rejects(deleteWorkspace(personal.id), /Personal/);
   mkdirSync(join(root, 'workspaces', team.id), { recursive: true });
   await deleteWorkspace(team.id);
