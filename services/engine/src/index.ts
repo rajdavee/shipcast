@@ -58,3 +58,5 @@ export * from './report-facts.ts';
 export * from './report.ts';
 export * from './utm.ts';
 export * from './site.ts';
+export * from './report-html.ts';
+export * from './report-out.ts';

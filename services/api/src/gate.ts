@@ -63,6 +63,9 @@ const MANAGE: [string, RegExp][] = [
   ['*', /^\/api\/campaigns\/[^/]+\/env$/],
   // The website connection: choosing properties, syncing and settings (reading the status is for everyone).
   ['PUT', /^\/api\/site$/],
+  // Sharing a report outside the workspace.
+  ['POST', /^\/api\/reports\/[^/]+\/shares$/],
+  ['DELETE', /^\/api\/reports\/[^/]+\/shares\//],
   ['*', /^\/api\/site\//],
 ];
 const hit = (list: [string, RegExp][], method: string, path: string) => list.some(([m, re]) => (m === '*' || m === method) && re.test(path));

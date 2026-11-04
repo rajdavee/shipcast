@@ -1,4 +1,4 @@
-import { createServer, type IncomingMessage, type Server } from 'node:http';
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { existsSync, createWriteStream, realpathSync } from 'node:fs';
 import { mkdtemp, readdir, readFile, rm, symlink, writeFile as writeFileP } from 'node:fs/promises';
 import { mkdir } from 'node:fs/promises';
@@ -157,6 +157,21 @@ import {
   searchSites,
   siteStatus,
   syncSite,
+  countView,
+  createShare,
+  listShares,
+  listWorkspaces,
+  reportCardPng,
+  reportCsv,
+  reportHtml,
+  reportMarkdown,
+  reportPdf,
+  reportPptx,
+  resolveShare,
+  revokeShare,
+  revokeSharesFor,
+  topPostImage,
+  type Report,
   postizIntegrations,
   PublishError,
   queueSendNow,
@@ -729,7 +744,62 @@ router.post('/api/reports/:id/actions/:rec', async (_q, _r, p) => {
 });
 router.delete('/api/reports/:id', async (_q, _r, p) => {
   if (!(await deleteReport(p.id))) throw new HttpError(404, 'report not found');
+  await revokeSharesFor(currentContext()?.workspace ?? '', p.id);
   return { ok: true };
+});
+
+// Share links, exports and the week card.
+const wsOf = () => currentContext()?.workspace ?? '';
+router.post('/api/reports/:id/shares', async (req, _r, p) => {
+  await mustReport(p.id);
+  const b = (await readJson(req)) ?? {};
+  const { share, token } = await createShare(wsOf(), p.id, { expiresDays: Number(b.expiresDays) || undefined, by: callerOf(req).user.id }).catch(reportError);
+  return { ...share, url: `/r/${token}` };
+});
+router.get('/api/reports/:id/shares', async (_q, _r, p) => {
+  await mustReport(p.id);
+  return listShares(wsOf(), p.id);
+});
+router.delete('/api/reports/:id/shares/:share', async (_q, _r, p) => {
+  if (!(await revokeShare(wsOf(), p.share))) throw new HttpError(404, 'link not found');
+  return { ok: true };
+});
+const download = (res: ServerResponse, body: Buffer | string, type: string, name: string) => {
+  res.writeHead(200, { 'content-type': type, 'content-disposition': `attachment; filename="${name.replace(/[^\w.-]+/g, '-')}"`, 'cache-control': 'no-store' });
+  res.end(body);
+  return undefined;
+};
+const fileBase = (r: Report) => `${r.title.replace(/ · /, '-').replace(/\s+/g, '-').toLowerCase()}`;
+router.get('/api/reports/:id/export/:format', async (_q, res, p) => {
+  const r = await mustReport(p.id);
+  switch (p.format) {
+    case 'csv':
+      return download(res, reportCsv(r), 'text/csv; charset=utf-8', `${fileBase(r)}.csv`);
+    case 'md':
+      return download(res, reportMarkdown(r), 'text/markdown; charset=utf-8', `${fileBase(r)}.md`);
+    case 'html':
+      return download(res, reportHtml(r), 'text/html; charset=utf-8', `${fileBase(r)}.html`);
+    case 'pdf':
+      return download(res, await reportPdf(r).catch((e) => reportError(Object.assign(new Error(`Couldn't make the PDF: ${(e as Error).message.slice(0, 160)}`), { status: 503 }))), 'application/pdf', `${fileBase(r)}.pdf`);
+    case 'pptx': {
+      const dir = await mkdtemp(join(tmpdir(), 'shipcast-report-'));
+      try {
+        await reportPptx(r, join(dir, 'r.pptx'));
+        return download(res, await readFile(join(dir, 'r.pptx')), 'application/vnd.openxmlformats-officedocument.presentationml.presentation', `${fileBase(r)}.pptx`);
+      } finally {
+        await rm(dir, { recursive: true, force: true });
+      }
+    }
+    default:
+      throw new HttpError(404, 'unknown format');
+  }
+});
+router.get('/api/reports/:id/card.png', async (_q, res, p) => {
+  const r = await mustReport(p.id);
+  const png = await reportCardPng(r).catch((e) => reportError(Object.assign(new Error(`Couldn't draw the card: ${(e as Error).message.slice(0, 160)}`), { status: 503 })));
+  res.writeHead(200, { 'content-type': 'image/png', 'content-disposition': `inline; filename="${fileBase(r)}-card.png"`, 'cache-control': 'no-store' });
+  res.end(png);
+  return undefined;
 });
 
 // ── website numbers: Google Analytics and Search Console (read-only) ──
@@ -1538,6 +1608,41 @@ const callerOf = (req: IncomingMessage): Caller => {
 };
 registerAuthRoutes(router, callerOf);
 
+const shareHits = new Map<string, number[]>();
+/** /r/<token> (the page) and /r/<token>/img/<n> (a top post's image). Rate-limited per address; the same answer for every bad link. */
+async function serveShare(req: IncomingMessage, res: ServerResponse, url: URL) {
+  const ip = String(req.socket.remoteAddress ?? '');
+  const now = Date.now();
+  const hits = (shareHits.get(ip) ?? []).filter((t) => now - t < 60_000);
+  hits.push(now);
+  shareHits.set(ip, hits);
+  if (shareHits.size > 5000) shareHits.clear();
+  const headers = { 'cache-control': 'no-store', 'x-robots-tag': 'noindex, nofollow', 'referrer-policy': 'no-referrer', 'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'" };
+  const gone = () => {
+    res.writeHead(404, { ...headers, 'content-type': 'text/html; charset=utf-8' });
+    res.end(callbackPage('This link doesn’t work', 'It may have expired or been turned off. Ask the person who sent it for a new one.'));
+  };
+  if (hits.length > 60) {
+    res.writeHead(429, { ...headers, 'content-type': 'text/plain' });
+    return res.end('Too many requests — try again in a minute.');
+  }
+  const m = /^\/r\/([\w-]{40,50})(?:\/img\/(\d))?$/.exec(url.pathname);
+  const share = m ? await resolveShare(m[1]) : null;
+  if (!m || !share || !(await listWorkspaces()).some((w) => w.id === share.workspace)) return gone();
+  await runAs({ workspace: share.workspace }, async () => {
+    const r = await getReport(share.report);
+    if (!r) return gone();
+    if (m[2] !== undefined) {
+      const img = topPostImage(r, Number(m[2]));
+      if (!img) return gone();
+      return sendFile(req, res, img, { 'cache-control': 'private, max-age=3600', 'x-content-type-options': 'nosniff' });
+    }
+    await countView(share.id);
+    res.writeHead(200, { ...headers, 'content-type': 'text/html; charset=utf-8' });
+    res.end(reportHtml(r, { media: (_p, i) => (topPostImage(r, i) ? `/r/${m[1]}/img/${i}` : undefined), note: share.expiresAt ? `Link expires ${new Date(share.expiresAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` : 'Shared link' }));
+  });
+}
+
 export function createApp({ serveWeb = true } = {}): Server {
   return createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost');
@@ -1580,6 +1685,8 @@ export function createApp({ serveWeb = true } = {}): Server {
         if (out !== undefined && !res.headersSent) json(res, 200, out);
         return;
       }
+      // A report someone was sent a link to: no session, only that report.
+      if (url.pathname.startsWith('/r/')) return await serveShare(req, res, url);
       if (!serveWeb) throw new HttpError(404, 'not found');
       if (!existsSync(WEB_DIST)) {
         res.writeHead(200, { 'content-type': 'text/plain' });

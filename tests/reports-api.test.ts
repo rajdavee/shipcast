@@ -111,3 +111,49 @@ test('reports: Claude writes the words when it can (fake Claude here), checked a
   assert.ok(['claude', 'mixed', 'template'].includes(r.body.writer));
   assert.ok(r.body.headline.length > 0);
 });
+
+test('reports: share links open one report (and its images) without signing in, until revoked; exports download', async () => {
+  const cookie = (await fetch(base + '/api/auth/signin', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: 'ana@test.dev', password: PW }) })).headers.get('set-cookie')!.split(';')[0];
+  const ws = (await call({ cookie, ws: '' }, 'GET', '/api/account')).body.workspaces.find((w: any) => w.personal).id;
+  const ana: Who = { cookie, ws };
+  const rep = (await call(ana, 'POST', '/api/reports', { kind: 'last30', writer: 'template' })).body;
+  const sh = await call(ana, 'POST', `/api/reports/${rep.id}/shares`, { expiresDays: 7 });
+  assert.equal(sh.status, 200, JSON.stringify(sh.body));
+  assert.match(sh.body.url, /^\/r\/[\w-]{43}$/);
+  assert.ok(sh.body.expiresAt);
+  const listed = (await call(ana, 'GET', `/api/reports/${rep.id}/shares`)).body;
+  assert.equal(listed.length, 1);
+  assert.ok(!JSON.stringify(listed).includes(sh.body.url.slice(3)), 'the token is never listed again');
+
+  const page = await fetch(base + sh.body.url);
+  assert.equal(page.status, 200);
+  assert.match(page.headers.get('content-security-policy')!, /default-src 'none'/);
+  assert.equal(page.headers.get('x-robots-tag'), 'noindex, nofollow');
+  const html = await page.text();
+  assert.ok(html.includes(rep.headline.replace(/&/g, '&#38;').slice(0, 20)) || html.includes('<h1>'), 'the report renders');
+  assert.ok(!html.includes(ws), 'no workspace id on the page');
+  assert.equal((await call(ana, 'GET', `/api/reports/${rep.id}/shares`)).body[0].views, 1);
+  assert.equal((await fetch(base + sh.body.url + 'x')).status, 404);
+  assert.equal((await fetch(base + '/r/' + 'a'.repeat(43))).status, 404);
+  assert.equal((await fetch(base + sh.body.url + '/img/0')).status, 404, 'no image on this report');
+  assert.equal((await fetch(base + sh.body.url.replace('/r/', '/api/reports/'))).status, 401, 'the token is not a session');
+
+  for (const [fmt, type] of [['csv', 'text/csv'], ['md', 'text/markdown'], ['pptx', 'presentationml']]) {
+    const r = await fetch(`${base}/api/reports/${rep.id}/export/${fmt}`, { headers: { cookie, 'x-shipcast-workspace': ws } });
+    assert.equal(r.status, 200, fmt);
+    assert.match(r.headers.get('content-type')!, new RegExp(type));
+    assert.match(r.headers.get('content-disposition')!, /attachment; filename="monthly|30-day/);
+  }
+  const csv = await (await fetch(`${base}/api/reports/${rep.id}/export/csv`, { headers: { cookie, 'x-shipcast-workspace': ws } })).text();
+  assert.match(csv.split('\n')[0], /^section,name,channel,value/);
+  const pptx = Buffer.from(await (await fetch(`${base}/api/reports/${rep.id}/export/pptx`, { headers: { cookie, 'x-shipcast-workspace': ws } })).arrayBuffer());
+  assert.equal(pptx.subarray(0, 2).toString(), 'PK');
+
+  assert.equal((await call(ana, 'DELETE', `/api/reports/${rep.id}/shares/${listed[0].id}`)).status, 200);
+  assert.equal((await fetch(base + sh.body.url)).status, 404, 'revoked at once');
+  // Deleting a report turns off its links.
+  const sh2 = (await call(ana, 'POST', `/api/reports/${rep.id}/shares`, {})).body;
+  assert.equal((await fetch(base + sh2.url)).status, 200);
+  await call(ana, 'DELETE', `/api/reports/${rep.id}`);
+  assert.equal((await fetch(base + sh2.url)).status, 404);
+});
