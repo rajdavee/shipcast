@@ -1,13 +1,7 @@
-import { appendEvent, claimNext, listWorkspaces, recoverOrphans, runAs, runStep, updateStep, WORKER_ID, type WorkContext } from '@shipcast/engine';
+import { appendEvent, claimNext, recoverOrphans, runAs, runStep, updateStep, WORKER_ID, workContexts, type WorkContext } from '@shipcast/engine';
 
-/**
- * Every workspace's queue, each read and run inside its own context. Before anyone has signed up
- * (a fresh or single-user install) there are no workspaces: the root is the only queue.
- */
-export async function workContexts(): Promise<WorkContext[]> {
-  const ws = await listWorkspaces().catch(() => []);
-  return ws.length ? ws.map((w) => ({ workspace: w.id, user: w.members.find((m) => m.role === 'owner')?.user })) : [{}];
-}
+export { workContexts };
+
 
 export interface Worker {
   stop: () => Promise<void>;

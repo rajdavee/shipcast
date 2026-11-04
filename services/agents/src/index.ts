@@ -1,4 +1,4 @@
-import { blockedReason, createService, foregroundBusy, learnOnce, logRun, refreshPlaybook, refreshTrends, runGolden, redactSecrets, runPublisher, runMetrics, pickDue, readJobs, readSettings, updateJob, type AgentJob, type AgentKind, type MetricsReport, type PublisherReport } from '@shipcast/engine';
+import { blockedReason, createService, currentContext, primaryWorkspace, runAs, workContexts, foregroundBusy, learnOnce, logRun, refreshPlaybook, refreshTrends, runGolden, redactSecrets, runPublisher, runMetrics, pickDue, readJobs, readSettings, updateJob, type AgentJob, type AgentKind, type MetricsReport, type PublisherReport } from '@shipcast/engine';
 
 /**
  * The agents service: wakes every 20 seconds, starts at most one background
@@ -50,6 +50,10 @@ registerAgent('learn', async (ctx) => {
 registerAgent('golden', async () => runGolden());
 
 registerAgent('trends', async (ctx) => {
+  // Market data is the same for everyone: refresh it once, in the install owner's workspace.
+  const primary = await primaryWorkspace();
+  const here = currentContext()?.workspace;
+  if (primary && here && here !== primary) return { summary: 'Trends are refreshed once for the whole install.', claudeRuns: 0 };
   const r = await refreshTrends({ now: ctx.now, shouldYield: ctx.shouldYield });
   const src = Object.entries(r.sources).filter(([, n]) => n).map(([k, n]) => `${k} ${n}`).join(', ');
   return { summary: r.claudeRuns ? `${r.fresh} trends found · ${r.live} live · from ${src || 'web search'}` : 'Paused for your campaign', claudeRuns: r.claudeRuns };
@@ -148,15 +152,27 @@ export function createAgentsService() {
       metrics: async () => metricsTick(),
     },
   });
+  let busyFast = false;
   const start = async () => {
     // A crash mid-job leaves "running" set; clear it so the job can run again.
-    for (const j of await readJobs()) if (j.running) await updateJob(j.id, { running: false });
+    for (const ctx of await workContexts()) await runAs(ctx, async () => { for (const j of await readJobs()) if (j.running) await updateJob(j.id, { running: false }); });
     timer = setInterval(async () => {
-      void publishTick();
-      void metricsTick();
+      // Every workspace in its own context. Publishing and reading numbers are quick and time-critical,
+      // so they get their own pass that a long Claude job can't hold up.
+      if (!busyFast) {
+        busyFast = true;
+        (async () => {
+          for (const ctx of await workContexts()) {
+            await runAs(ctx, () => publishTick());
+            await runAs(ctx, () => metricsTick());
+          }
+        })().finally(() => (busyFast = false));
+      }
       if (busyTick) return;
       busyTick = true;
-      await tick().catch((e) => console.error('[agents] tick failed:', e)).finally(() => (busyTick = false));
+      (async () => {
+        for (const ctx of await workContexts()) await runAs(ctx, () => tick()).catch((e) => console.error(`[agents] tick failed${ctx.workspace ? ` (${ctx.workspace})` : ''}:`, e));
+      })().finally(() => (busyTick = false));
     }, 20_000);
   };
   const close = svc.close.bind(svc);

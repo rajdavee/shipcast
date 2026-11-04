@@ -2,6 +2,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { run } from './exec.ts';
 import { engineEnv } from './setup.ts';
+import { claudeEnv } from './claude-account.ts';
 
 export interface ClaudeAuth {
   installed: boolean;
@@ -147,9 +148,17 @@ export interface ClaudeRun {
 
 export function runClaude(o: RunOptions): ClaudeRun {
   const bin = process.env.SHIPCAST_CLAUDE_BIN ?? 'claude';
+  // The person this run is for brings their own Claude; without one it never starts.
+  let who: Record<string, string>;
+  try {
+    who = claudeEnv();
+  } catch (e) {
+    const child = spawn(process.execPath, ['-e', ''], { stdio: 'ignore' });
+    return { child, kill: () => {}, done: Promise.resolve({ code: -1, stderr: (e as Error).message }) };
+  }
   const child = spawn(bin, buildArgs(o), {
     cwd: o.cwd,
-    env: { ...process.env, ...engineEnv(), ...(o.env ?? {}) },
+    env: { ...process.env, ...engineEnv(), ...who, ...(o.env ?? {}) },
     stdio: ['ignore', 'pipe', 'pipe'],
     // Own process group, so stopping a run also stops the renders it started.
     detached: process.platform !== 'win32',

@@ -463,3 +463,18 @@ export async function inviteInfo(token: string): Promise<{ valid: boolean; probl
   const w = (await listWorkspaces()).find((x) => x.id === inv.workspace);
   return { valid: !problem && !!w, ...(problem ? { problem } : {}), workspace: w?.name, role: inv.role, ...(inv.email ? { email: inv.email } : {}) };
 }
+
+/**
+ * Every workspace as a context for background work, run as its (first) owner. Before anyone has
+ * signed up there are no workspaces: the root is the only one.
+ */
+export async function workContexts(): Promise<{ workspace?: string; user?: string; role?: Role }[]> {
+  const ws = await listWorkspaces().catch(() => [] as Workspace[]);
+  return ws.length ? ws.map((w) => ({ workspace: w.id, user: w.members.find((m) => m.role === 'owner')?.user, role: 'owner' as Role })) : [{}];
+}
+
+/** The install owner's personal workspace: where install-wide background work (the trend radar) runs. */
+export async function primaryWorkspace(): Promise<string | undefined> {
+  const owner = (await listUsers()).find((u) => u.installOwner);
+  return owner ? (await listWorkspaces()).find((w) => w.personalOf === owner.id)?.id : undefined;
+}

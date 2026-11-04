@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { acceptInvite, AuthError, authConfig, can, changePassword, createInvite, createWorkspace, deleteWorkspace, getUser, hasUsers, inviteInfo, invitesFor, listUsers, publicUser, removeMember, renameWorkspace, revokeInvite, roleIn, sessionsOf, sessionUser, setLastWorkspace, setMemberRole, setOpenSignup, signIn, signOut, signOutAll, signUp, workspacesFor, type Action, type Role, type User } from '@shipcast/engine';
+import { acceptInvite, AuthError, claudeConnection, forgetClaudeCredential, saveClaudeCredential, authConfig, can, changePassword, createInvite, createWorkspace, deleteWorkspace, getUser, hasUsers, inviteInfo, invitesFor, listUsers, publicUser, removeMember, renameWorkspace, revokeInvite, roleIn, sessionsOf, sessionUser, setLastWorkspace, setMemberRole, setOpenSignup, signIn, signOut, signOutAll, signUp, workspacesFor, type Action, type Role, type User } from '@shipcast/engine';
 import { HttpError, readJson, type Router } from './http.ts';
 
 /**
@@ -43,7 +43,7 @@ const INSTALL_OWNER: [string, RegExp][] = [
   ['POST', /^\/api\/setup\//],
   ['POST', /^\/api\/packs\/[^/]+\/install$/],
   ['*', /^\/api\/skills(\/|$)/],
-  ['POST', /^\/api\/connect\/github$/],
+  ['POST', /^\/api\/connect\/(github|claude)$/],
   ['POST', /^\/api\/campaigns\/[^/]+\/reveal$/],
 ];
 /** Connections, keys, publishing and workspace settings: admins and owners. */
@@ -134,6 +134,21 @@ export function registerAuthRoutes(router: Router, callerOf: (req: IncomingMessa
   router.get('/api/account', async (req) => {
     const c = callerOf(req);
     return { user: publicUser(c.user), workspaces: (await workspacesFor(c.user.id)).map((w) => ({ id: w.id, name: w.name, role: w.role, personal: w.personalOf === c.user.id, members: w.members.length })), current: c.user.lastWorkspace, sessions: await sessionsOf(c.user.id, c.token) };
+  });
+  router.get('/api/account/claude', async (req) => claudeConnection(callerOf(req).user.id));
+  router.put('/api/account/claude', async (req) => {
+    const c = callerOf(req);
+    try {
+      await saveClaudeCredential(c.user.id, String((await readJson(req)).credential ?? ''));
+    } catch (e) {
+      throw new HttpError(400, (e as Error).message);
+    }
+    return claudeConnection(c.user.id);
+  });
+  router.delete('/api/account/claude', async (req) => {
+    const c = callerOf(req);
+    await forgetClaudeCredential(c.user.id);
+    return claudeConnection(c.user.id);
   });
   router.put('/api/account/password', async (req) => {
     const c = callerOf(req);

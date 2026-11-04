@@ -8,6 +8,7 @@ import { homedir, tmpdir } from 'node:os';
 import { pipeline } from 'node:stream/promises';
 import {
   appendEvent,
+  claudeConnection,
   currentContext,
   runAs,
   type WorkContext,
@@ -235,7 +236,11 @@ function validateSource(s: Partial<Source> | undefined): Source {
 
 // ── connection + health ────────────────────────────────────────────────
 router.get('/api/status', async () => {
-  const [claude, github] = await Promise.all([claudeAuth(), githubStatus()]);
+  const [machine, github] = await Promise.all([claudeAuth(), githubStatus()]);
+  // What matters is the Claude this person's runs will use: their own, or (install owner only) the machine's.
+  const uid = currentContext()?.user;
+  const mine = uid ? await claudeConnection(uid) : null;
+  const claude = !mine || mine.method === 'machine' ? machine : { ...machine, loggedIn: mine.connected, method: mine.method === 'token' ? 'Claude token' : 'Anthropic API key', account: undefined };
   return { claude, github, logins: { claude: loginState('claude'), github: loginState('github') } };
 });
 router.get('/api/doctor', () => doctor());

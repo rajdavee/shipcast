@@ -134,3 +134,33 @@ test('sign-in is rate limited; signing out ends the session; a changed password 
   assert.equal((await call({ cookie: one.cookie }, 'GET', '/api/account')).status, 401);
   void ben;
 });
+
+test("each person's Claude: their own credential, isolated config, never someone else's", async () => {
+  const E = await import('@shipcast/engine');
+  const users = await E.listUsers();
+  const anaU = users.find((u) => u.email === 'ana@test.dev')!;
+  const benU = users.find((u) => u.email === 'ben@test.dev')!;
+  // Ana set the install up: without her own token she uses the machine's sign-in.
+  assert.deepEqual(E.runAs({ workspace: ana.ws!, user: anaU.id }, () => E.claudeEnv()), {});
+  // Ben didn't, and has nothing connected: his runs are refused, not handed Ana's or the machine's.
+  assert.throws(() => E.runAs({ workspace: ben.ws!, user: benU.id }, () => E.claudeEnv()), /Connect your Claude account/);
+  const signed = await call(null, 'POST', '/api/auth/signin', { email: 'ben@test.dev', password: 'another long password' });
+  const me = { cookie: signed.cookie };
+  assert.equal((await call(me, 'GET', '/api/account/claude')).body.method, 'none');
+  assert.equal((await call(me, 'PUT', '/api/account/claude', { credential: 'not a token' })).status, 400);
+  const tok = 'sk-ant-oat01-' + 'x'.repeat(40);
+  const saved = await call(me, 'PUT', '/api/account/claude', { credential: tok });
+  assert.equal(saved.body.method, 'token');
+  assert.ok(!JSON.stringify(saved.body).includes(tok), 'the token never comes back');
+  const env = E.runAs({ workspace: ben.ws!, user: benU.id }, () => E.claudeEnv());
+  assert.equal(env.CLAUDE_CODE_OAUTH_TOKEN, tok);
+  assert.equal(env.CLAUDE_CONFIG_DIR, join(home, 'users', benU.id, 'claude'));
+  assert.equal(env.ANTHROPIC_API_KEY, '', 'a machine-wide API key is blanked for his runs');
+  const { statSync } = await import('node:fs');
+  assert.equal(statSync(join(home, 'users', benU.id, 'claude.json')).mode & 0o777, 0o600);
+  // A run that would use nobody's Claude never starts.
+  const r = E.runAs({ workspace: ana.ws!, user: 'u000000000000' }, () => E.runClaude({ prompt: 'x', cwd: home, onEvent: () => {} }));
+  assert.match((await r.done).stderr, /Connect your Claude account/);
+  assert.equal((await call(me, 'POST', '/api/connect/claude', {})).status, 403, "signing this machine's Claude in is for the install owner only");
+  assert.equal((await call(me, 'DELETE', '/api/account/claude')).body.method, 'none');
+});
