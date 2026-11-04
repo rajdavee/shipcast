@@ -445,11 +445,15 @@ function Delivery() {
         {s.webhooks.length > 0 && (
           <ul className="rp-hooks">
             {s.webhooks.map((h, i) => (
-              <li key={`${h.url}${i}`}>
-                <select className="select" value={h.kind} aria-label="Kind" onChange={(e) => set({ webhooks: s.webhooks.map((x, j) => (j === i ? { ...x, kind: e.target.value as WebhookKind } : x)) })}>
-                  {(Object.keys(WEBHOOK_LABEL) as WebhookKind[]).map((k) => <option key={k} value={k}>{WEBHOOK_LABEL[k]}</option>)}
-                </select>
-                <code title={h.url}>{h.url.replace(/^https:\/\//, '').slice(0, 34)}…</code>
+              <li key={`${h.url ?? h.host}${i}`}>
+                {h.url ? (
+                  <select className="select" value={h.kind} aria-label="Kind" onChange={(e) => set({ webhooks: s.webhooks.map((x, j) => (j === i ? { ...x, kind: e.target.value as WebhookKind } : x)) })}>
+                    {(Object.keys(WEBHOOK_LABEL) as WebhookKind[]).map((k) => <option key={k} value={k}>{WEBHOOK_LABEL[k]}</option>)}
+                  </select>
+                ) : (
+                  <span className="chip">{WEBHOOK_LABEL[h.kind]}</span>
+                )}
+                <code title={h.url ? h.url : 'Saved — the full address stays on the server'}>{h.url ? `${h.url.replace(/^https:\/\//, '').slice(0, 34)}…` : `${h.host}/…`}</code>
                 <button className="btn ghost icon-btn sm" aria-label="Remove webhook" onClick={() => set({ webhooks: s.webhooks.filter((_, j) => j !== i) })}><Cal.trash /></button>
               </li>
             ))}

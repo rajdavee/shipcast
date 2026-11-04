@@ -58,6 +58,8 @@ export interface Recommendation {
 }
 export type ReportStatus = 'draft' | 'ready' | 'sent';
 export interface Report {
+  /** Someone changed the written words since they were checked. */
+  edited?: boolean;
   id: string; title: string; headline: string; audience: Audience; kind: PeriodKind; facts: Facts; sections: Section[]; recommendations: Recommendation[];
   writer: 'claude' | 'template' | 'mixed'; createdAt: string; updatedAt: string; by?: string; status: ReportStatus; sentAt?: string; intro?: string; version: number;
 }
@@ -71,7 +73,8 @@ export interface ShareInfo { id: string; createdAt: string; expiresAt?: string; 
 export interface AskChart { title: string; labels: string[]; series: { name: string; values: number[] }[] }
 export interface AskAnswer { answer: string[]; chart?: AskChart }
 export type WebhookKind = 'slack' | 'teams' | 'discord' | 'generic';
-export interface ReportSchedule { enabled: boolean; kind: PeriodKind; audience: Audience; weekday: number; time: string; mode: 'review' | 'auto'; emails: string[]; webhooks: { kind: WebhookKind; url: string }[] }
+export interface ReportSchedule { enabled: boolean; kind: PeriodKind; audience: Audience; weekday: number; time: string; mode: 'review' | 'auto'; emails: string[]; /** New ones carry their address; saved ones come back with only their host (the address is a secret). */
+  webhooks: { kind: WebhookKind; url?: string; host?: string }[]; attachPdf?: boolean }
 export interface EmailSettings { host: string; port: number; secure: boolean; user: string; from: string; pass?: string; configured: boolean }
 export interface RollupItem { workspace: { id: string; name: string }; report?: ReportSummary; needsAttention: boolean; why?: string }
 export interface SiteState {
@@ -129,7 +132,7 @@ export const makingStep = (elapsedMs: number) => MAKING_STEPS[Math.min(MAKING_ST
 
 export interface ReportGates { read: boolean; create: boolean; edit: boolean; act: boolean; ask: boolean; share: boolean; send: boolean; delivery: boolean; website: boolean; remove: boolean }
 export function reportGates(p: Pick<Perms, 'read' | 'write' | 'manage'>): ReportGates {
-  return { read: p.read, create: p.write, edit: p.write, act: p.write, ask: p.write, remove: p.write, share: p.manage, send: p.manage, delivery: p.manage, website: p.manage };
+  return { read: p.read, create: p.write, edit: p.write, act: p.write, ask: p.read, remove: p.write, share: p.manage, send: p.manage, delivery: p.manage, website: p.manage };
 }
 
 // ── numbers ────────────────────────────────────────────────────────────

@@ -182,6 +182,14 @@ Publishing is your choice per channel: a **post kit** and a reminder (always wor
 
 After a post goes out, Shipcast gets its numbers back — automatically for YouTube and anything posted through Postiz, and with a quick form, a screenshot or an export file for the rest. Each post is compared with **your own usual** on that channel at the same age, and a small local model works out what actually wins for your audience: formats, hooks, posting times, media and copy patterns. **Insights → Performance** shows it with the evidence and how sure it is; drafts get a forecast; and everything Shipcast plans and writes next leans on it — while a share of posts deliberately try something new so it keeps learning.
 
+## Reports that write themselves
+
+Marketers spend about a third of their week on reporting. **Reports** does it for you: pick *this week*, *last month* or *last quarter* and who it's for (your team, your boss or a client), and Shipcast writes a one-page report from what it already knows: what you shipped, how it did against the period before, **why** (which channels moved, more posts or better posts, what the winners had in common, your own timeline notes), your goals with their pace, and **three next steps that each do something** with one click (a follow-up idea, a remix, better posting times, planning next week).
+
+Every number in the words is checked against your data, and a line that doesn't check out is replaced. Edit anything in place, switch the audience, restore an earlier version, or **ask the report** a question and get an answer with a small chart. Connect **Google Analytics and Search Console** (read-only) to add website visits, signups and searches. Shipcast tags the links it publishes so the report can say which post brought which visits.
+
+Send it on a schedule by email (the PDF attached) or to Slack, Teams or Discord, review it first or let it go automatically. You can also download PDF, PowerPoint, CSV or a one-image summary of the week, or share a private link that opens just that report. If you work across several workspaces, every client's week sits on one screen with the ones needing attention first.
+
 ## Gets better on its own
 
 Shipcast runs a few background agents while you're not using it (Setup → Background agents). They wait until your own campaigns finish, stay out of quiet hours and use a small daily share of your Claude runs.

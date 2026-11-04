@@ -171,7 +171,7 @@ test('create form: period labels, custom ranges and the request body', () => {
 
 test('role gates: viewers read, editors make and act, admins also share, send and deliver', () => {
   const v = m.reportGates(perms('viewer'));
-  assert.deepEqual([v.read, v.create, v.edit, v.act, v.ask, v.share, v.send, v.delivery, v.website], [true, false, false, false, false, false, false, false, false]);
+  assert.deepEqual([v.read, v.create, v.edit, v.act, v.ask, v.share, v.send, v.delivery, v.website], [true, false, false, false, true, false, false, false, false], 'viewers may ask (answered from the facts, no Claude)');
   const e = m.reportGates(perms('editor'));
   assert.deepEqual([e.create, e.edit, e.act, e.ask, e.remove, e.share, e.send, e.delivery], [true, true, true, true, true, false, false, false]);
   const a = m.reportGates(perms('admin'));

@@ -373,7 +373,7 @@ function ReportBody({ rep, can, save, onReport }: { rep: Report; can: ReportGate
         <Editable value={rep.intro ?? ''} can={can.edit} label="Intro" multiline placeholder="Add a short intro for your reader (optional)" onSave={(v) => save({ intro: v })} render={(v) => (v ? <p className="rp-intro">{v}</p> : null)} />
         <div className="rp-badges">
           <span className={`rp-writer w-${rep.writer}`} title="Every number in the text was checked against the fact sheet; sentences with numbers that aren't there are dropped.">
-            <Nav.check />{WRITER_LABEL[rep.writer]}
+            <Nav.check />{rep.edited ? 'Edited by the team' : WRITER_LABEL[rep.writer]}
           </span>
           <span className="rp-asof">Numbers as of {new Date(f.asOf).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}</span>
         </div>

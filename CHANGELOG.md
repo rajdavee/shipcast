@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — sprint v10: reports that write themselves
+
+- **The report** — weekly, 30-day, monthly, quarterly or custom; for the team, the boss or a client. Covers what was shipped, how it did against the period before (compared fairly at the same age), why (channel by channel, more posts vs better posts, what the winners had, timeline notes), goals with pace, notable highs and streaks, and what the report can't see.
+- **Checked words** — written from a frozen fact sheet. Any line with a number that isn't in the facts is replaced by the template's line, and without a model the template writes it all. Edit in place, hide sections, switch audience, restore versions.
+- **Next steps that act** — follow-up ideas, remixes, better posting times, more of what wins, plan next week, close a goal's gap: one click each.
+- **Website numbers** — a read-only Google Analytics and Search Console connection caches visits, users, key events, sources, search clicks and top searches. Links Shipcast publishes to your site are tagged with UTM, so visits and signups are credited to the post that brought them. Late-arriving data is compared on the same complete days.
+- **Out of the app** — PDF, PowerPoint, CSV, Markdown and a 1080×1350 week card. Private share links are hashed, can expire, are revocable and show only that report.
+- **Delivery** — a schedule in your time zone; review first or send automatically. Email goes through Shipcast's own small SMTP client with the PDF attached; Slack, Teams, Discord and webhooks get their own message shapes. The day before, a reminder if numbers are missing.
+- **Ask the report** — questions answered from the report's facts and history, numbers checked, with a chart.
+- **Agency view** — every workspace's latest week on one screen, the ones needing attention first.
+
 ## Unreleased — sprint v9: accounts, workspaces and data isolation
 
 - **Accounts** — email and password (scrypt), secure sessions, rate-limited sign-in, change password signs out other devices.

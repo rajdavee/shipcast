@@ -113,3 +113,20 @@ The writer (one Claude call) turns facts into prose; a validator checks every nu
 - **API:** every route signed in, with role checks, cross-workspace 404s, and share links that reach nothing else.
 - **UI:** typecheck, build and screenshots.
 - **Live:** seed 90 days, generate a weekly and a monthly report, check the planted effects show up in "why", export PDF/PPTX, and send to a local SMTP and webhook catcher.
+
+## Status (2026-11-05)
+
+| M | State |
+|---|---|
+| M1 fact sheet | Done. Rolling and calendar periods in the plan's zone, fair same-lag comparisons, KPI history, channel waterfall, volume vs per-post split, top/bottom posts with the wins they had, work done, goals with pace, highs/lows/streaks, coverage, notes |
+| M2 writer | Done. Boss/client/team writing, a number checker (lines that fail fall back to the template), next steps that act, versions, goals and notes |
+| M3 website | Done. Read-only Google Analytics + Search Console connection, 6-hourly cache, UTM tags on published links and post kits, visits and key events per post, late data compared on the same complete days |
+| M4 outputs | Done. Report page (edit in place, hide, audience switch, versions), share links (hashed, expiring, revocable), PDF, PowerPoint, CSV, Markdown, week card |
+| M5 delivery | Done. Schedule, review first or auto-send, own SMTP client with PDF attached (Bcc), Slack/Teams/Discord/webhook cards, day-before reminder for missing numbers, daily cap and log |
+| M6 ask + rollup | Done. Ask a report (checked answers with a chart; viewers get answers from the facts without spending Claude), agency rollup, time-saved estimate |
+| M7 | Done. Security review (all ten findings fixed), sample website data in the seeder, docs, CI |
+
+Notes:
+- Share links and emailed links only work where people can reach this Shipcast. On a team server set `SHIPCAST_PUBLIC_URL` and delivered messages link to a 30-day share. On a laptop, send the PDF.
+- The Google connection uses the YouTube Google app. Add `http://localhost:<port>/oauth/google/callback` to its redirect URIs and enable the Analytics Data, Analytics Admin and Search Console APIs.
+- Not verified against a live Google property or a real mail provider here (the API mapping and SMTP dialogue are tested with fixtures and a local fake server).
