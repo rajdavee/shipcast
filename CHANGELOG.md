@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — sprint v9: accounts, workspaces and data isolation
+
+- **Accounts** — email and password (scrypt), secure sessions, rate-limited sign-in, change password signs out other devices.
+- **Workspaces** — a private one for everyone plus team workspaces with owner, admin, editor and viewer roles and single-use invite links; projects, calendar, numbers, voices, lessons, connections and settings belong to a workspace and are invisible outside it. The first account inherits the existing data.
+- **Your own Claude** — each person connects their own Claude token or API key; the install owner may keep the machine's sign-in. Other people's runs execute in an OS sandbox that only sees their own workspace.
+- **Hardened** — internal services accept work only from Shipcast or a run's token and stay inside its workspace; local folders, app runs and the machine's GitHub are the install owner's.
+
 ## Unreleased — sprint v8: Pulse, learning from what your audience does
 
 - **Numbers come back** — YouTube stats read automatically; Instagram, X, TikTok and more through Postiz (kept under its hourly limit); everywhere else a gentle "add the numbers" reminder at 1, 3, 7 and 30 days with a quick form, a screenshot Shipcast reads for you to confirm, or the platform's own CSV export.

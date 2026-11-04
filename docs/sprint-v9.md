@@ -52,3 +52,17 @@ Shipcast was a single-person app: one data folder, one Claude login, every conne
 
 ## Testing
 Isolation matrix: user A and user B in separate workspaces — every list/read/write/delete route returns only their own data; cross-workspace ids → 404; viewer can't write; editor can't manage connections; removed member loses access immediately; sessions expire and revoke; rate limit; invite single-use; OAuth state bound to workspace; background jobs write into the right workspace; Claude env per user. Plus the full existing suite, signed in.
+
+## Status (2026-11-04)
+
+| M | State |
+|---|---|
+| M1 context | Done — home() follows the request's/job's workspace; machine-wide caches at the root |
+| M2 accounts | Done — scrypt, hashed sessions, rate limits, workspaces, roles, invites, first-account migration |
+| M3 gate | Done — every route: session + membership + role; x-shipcast header; 404 for foreign ids |
+| M4 background + Claude | Done — worker/agents per workspace; own Claude token/API key per person; install owner may use the machine sign-in |
+| Security review | Done — all findings fixed: id traversal, OS sandbox for other people's runs, services bound to a workspace by internal key or run token and confined to it, owner-only local sources/app runs/machine GitHub, OAuth bound to session, capped invites, rate-limit race, enumeration, caches, permissions |
+| M5 UI | Done — first run, sign in, join, workspace switcher, members, account (password, devices, Claude), role-aware pages |
+
+Known trade-off: the per-email sign-in limit lets someone who knows an email delay that person's sign-in for 15 minutes.
+Linux servers need bubblewrap for multi-user runs (or SHIPCAST_TRUST_ALL_USERS=1 when every account is trusted). Team servers reached by name need SHIPCAST_ALLOWED_HOSTS; behind HTTPS set SHIPCAST_SECURE_COOKIE=1 (and SHIPCAST_TRUST_PROXY=1 behind a proxy you control).
