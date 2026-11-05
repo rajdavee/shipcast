@@ -8,7 +8,7 @@ import type { AddressInfo } from 'node:net';
 // Real capability services on random ports, in an isolated data dir.
 const home = mkdtempSync(join(tmpdir(), 'shipcast-svc-'));
 process.env.SHIPCAST_HOME = home;
-const { findChrome, alignScript, buildCues, checkCaptions, validateStoryboard } = await Promise.all([
+const { findChrome, alignScript, buildCues, phraseCues, applyPronunciations, sentences, paceTempo, checkCaptions, validateStoryboard } = await Promise.all([
   import('@shipcast/engine'),
   import('@shipcast/media'),
   import('@shipcast/qa'),
@@ -56,6 +56,34 @@ test('caption cues respect chunk size and minimum display time', () => {
   cues.forEach((c, i) => assert.ok(c.end >= Math.min(c.start + 0.69, cues[i + 1]?.start ?? Infinity), `cue ${i}`));
   const r = checkCaptions('1\n00:00:00,000 --> 00:00:00,300\nThis cue is far too long to read in a third of a second\n');
   assert.ok(r.issues.some((i) => i.rule === 'captions.speed'));
+});
+
+test('phrase cues break at punctuation, balance long phrases and keep their words', () => {
+  const script = 'Final whistle. Two to one, and number nine kept the whole team going all the way through the second half.';
+  const words = script.split(' ').map((t, i) => ({ text: t, start: i * 0.3, end: i * 0.3 + 0.25 }));
+  const cues = phraseCues(words, { maxChars: 30 });
+  assert.equal(cues[0].text, 'Final whistle.');
+  assert.equal(cues[1].text, 'Two to one,');
+  // No cue runs across a comma or full stop, and none is far over the target.
+  for (const c of cues.slice(0, -1)) assert.ok(!/[,.]/.test(c.text.slice(0, -1)), c.text);
+  assert.ok(cues.every((c) => c.text.length <= 36), cues.map((c) => c.text).join(' | '));
+  // Every word appears once, in order, with its own timing.
+  assert.deepEqual(cues.flatMap((c) => c.words.map((w) => w.text)), script.split(' '));
+  for (let i = 1; i < cues.length; i++) assert.ok(cues[i].start >= cues[i - 1].end, `cue ${i} overlaps`);
+  // A lone short word joins the cue before it rather than flashing alone.
+  const tail = phraseCues('Coaches nominate from the sideline in about a minute today'.split(' ').map((t, i) => ({ text: t, start: i * 0.3, end: i * 0.3 + 0.2 })), { maxChars: 26 });
+  assert.ok(tail.every((c) => c.words.length > 1), tail.map((c) => c.text).join(' | '));
+});
+
+test('pronunciations respell whole words only; pace and sentences shape the read', () => {
+  assert.equal(applyPronunciations('EdgeTrack Awards by EdgeTrack.', { EdgeTrack: 'Edge Track' }), 'Edge Track Awards by Edge Track.');
+  assert.equal(applyPronunciations('EdgeTracker stays', { EdgeTrack: 'Edge Track' }), 'EdgeTracker stays');
+  assert.equal(applyPronunciations('a+b (c)', { 'a+b': 'a plus b' }), 'a plus b (c)');
+  assert.deepEqual(sentences('Final whistle. Now what? Recognition that lasts'), ['Final whistle.', 'Now what?', 'Recognition that lasts']);
+  // 30 words in 10 s is 180 wpm; reaching 150 means slowing to 0.833.
+  assert.equal(paceTempo(30, 10, 150).toFixed(3), '0.833');
+  assert.equal(paceTempo(30, 30, 220), 1.2);
+  assert.equal(paceTempo(0, 10, 150), 1);
 });
 
 test('storyboard validation names the broken scene and field', () => {

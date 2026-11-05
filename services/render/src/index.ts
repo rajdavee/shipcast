@@ -5,26 +5,26 @@ import { join } from 'node:path';
 import { assertInHome, rootHome, callService, contactSheet, createService, frameDetail, home, PRESETS, presetForSize, run, SERVICE_PORTS, npxRun, engineEnv, chatterboxReady, findBroll, getSecret, readSettings } from '@shipcast/engine';
 import { SCENES } from './scenes.ts';
 import { CAPTION_STYLES } from './captions.ts';
-import { compileStoryboard, echoesVoice, validateStoryboard, type Storyboard } from './compile.ts';
+import { compileStoryboard, echoesVoice, validateStoryboard, type Storyboard, type VoiceShape } from './compile.ts';
 import { compileCaptionVideo } from './captionVideo.ts';
 import { compileInfographic, validateInfographic } from './infographic.ts';
 
 export { SCENES, CAPTION_STYLES, compileStoryboard, validateStoryboard, validateInfographic, echoesVoice };
 export type { Storyboard };
 
-/** Voice lines are cached by (text, voice, speed): editing visuals never re-synthesizes speech. */
-async function cachedVoice(text: string, voice: string, speed: number, out: string) {
+/** Voice lines are cached by (text, voice, speed, shape): editing visuals never re-synthesizes speech. */
+async function cachedVoice(text: string, voice: string, speed: number, out: string, shape: VoiceShape = {}) {
   // Your own ElevenLabs voice replaces Kokoro everywhere when it's switched on.
   const s = await readSettings();
   if (s.voiceProvider === 'chatterbox' && chatterboxReady() && !voice.startsWith('eleven:')) voice = 'chatterbox';
   else if (s.voiceProvider === 'elevenlabs' && s.elevenVoice && !voice.startsWith('eleven:') && (await getSecret('elevenlabs'))) voice = `eleven:${s.elevenVoice}:${s.elevenModel || 'eleven_multilingual_v2'}`;
-  const key = createHash('sha256').update(JSON.stringify([text, voice, speed])).digest('hex').slice(0, 24);
+  const key = createHash('sha256').update(JSON.stringify(shape.pronounce || shape.pause || shape.pace ? [text, voice, speed, shape] : [text, voice, speed])).digest('hex').slice(0, 24);
   const dir = join(rootHome(), 'cache', 'voice');
   const wav = join(dir, `${key}.wav`);
   const meta = join(dir, `${key}.json`);
   if (!existsSync(wav) || !existsSync(meta)) {
     await mkdir(dir, { recursive: true });
-    const r = await callService('media', 'voice', { text, voice, speed, out: wav });
+    const r = await callService('media', 'voice', { text, voice, speed, out: wav, ...shape });
     await writeFile(meta, JSON.stringify({ duration: r.duration, words: r.words, engine: r.engine }));
   }
   await copyFile(wav, out);

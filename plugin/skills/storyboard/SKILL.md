@@ -34,6 +34,7 @@ back to you to fix.
 }
 ```
 
+- `voice` can also take `"pace": 150` (words per minute; 145–160 reads calm and clear), `"pause": 0.35` (a breath between sentences) and `"pronounce": { "EdgeTrack": "Edge Track" }` for brand names the voice mispronounces. Listen to one line first; add a pronunciation the moment a name sounds wrong. Captions keep the script's spelling.
 - `preset` comes from the prompt (format option). `voice: null` and `captions: "none"` for music-only pieces.
 - Image fields take paths relative to the brief folder (`assets/…`) — only files that exist there.
 - Scene duration is automatic (voice line + breathing room, never below the scene's minimum). Set `duration` only to hold longer.

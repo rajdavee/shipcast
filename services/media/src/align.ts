@@ -77,6 +77,73 @@ export function buildCues(words: Word[], { maxWords = 3, maxChars = 28 } = {}): 
   return cues;
 }
 
+export interface Cue extends Word {
+  /** The cue's own words with timings, for word-by-word highlighting. */
+  words: Word[];
+}
+
+/**
+ * Phrase-led cues: split at punctuation first, so a cue never runs across a
+ * comma or a sentence end, then balance long phrases into even chunks of about
+ * maxChars, and fold a lone short trailing word into the cue before it.
+ * Gaps under 0.25 s between cues are closed so captions don't blink.
+ */
+export function phraseCues(words: Word[], { maxChars = 30 } = {}): Cue[] {
+  const text = (ws: Word[]) => ws.map((w) => w.text).join(' ');
+  const phrases: Word[][] = [];
+  let cur: Word[] = [];
+  for (const w of words) {
+    cur.push(w);
+    if (/[,.:;!?…—]["')\]]?$/.test(w.text)) {
+      phrases.push(cur);
+      cur = [];
+    }
+  }
+  if (cur.length) phrases.push(cur);
+  const chunks: Word[][] = [];
+  for (const ph of phrases) {
+    const len = text(ph).length;
+    const target = len / Math.max(1, Math.ceil(len / maxChars));
+    let chunk: Word[] = [];
+    for (const w of ph) {
+      if (chunk.length && text([...chunk, w]).length > target + 6) {
+        chunks.push(chunk);
+        chunk = [];
+      }
+      chunk.push(w);
+    }
+    if (chunk.length) chunks.push(chunk);
+  }
+  for (let i = chunks.length - 1; i > 0; i--)
+    if (chunks[i].length === 1 && chunks[i][0].text.length <= 6 && !/[.!?…]["')\]]?$/.test(chunks[i - 1].at(-1)!.text) && text([...chunks[i - 1], ...chunks[i]]).length <= maxChars + 4)
+      chunks[i - 1].push(...chunks.splice(i, 1)[0]);
+  const cues: Cue[] = chunks.map((ws) => ({ text: text(ws), start: ws[0].start, end: ws.at(-1)!.end, words: ws }));
+  for (let i = 0; i < cues.length; i++) {
+    const next = cues[i + 1];
+    const minEnd = cues[i].start + CAPTION_RULES.minSeconds;
+    if (cues[i].end < minEnd) cues[i].end = next ? Math.min(minEnd, next.start) : minEnd;
+    if (next && next.start - cues[i].end < 0.25) cues[i].end = Math.max(cues[i].end, next.start - 0.02);
+  }
+  return cues;
+}
+
+/** Apply a pronunciation map to text before it is spoken ("EdgeTrack" → "Edge Track"); whole words only. */
+export function applyPronunciations(text: string, map: Record<string, string> = {}): string {
+  let out = text;
+  for (const [from, to] of Object.entries(map)) {
+    if (!from.trim()) continue;
+    const esc = from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    out = out.replace(new RegExp(`(?<![\\p{L}\\p{N}])${esc}(?![\\p{L}\\p{N}])`, 'gu'), to);
+  }
+  return out;
+}
+
+/** Split a script into sentences, keeping the punctuation. */
+export const sentences = (text: string) => text.match(/[^.!?…]+[.!?…]+["')\]]?|[^.!?…]+$/g)?.map((s) => s.trim()).filter(Boolean) ?? [];
+
+/** Atempo factor that brings speech of `words` over `seconds` to `wpm`, kept within a natural range. */
+export const paceTempo = (words: number, seconds: number, wpm: number) => (seconds > 0 && words > 0 ? Math.min(1.2, Math.max(0.8, wpm / ((words / seconds) * 60))) : 1);
+
 const ts = (s: number, sep: ',' | '.') => {
   const ms = Math.round(s * 1000);
   const h = Math.floor(ms / 3_600_000);

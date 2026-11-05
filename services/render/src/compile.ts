@@ -11,6 +11,12 @@ import { audioLevels, LEVEL_FPS } from './audiogram.ts';
 
 export type Transition = 'cut' | 'flash' | 'wipe' | 'fade' | 'zoom' | 'blur' | 'push';
 
+export interface VoiceShape {
+  pronounce?: Record<string, string>;
+  pause?: number;
+  pace?: number;
+}
+
 export interface StoryScene {
   /** Shipcast scene id (see SCENES) … */
   scene?: string;
@@ -39,7 +45,8 @@ export interface Storyboard {
   scenes: StoryScene[];
   /** Long-form: chapters render separately (cached), then join into one video. Replaces `scenes`. */
   chapters?: StoryChapter[];
-  voice?: { voice: string; speed?: number } | null;
+  /** `pronounce` respells words for the voice only, `pause` breathes between sentences (s), `pace` targets words per minute. */
+  voice?: { voice: string; speed?: number; pronounce?: Record<string, string>; pause?: number; pace?: number } | null;
   /** A file to use, or a mood for Shipcast's procedural bed. `null` = no music. Default: an uplifting bed. */
   music?: { file?: string; mood?: Mood; gainDb?: number } | null;
   captions?: CaptionStyle;
@@ -49,7 +56,7 @@ export interface Storyboard {
 
 export interface CompileDeps {
   /** media.voice — returns audio + aligned words. */
-  voice: (text: string, voice: string, speed: number, out: string) => Promise<{ file: string; duration: number; words: Word[] }>;
+  voice: (text: string, voice: string, speed: number, out: string, shape?: VoiceShape) => Promise<{ file: string; duration: number; words: Word[] }>;
   /** media.music — procedural bed with SFX. */
   music: (mood: Mood, seconds: number, sfx: { kind: string; at: number; gain?: number }[], out: string, energy?: { at: number; level: number }[]) => Promise<{ file: string; bpm: number }>;
   /** Optional stock footage for `broll` scenes (null = none available → cinematic fallback). */
@@ -167,7 +174,7 @@ export async function compileStoryboard(story: Storyboard, opts: { dir: string; 
   for (const [i, sc] of story.scenes.entries()) {
     if (story.voice && sc.vo?.trim()) {
       progress(0.05 + (0.35 * i) / story.scenes.length, `voice ${i + 1}/${story.scenes.length}`);
-      voiced[i] = await opts.deps.voice(sc.vo.trim(), story.voice.voice, story.voice.speed ?? 1, join(dir, 'assets', `vo-${i + 1}.wav`));
+      voiced[i] = await opts.deps.voice(sc.vo.trim(), story.voice.voice, story.voice.speed ?? 1, join(dir, 'assets', `vo-${i + 1}.wav`), { pronounce: story.voice.pronounce, pause: story.voice.pause, pace: story.voice.pace });
     }
   }
 
