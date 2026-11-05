@@ -19,6 +19,7 @@ class Session {
   private id = 0;
   private pending = new Map<number, Pending>();
   private ready: Promise<void>;
+  private listeners = new Set<(method: string, params: any, sessionId?: string) => void>();
   closed = false;
   constructor(url: string) {
     this.ws = new WebSocket(url);
@@ -28,6 +29,7 @@ class Session {
     });
     this.ws.onmessage = (ev) => {
       const msg = JSON.parse(String(ev.data));
+      if (msg.method) for (const f of this.listeners) f(msg.method, msg.params, msg.sessionId);
       const p = msg.id && this.pending.get(msg.id);
       if (!p) return;
       this.pending.delete(msg.id);
@@ -56,9 +58,95 @@ class Session {
       this.pending.set(id, { resolve: done(resolve), reject: done(reject) });
     });
   }
+  /** Listen to protocol events; returns the unsubscribe. */
+  onEvent(fn: (method: string, params: any, sessionId?: string) => void): () => void {
+    this.listeners.add(fn);
+    return () => this.listeners.delete(fn);
+  }
   close() {
     this.ws.close();
   }
+}
+
+/** Spawn Chrome with remote debugging on and wait for its DevTools endpoint. */
+async function spawnChrome(bin: string, args: string[]): Promise<{ proc: ChildProcess; wsUrl: string }> {
+  const proc = spawn(bin, ['--remote-debugging-port=0', ...args], { stdio: ['ignore', 'ignore', 'pipe'] });
+  const wsUrl = await new Promise<string>((resolve, reject) => {
+    let buf = '';
+    // Busy CI machines can take well over 20 s to bring Chrome up.
+    const t = setTimeout(() => reject(new Error('Chrome did not start')), 45_000);
+    proc.stderr!.on('data', (d) => {
+      buf += d;
+      const m = buf.match(/DevTools listening on (ws:\/\/\S+)/);
+      if (m) {
+        clearTimeout(t);
+        resolve(m[1]);
+      }
+    });
+    proc.on('error', (e) => reject(new Error(`Chrome failed to start: ${e.message}`)));
+    proc.on('exit', () => reject(new Error(`Chrome exited: ${buf.slice(-300)}`)));
+  }).catch((e) => {
+    proc.kill('SIGKILL');
+    throw e;
+  });
+  if (process.env.SHIPCAST_DEBUG) {
+    proc.stderr!.on('data', (d) => process.stderr.write(`[chrome] ${d}`));
+    proc.on('exit', (code, sig) => process.stderr.write(`[chrome] exited code=${code} signal=${sig}\n`));
+  }
+  return { proc, wsUrl };
+}
+
+export interface ChromeOptions {
+  /** Persistent profile (signed-in sessions); a throwaway one when omitted. */
+  profileDir?: string;
+  /** A visible window instead of headless. */
+  headful?: boolean;
+  bin?: string;
+  windowSize?: { width: number; height: number };
+  /** What the first tab opens. */
+  startUrl?: string;
+}
+
+/** A dedicated Chrome process with raw protocol access (screencasts, sign-in windows). */
+export interface Chrome {
+  send<T = any>(method: string, params?: Record<string, unknown>, sessionId?: string): Promise<T>;
+  onEvent(fn: (method: string, params: any, sessionId?: string) => void): () => void;
+  /** Settles when the browser process exits. */
+  exited: Promise<void>;
+  close(): Promise<void>;
+}
+
+export async function launchChrome(opts: ChromeOptions = {}): Promise<Chrome> {
+  const bin = opts.bin ?? process.env.CHROME_PATH ?? findChrome();
+  if (!bin) throw new Error('No Chrome found. Run `npx hyperframes browser ensure` or install Google Chrome.');
+  const temp = opts.profileDir ? undefined : await mkdtemp(join(tmpdir(), 'shipcast-chrome-'));
+  const args = [`--user-data-dir=${opts.profileDir ?? temp}`, '--no-first-run', '--no-default-browser-check', '--force-color-profile=srgb', '--disable-dev-shm-usage', '--password-store=basic'];
+  // A fixed key, so cookies saved in a visible window decrypt in a headless run (and macOS never asks for the keychain).
+  if (process.platform === 'darwin') args.push('--use-mock-keychain');
+  if (!opts.headful) args.push('--headless', '--hide-scrollbars', '--disable-gpu', '--no-sandbox', '--font-render-hinting=none');
+  if (opts.windowSize) args.push(`--window-size=${opts.windowSize.width},${opts.windowSize.height}`);
+  args.push(opts.startUrl ?? 'about:blank');
+  const { proc, wsUrl } = await spawnChrome(bin, args).catch(async (e) => {
+    if (temp) await rm(temp, { recursive: true, force: true }).catch(() => {});
+    throw e;
+  });
+  const exited = new Promise<void>((r) => (proc.exitCode !== null ? r() : proc.once('exit', () => r())));
+  const session = new Session(wsUrl);
+  let closing: Promise<void> | undefined;
+  return {
+    send: (m, p = {}, sid) => session.send(m, p, sid),
+    onEvent: (fn) => session.onEvent(fn),
+    exited,
+    close: () =>
+      (closing ??= (async () => {
+        // A graceful close flushes the profile's cookies to disk.
+        await Promise.race([session.send('Browser.close').catch(() => {}), new Promise((r) => setTimeout(r, 3000))]);
+        const gone = await Promise.race([exited.then(() => true), new Promise<boolean>((r) => setTimeout(() => r(false), 5000))]);
+        if (!gone) proc.kill('SIGKILL');
+        session.close();
+        if (temp) await rm(temp, { recursive: true, force: true }).catch(() => {});
+      })()),
+  };
 }
 
 export interface CaptureOptions {
@@ -94,26 +182,8 @@ export class Browser {
     const bin = process.env.CHROME_PATH ?? findChrome();
     if (!bin) throw new Error('No Chrome found. Run `npx hyperframes browser ensure` or install Google Chrome.');
     this.profile = await mkdtemp(join(tmpdir(), 'shipcast-chrome-'));
-    const proc = spawn(bin, ['--headless', '--remote-debugging-port=0', `--user-data-dir=${this.profile}`, '--no-first-run', '--no-default-browser-check', '--hide-scrollbars', '--force-color-profile=srgb', '--font-render-hinting=none', '--disable-gpu', '--disable-dev-shm-usage', '--no-sandbox', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
+    const { proc, wsUrl } = await spawnChrome(bin, ['--headless', `--user-data-dir=${this.profile}`, '--no-first-run', '--no-default-browser-check', '--hide-scrollbars', '--force-color-profile=srgb', '--font-render-hinting=none', '--disable-gpu', '--disable-dev-shm-usage', '--no-sandbox', 'about:blank']);
     this.proc = proc;
-    const wsUrl = await new Promise<string>((resolve, reject) => {
-      let buf = '';
-      // Busy CI machines can take well over 20 s to bring Chrome up.
-      const t = setTimeout(() => reject(new Error('Chrome did not start')), 45_000);
-      proc.stderr!.on('data', (d) => {
-        buf += d;
-        const m = buf.match(/DevTools listening on (ws:\/\/\S+)/);
-        if (m) {
-          clearTimeout(t);
-          resolve(m[1]);
-        }
-      });
-      proc.on('exit', () => reject(new Error(`Chrome exited: ${buf.slice(-300)}`)));
-    });
-    if (process.env.SHIPCAST_DEBUG) {
-      proc.stderr!.on('data', (d) => process.stderr.write(`[chrome] ${d}`));
-      proc.on('exit', (code, sig) => process.stderr.write(`[chrome] exited code=${code} signal=${sig}\n`));
-    }
     this.session = new Session(wsUrl);
     proc.on('exit', () => {
       this.session = undefined;

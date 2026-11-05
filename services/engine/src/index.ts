@@ -62,3 +62,6 @@ export * from './report-html.ts';
 export * from './report-out.ts';
 export * from './report-deliver.ts';
 export * from './import.ts';
+export * from './takes.ts';
+export * from './capture-session.ts';
+export * from './explore.ts';
