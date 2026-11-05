@@ -1,0 +1,23 @@
+{
+  "id": "real-product-film",
+  "name": "Real Product Film Campaign",
+  "tagline": "Explores your live product, records real phone and desktop takes, and builds a main film, cutdowns and bumpers in 9:16 and 16:9, scored against your brief and improved until it stops getting better.",
+  "category": "video",
+  "order": 3,
+  "estimate": "45–120 min",
+  "accent": "#f2b544",
+  "timeoutMinutes": 180,
+  "sources": ["url"],
+  "options": [
+    { "key": "views", "label": "Views to film", "type": "text", "default": "", "placeholder": "e.g. /coach, /ops, /family (blank: start from the URL)" },
+    { "key": "signedIn", "label": "Product needs a sign-in", "type": "select", "choices": ["no", "yes"], "default": "no" },
+    { "key": "cuts", "label": "Cuts", "type": "select", "choices": ["main + 30s + 15s + bumpers", "main + 30s", "main only"], "default": "main + 30s + 15s + bumpers" },
+    { "key": "voice", "label": "Voice", "type": "select", "choices": ["chatterbox", "am_michael", "af_heart", "bf_emma", "bm_george", "none"], "default": "chatterbox" },
+    { "key": "pronounce", "label": "Say these names as", "type": "text", "default": "", "placeholder": "e.g. EdgeTrack=Edge Track; Qwiq=Quick" },
+    { "key": "brief", "label": "Client brief", "type": "text", "default": "", "placeholder": "paste the brief's requirements; each becomes a pass/fail line" }
+  ],
+  "outputs": ["films/*.mp4", "films/*.srt", "takes/*.mp4", "product.md", "rubric.md", "iteration-log.md", "*.md"],
+  "skills": [],
+  "tools": ["ffmpeg", "chrome"],
+  "roles": ["script", "video-strategy", "copy", "humanize"]
+}

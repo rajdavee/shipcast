@@ -30,3 +30,11 @@ A client campaign was made almost entirely outside Shipcast with hand-written sc
 - Recording and exploring only touch what the user points at; destructive controls are never pressed; submissions happen only in an environment the user marks as a demo.
 - Session profiles are private to the workspace, never logged, and can be deleted.
 - Films use real recordings only; there are no imitation screens.
+
+## Status (5 Nov 2026)
+- M1–M3: `engine/takes.ts`, `capture-session.ts`, `explore.ts`. The explorer also skips form submits, off-site links and selects.
+- M4: `render/demofilm.ts`, plus the render kinds `demoFilm` and `validateFilm`. Its warnings cover voice longer than the footage, cuts off target, and logos with a box behind them. The project is built next to the output (`<out>.film/`).
+- M5: voice `pace`/`pause`/`pronounce`, and `phraseCues`. The voice cache is now per workspace (workspace renders could not write to the install-wide cache).
+- M6: pack `real-product-film`; skill scripts `explore.mjs`, `takes.mjs` (plan · signin · sessions · forget) and `film.mjs`.
+- M7: `POST /api/campaigns/import`; the doctor shows Chatterbox.
+- Not yet: the sign-in window and the visible-window bot-check fallback have no automated tests (they need a display). The demo film's final file skips the storyboard QA gate and contact sheet.

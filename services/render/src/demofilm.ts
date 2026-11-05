@@ -458,7 +458,7 @@ export async function buildFilm(spec: FilmSpec, dir: string, deps: FilmDeps): Pr
   const T = L.text;
   let calloutTrack = 0;
   for (const p of plan) {
-    const { sc } = p;
+    let { sc } = p;
     const S = `#g-${sc.id}`;
     const st = p.start;
     const d = p.duration;
@@ -561,6 +561,9 @@ export async function buildFilm(spec: FilmSpec, dir: string, deps: FilmDeps): Pr
       textIn();
       exit(`${S} .card`);
     } else if (sc.kind === 'cta') {
+      // The URL gets its own pill; a sub line that only repeats it is dropped.
+      const norm = (u?: string) => (u ?? '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\.|\/$/g, '');
+      if (spec.brand.url && norm(sc.sub) === norm(spec.brand.url)) sc = { ...sc, sub: undefined };
       const mark = logo ? `<div class="mark"><img src="${logo}" alt="${esc(spec.brand.name)}"><div class="glint"><i></i></div></div>` : `<div class="nm">${esc(spec.brand.name)}</div>`;
       open(`<div class="cta">${mark}${words('kick', sc.kick)}${words('head', sc.head)}${words('sub', sc.sub)}${spec.brand.url ? `<div class="url">${esc(spec.brand.url)}</div>` : ''}</div>`);
       if (logo) tl(`tl.fromTo("${S} .mark",{clipPath:"inset(0 100% 0 0)",x:-30},{clipPath:"inset(0 0% 0 0)",x:0,duration:.8,ease:"expo.out"},${r3(st + 0.05)});tl.fromTo("${S} .glint",{xPercent:-160},{xPercent:400,duration:.8,ease:"power2.inOut"},${r3(st + 0.55)});`);

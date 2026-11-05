@@ -79,7 +79,7 @@ const fullSpec = (format: 'vertical' | 'landscape', logo?: string): FilmSpec => 
     { id: 'ops', kind: 'ui', take: { file: desk, log: `${desk}.json`, from: 0.2 }, head: 'The team takes over', vo: 'We draft, review, and ship it.', pipeline: ['Draft', 'Review', 'Ship'], callouts: [{ text: 'Approve', at: 1.6 }] },
     { id: 'result', kind: 'ui', take: { file: phone, log: `${phone}.json`, from: 1 }, head: 'For the family', dive: true, vo: 'When it is ready the family finds it waiting in their collection, with a note from the team and every detail checked twice.' },
     { id: 'card', kind: 'card', image: card, vo: 'A keepsake that lasts.', head: 'Made to keep' },
-    { id: 'cta', kind: 'cta', vo: 'Try Acme Plans today.', head: 'Plan your next one', sub: 'Free to start.' },
+    { id: 'cta', kind: 'cta', vo: 'Try Acme Plans today.', head: 'Plan your next one', sub: format === 'vertical' ? 'https://www.acme.test/' : 'Free to start.' },
   ],
 });
 
@@ -157,6 +157,8 @@ for (const format of ['vertical', 'landscape'] as const) {
     assert.doesNotMatch(html, /<br/i);
     assert.doesNotMatch(html, /letterSpacing/);
     assert.equal(r.width, format === 'vertical' ? 1080 : 1920);
+    // The URL shows once, in its pill, even when the sub line repeats it.
+    assert.equal(html.match(/acme\.test/g)?.length, 1);
 
     const els = tree(html);
     const find = (id: string) => els.find((e) => idOf(e.attrs) === id);
