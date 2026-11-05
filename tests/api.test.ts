@@ -1,6 +1,6 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { AddressInfo } from 'node:net';
@@ -292,4 +292,36 @@ test('pulse API: record numbers, read performance, import, delete', async () => 
   assert.ok(Array.isArray((await api('/api/metrics/performance')).body));
   assert.equal((await api('/api/metrics/import', { method: 'POST', json: { csv: 'post_id,impressions\n' + p.id + ',3000' } })).body.saved, 1);
   assert.equal((await api(`/api/metrics/snapshots/${s.body.id}`, { method: 'DELETE' })).status, 200);
+});
+
+test('imports a folder of finished work into the Library, refusing anything unsafe', async () => {
+  const src = mkdtempSync(join(tmpdir(), 'shipcast-import-'));
+  try {
+    mkdirSync(join(src, 'videos'));
+    writeFileSync(join(src, 'videos', 'main.mp4'), 'mp4');
+    writeFileSync(join(src, 'videos', 'main.srt'), '1\n00:00:00,000 --> 00:00:01,000\nHi\n');
+    writeFileSync(join(src, 'deck.pdf'), '%PDF');
+    writeFileSync(join(src, 'run.sh'), 'echo');
+    symlinkSync(join(home, 'claude-calls.ndjson'), join(src, 'leak.md'));
+    const good = { folder: src, name: 'Imported campaign', goal: 'Show it', brief: '# Brief\n\nFrom elsewhere.', items: [{ pack: 'reel', title: 'Main film', files: ['videos/main.mp4', 'videos/main.srt'] }, { pack: 'reel', files: ['deck.pdf'] }] };
+    for (const [files, why] of [[['run.sh'], /file type/], [['leak.md'], /link|regular/], [['../x.mp4'], /outside|regular/], [['/etc/hosts'], /relative/]] as const) {
+      const r = await api('/api/campaigns/import', { method: 'POST', json: { ...good, items: [{ pack: 'reel', files }] } });
+      assert.equal(r.status, 400, String(files));
+      assert.match(r.body.error, why);
+    }
+    assert.equal((await api('/api/campaigns/import', { method: 'POST', json: { ...good, items: [{ pack: 'nope', files: ['deck.pdf'] }] } })).status, 400);
+    const before = (await api('/api/campaigns')).body.length;
+    const r = await api('/api/campaigns/import', { method: 'POST', json: good });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    const c = r.body;
+    assert.equal((await api('/api/campaigns')).body.length, before + 1);
+    assert.deepEqual(c.steps.map((s: any) => s.status), ['done', 'done', 'done']);
+    assert.deepEqual(c.steps[1].outputs, ['out/main.mp4', 'out/main.srt']);
+    assert.equal(c.steps[1].options._title, 'Main film');
+    const found = (rel: string) => readFileSync(join(S.dir, 'campaigns', c.id, rel), 'utf8');
+    assert.equal(found(`deliverables/${c.steps[1].id}/out/main.mp4`), 'mp4');
+    assert.match(found('brief/brief.md'), /From elsewhere/);
+  } finally {
+    rmSync(src, { recursive: true, force: true });
+  }
 });

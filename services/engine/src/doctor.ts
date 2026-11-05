@@ -5,6 +5,7 @@ import { run, which } from './exec.ts';
 import { claudeAuth } from './claude.ts';
 import { githubStatus } from './github.ts';
 import { voiceReady } from './setup.ts';
+import { chatterboxReady } from './chatterbox.ts';
 
 export interface Check {
   id: string;
@@ -105,6 +106,14 @@ export async function doctor(): Promise<Check[]> {
       detail: kokoro ? 'local voices ready' : 'not installed — videos fall back to the system voice',
       hint: 'Free, natural local voiceover. Installs into ~/.shipcast/voice.',
       fix: 'voice',
+    },
+    {
+      id: 'chatterbox',
+      label: 'Chatterbox (expressive voiceover)',
+      ok: chatterboxReady(),
+      required: false,
+      detail: chatterboxReady() ? 'installed — pick it in Setup → Voiceover' : kokoro ? 'not installed — Kokoro reads instead' : 'not installed',
+      hint: 'A warmer, more natural local read for hero films. Setup → Voiceover installs it.',
     },
     docker,
     zip,

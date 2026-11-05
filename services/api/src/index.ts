@@ -78,6 +78,7 @@ import {
   deleteCampaign,
   doctor,
   getPack,
+  importCampaign,
   githubStatus,
   installSkill,
   isSkillInstalled,
@@ -1221,6 +1222,22 @@ router.post('/api/campaigns', async (req) => {
   }
   if (Object.keys(env).length) await writeCampaignEnv(created.id, env);
   return created;
+});
+
+/**
+ * Bring a folder of finished work into the Library. It reads files on this
+ * machine, so it's for the person who set up this Shipcast.
+ */
+router.post('/api/campaigns/import', async (req) => {
+  if (!callerIsInstallOwner()) throw new HttpError(403, 'Importing files from this machine is for the person who set up this Shipcast.');
+  const b = await readJson(req);
+  const packs = new Set((await loadPacks()).map((x) => x.id));
+  try {
+    return await importCampaign({ ...b, ...(b.source ? { source: validateSource(b.source) } : {}) }, packs);
+  } catch (e) {
+    if (e instanceof HttpError) throw e;
+    throw new HttpError(400, (e as Error).message);
+  }
 });
 
 router.get('/api/campaigns/:id', (_q, _r, p) => mustCampaign(p.id));
