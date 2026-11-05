@@ -120,8 +120,8 @@ export function createMediaService() {
         }
         if (shaped) {
           ctx.progress(0.5, 'pacing');
-          // Trim each sentence's edge silence, join with even breaths, then retime to the pace.
-          const trim = 'silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.05,areverse,silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.08,areverse';
+          // Trim each sentence's edge silence (gently: soft word endings sit near -45 dB), join with even breaths, then retime to the pace.
+          const trim = 'silenceremove=start_periods=1:start_threshold=-50dB:start_silence=0.06,areverse,silenceremove=start_periods=1:start_threshold=-50dB:start_silence=0.15,areverse';
           const ins = wavs.flatMap((w) => ['-i', w]);
           let graph = wavs.map((_, i) => `[${i}:a]aresample=24000,aformat=channel_layouts=mono,${trim}[s${i}]`).join(';');
           const gap = pause ? `aevalsrc=0:d=${pause}:s=24000` : '';
