@@ -334,6 +334,11 @@ export async function buildFilm(spec: FilmSpec, dir: string, deps: FilmDeps): Pr
   });
   const total = r3(t);
   if (spec.target && Math.abs(total - spec.target) / spec.target > 0.08) warnings.push(`${spec.target} s cut came out ${total.toFixed(1)} s`);
+  // Captions show the script, so a line written the way it's said ("Edge Track") shows the respelling on screen.
+  for (const [written, said] of Object.entries(spec.voice?.pronounce ?? {}))
+    for (const sc of spec.scenes)
+      if (said && said.toLowerCase() !== written.toLowerCase() && sc.vo?.toLowerCase().includes(said.toLowerCase()))
+        warnings.push(`scene "${sc.id}": the line says "${said}" — write "${written}" (the pronunciation takes care of how it's said; captions show the line as written)`);
 
   // 4. Layout.
   const phoneTake = takes.find((x) => x?.device === 'phone');

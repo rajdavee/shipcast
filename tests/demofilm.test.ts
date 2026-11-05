@@ -345,3 +345,11 @@ test('9:16 shows a desktop take cropped at readable size around its focus; the l
   assert.doesNotMatch(html.match(/<div id="g-hook"[\s\S]*?<\/div><\/div>/)![0], /class="lg"/);
   assert.ok(validateFilmSpec({ ...spec, scenes: [{ id: 'x', kind: 'title', mark: 'no' as any }] }).some((e) => e.includes('mark')));
 });
+
+test('a line written the way it is said (not spelled) is flagged, since captions show the line', { skip: !hasFfmpeg && 'no ffmpeg' }, async () => {
+  const spec: FilmSpec = { format: 'vertical', brand: brand(), voice: { voice: 'af_heart', pronounce: { EdgeTrack: 'Edge Track' } }, music: null, scenes: [{ id: 'a', kind: 'title', head: 'Hi', vo: 'Edge Track gives every seat the picture.' }, { id: 'b', kind: 'title', head: 'Hi', vo: 'EdgeTrack, for coaches.' }] };
+  const { deps } = stubDeps();
+  const r = await buildFilm(spec, join(home, 'film-said'), deps);
+  assert.equal(r.warnings.filter((w) => w.includes('write "EdgeTrack"')).length, 1);
+  assert.match(r.warnings.find((w) => w.includes('Edge Track'))!, /scene "a"/);
+});
