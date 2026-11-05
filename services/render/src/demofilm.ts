@@ -323,6 +323,12 @@ export async function buildFilm(spec: FilmSpec, dir: string, deps: FilmDeps): Pr
     const want = Math.max(sc.min ?? MIN[sc.kind], vo ? LEAD + vo.duration + TAIL : 0);
     let d = want;
     const take = takes[i];
+    if (take && want > take.span + 0.05 && take.from > 0) {
+      // Rather than freeze on the last frame, start earlier in the take: the viewer sees the screen arrive.
+      const back = r3(Math.min(take.from, want - take.span + 0.1));
+      take.from = r3(take.from - back);
+      take.span = r3(take.span + back);
+    }
     if (take) {
       if (want > take.span + 0.05)
         warnings.push(`scene "${sc.id}": the voice needs ${want.toFixed(1)} s but the take has ${take.span.toFixed(1)} s of footage from ${take.from.toFixed(1)} s — the last frame holds; trim the line or start the take earlier`);

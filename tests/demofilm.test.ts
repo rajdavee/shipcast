@@ -229,8 +229,10 @@ for (const format of ['vertical', 'landscape'] as const) {
     assert.match(html, /class="clip cap capd"/);
     assert.match(html, /\{color:"#facc15"\}/, 'the spoken word lights up in the highlight colour');
 
-    // Warnings: voice past its footage, a missed target, a boxed logo.
-    assert.ok(r.warnings.some((w) => /scene "result": the voice needs [\d.]+ s but the take has 5\.0 s of footage/.test(w)), r.warnings.join('\n'));
+    // Voice past its footage: the scene first starts earlier in the take (here from 1 s back to 0 s), and only
+    // warns when even the whole take is too short.
+    assert.match(html, /<video id="v-result"[^>]*data-media-start="0"/);
+    assert.ok(r.warnings.some((w) => /scene "result": the voice needs [\d.]+ s but the take has 6\.0 s of footage from 0\.0 s/.test(w)), r.warnings.join('\n'));
     assert.ok(r.warnings.some((w) => new RegExp(`^15 s cut came out ${r.total.toFixed(1)} s$`).test(w)));
     assert.ok(r.warnings.some((w) => /brand\.logo: the corners .* are opaque/.test(w)));
     if (format === 'vertical') assert.ok(r.warnings.some((w) => /desktop take in a 9:16 film/.test(w)));
