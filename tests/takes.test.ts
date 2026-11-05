@@ -158,3 +158,24 @@ test('upload attaches a local file to a hidden input; redact blurs matching text
   assert.match(late, /blur/);
   assert.equal(h1, 'none');
 });
+
+test('a stopped run takes its Chrome with it, and a stale profile lock is cleared', { skip }, async () => {
+  const { launchChrome } = await import('@shipcast/engine');
+  const { symlinkSync, mkdirSync } = await import('node:fs');
+  const { spawn } = await import('node:child_process');
+  // A lock left by a Chrome that no longer exists.
+  const prof = join(out, 'stale-profile');
+  mkdirSync(prof, { recursive: true });
+  symlinkSync('somehost-999999', join(prof, 'SingletonLock'));
+  const c = await launchChrome({ profileDir: prof });
+  await c.close();
+  // A child process that launches Chrome and is then stopped.
+  const child = spawn(process.execPath, ['--input-type=module', '-e', `const { launchChrome } = await import('@shipcast/engine'); await launchChrome({ profileDir: ${JSON.stringify(join(out, 'reap-profile'))} }); console.log('up'); setInterval(() => {}, 1000);`], { cwd: process.cwd(), stdio: ['ignore', 'pipe', 'inherit'] });
+  await new Promise<void>((r) => child.stdout!.on('data', (d) => String(d).includes('up') && r()));
+  const pids = () => spawnSync('pgrep', ['-f', 'reap-profile']).stdout.toString().trim();
+  assert.ok(pids(), 'Chrome is running');
+  child.kill('SIGTERM');
+  await new Promise((r) => child.once('exit', r));
+  for (let i = 0; i < 40 && pids(); i++) await new Promise((r) => setTimeout(r, 200));
+  assert.equal(pids(), '', 'Chrome went down with the run');
+});

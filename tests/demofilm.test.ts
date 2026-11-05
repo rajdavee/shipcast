@@ -286,3 +286,32 @@ test('a four-scene vertical film renders (draft) to a 1080×1920 video of the pl
   assert.equal(v.height, 1920);
   assert.ok(Math.abs(Number(p.format.duration) - r.total) < 0.3, `${p.format.duration} vs ${r.total}`);
 });
+
+test('badges wipe in on the word that names them; stats roll like a scoreboard; both validate', { skip: !hasFfmpeg && 'no ffmpeg' }, async () => {
+  const spec: FilmSpec = {
+    format: 'vertical',
+    brand: brand(),
+    voice: { voice: 'af_heart' },
+    music: null,
+    scenes: [
+      { id: 'seats', kind: 'badges', head: 'Six seats', items: ['Coach', 'Player', 'Parent'], vo: 'The coach, the player and the parent.' },
+      { id: 'club', kind: 'stat', stats: [{ value: 73, label: 'Players' }, { value: 4, label: 'Sports', suffix: '+' }], vo: 'Seventy-three players across four sports.' },
+    ],
+  };
+  const dir = join(home, 'film-kinds');
+  const { deps } = stubDeps();
+  const r = await buildFilm(spec, dir, deps);
+  const html = readFileSync(join(dir, 'index.html'), 'utf8');
+  assert.equal(html.match(/class="chip c\d"/g)?.length, 3);
+  assert.match(html, />Parent</);
+  // One drum per digit: 7, 3 and 4.
+  assert.equal(html.match(/class="dr d\d-\d"/g)?.length, 3);
+  assert.match(html, /\.d0-0 i",\{yPercent:0\},\{yPercent:-70/);
+  assert.match(html, /\.d0-1 i",\{yPercent:0\},\{yPercent:-30/);
+  // Chips enter in order, each at or after the one before.
+  const at = [0, 1, 2].map((k) => Number(html.match(new RegExp(`\\.c${k}",\\{opacity:0[^}]*\\},\\{[^}]*\\},([\\d.]+)`))![1]));
+  assert.ok(at[0] <= at[1] && at[1] <= at[2], at.join(' '));
+  assert.ok(r.total > 7);
+  assert.ok(validateFilmSpec({ ...spec, scenes: [{ id: 'x', kind: 'badges', items: ['one'] }] }).some((e) => e.includes('items')));
+  assert.ok(validateFilmSpec({ ...spec, scenes: [{ id: 'x', kind: 'stat', stats: [{ value: 1.5, label: 'Half' }] }] }).some((e) => e.includes('stats')));
+});

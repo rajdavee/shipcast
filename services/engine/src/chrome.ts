@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readlink, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { findChrome } from './doctor.ts';
@@ -69,8 +69,43 @@ class Session {
 }
 
 /** Spawn Chrome with remote debugging on and wait for its DevTools endpoint. */
+/** Chromes this process started. They go down with it, so a stopped run never leaves a profile locked. */
+const live = new Set<ChildProcess>();
+let reaping = false;
+function reapOnExit() {
+  if (reaping) return;
+  reaping = true;
+  const killAll = () => {
+    for (const p of live) p.kill('SIGKILL');
+    live.clear();
+  };
+  process.once('exit', killAll);
+  for (const sig of ['SIGINT', 'SIGTERM'] as const)
+    process.once(sig, () => {
+      killAll();
+      // Keep the default behaviour (exit) unless the app handles the signal itself.
+      if (!process.listenerCount(sig)) process.kill(process.pid, sig);
+    });
+}
+
+/** A profile's lock names the Chrome holding it ("host-pid"). Null when the lock is stale or absent. */
+async function profileHolder(dir: string): Promise<number | null> {
+  const target = await readlink(join(dir, 'SingletonLock')).catch(() => '');
+  const pid = Number(target.split('-').pop());
+  if (!pid) return null;
+  try {
+    process.kill(pid, 0);
+    return pid;
+  } catch {
+    return null;
+  }
+}
+
 async function spawnChrome(bin: string, args: string[]): Promise<{ proc: ChildProcess; wsUrl: string }> {
+  reapOnExit();
   const proc = spawn(bin, ['--remote-debugging-port=0', ...args], { stdio: ['ignore', 'ignore', 'pipe'] });
+  live.add(proc);
+  proc.once('exit', () => live.delete(proc));
   const wsUrl = await new Promise<string>((resolve, reject) => {
     let buf = '';
     // Busy CI machines can take well over 20 s to bring Chrome up.
@@ -126,9 +161,15 @@ export async function launchChrome(opts: ChromeOptions = {}): Promise<Chrome> {
   if (!opts.headful) args.push('--headless', '--hide-scrollbars', '--disable-gpu', '--no-sandbox', '--font-render-hinting=none');
   if (opts.windowSize) args.push(`--window-size=${opts.windowSize.width},${opts.windowSize.height}`);
   args.push(opts.startUrl ?? 'about:blank');
-  const { proc, wsUrl } = await spawnChrome(bin, args).catch(async (e) => {
+  const start = () => spawnChrome(bin, args);
+  const { proc, wsUrl } = await start().catch(async (e) => {
     if (temp) await rm(temp, { recursive: true, force: true }).catch(() => {});
-    throw e;
+    if (!opts.profileDir || !/ProcessSingleton|profile directory/i.test(String(e.message))) throw e;
+    // The profile is locked: by a Chrome that's still running (say so), or by one that died (clear it and retry).
+    const pid = await profileHolder(opts.profileDir);
+    if (pid) throw new Error(`This browser profile is open in another Chrome (pid ${pid}). Close it and try again.`);
+    for (const f of ['SingletonLock', 'SingletonSocket', 'SingletonCookie']) await rm(join(opts.profileDir, f), { force: true }).catch(() => {});
+    return start();
   });
   const exited = new Promise<void>((r) => (proc.exitCode !== null ? r() : proc.once('exit', () => r())));
   const session = new Session(wsUrl);

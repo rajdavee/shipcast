@@ -16,7 +16,7 @@ import type { VoiceShape } from './compile.ts';
  * laid out separately; the length is checked against the target.
  */
 
-export type FilmKind = 'title' | 'ui' | 'card' | 'cta' | 'bumper';
+export type FilmKind = 'title' | 'ui' | 'card' | 'cta' | 'bumper' | 'badges' | 'stat';
 
 export interface FilmTake {
   /** The recording (mp4). */
@@ -39,6 +39,10 @@ export interface FilmCallout {
 export interface FilmScene {
   id: string;
   kind: FilmKind;
+  /** badges: labelled chips that wipe in as the voice says each one (roles, sports, steps). Up to 8. */
+  items?: string[];
+  /** stat: big numbers that roll up like a scoreboard, each with a label. Up to 4. */
+  stats?: { value: number; label: string; suffix?: string }[];
   vo?: string;
   /** Minimum seconds on screen. */
   min?: number;
@@ -98,8 +102,8 @@ export interface FilmResult {
   words: Word[];
 }
 
-const KINDS: FilmKind[] = ['title', 'ui', 'card', 'cta', 'bumper'];
-const MIN: Record<FilmKind, number> = { title: 3, ui: 4, card: 5, cta: 4.5, bumper: 2.5 };
+const KINDS: FilmKind[] = ['title', 'ui', 'card', 'cta', 'bumper', 'badges', 'stat'];
+const MIN: Record<FilmKind, number> = { title: 3, ui: 4, card: 5, cta: 4.5, bumper: 2.5, badges: 3.5, stat: 3.5 };
 /** Voice starts this long into its scene and the scene holds this long after it. */
 const LEAD = 0.45;
 const TAIL = 0.6;
@@ -162,6 +166,8 @@ export function validateFilmSpec(spec: FilmSpec): string[] {
     if (s.min !== undefined && !(isNum(s.min) && s.min >= 0.5 && s.min <= 60)) e('min must be 0.5–60 seconds');
     for (const k of ['kick', 'head', 'sub'] as const) if (s[k] !== undefined && (typeof s[k] !== 'string' || s[k]!.length > (k === 'sub' ? 90 : 60))) e(`${k} must be text under ${k === 'sub' ? 90 : 60} characters`);
     if (s.kind === 'ui' && !s.take) e('take is required for a ui scene');
+    if (s.kind === 'badges' && !(Array.isArray(s.items) && s.items.length >= 2 && s.items.length <= 8 && s.items.every((x) => typeof x === 'string' && x.trim() && x.length <= 28))) e('items must list 2–8 labels of up to 28 characters');
+    if (s.kind === 'stat' && !(Array.isArray(s.stats) && s.stats.length >= 1 && s.stats.length <= 4 && s.stats.every((x) => x && Number.isInteger(x.value) && x.value >= 0 && x.value < 1e7 && typeof x.label === 'string' && x.label.length <= 28 && (x.suffix === undefined || (typeof x.suffix === 'string' && x.suffix.length <= 3))))) e('stats must list 1–4 { value: whole number, label, suffix? }');
     if (s.take) {
       if (s.kind !== 'ui' && s.kind !== 'bumper') e('take is only for ui and bumper scenes');
       if (typeof s.take.file !== 'string' || !isAbsolute(s.take.file) || !VIDEO.test(s.take.file)) e('take.file must be an absolute path to an mp4');
@@ -571,6 +577,34 @@ export async function buildFilm(spec: FilmSpec, dir: string, deps: FilmDeps): Pr
       const items = ['kick', 'head', 'sub'].filter((k) => sc[k as 'kick']).map((k) => `${S} .${k}`);
       if (items.length) tl(`tl.fromTo("${items.join(',')}",{opacity:0,y:22},{opacity:1,y:0,duration:.6,stagger:.18,ease:"expo.out"},${r3(st + 0.75)});`);
       if (spec.brand.url) tl(`tl.fromTo("${S} .url",{opacity:0,scale:.85},{opacity:1,scale:1,duration:.5,ease:"back.out(2)"},${r3(st + 1.4)});`);
+    } else if (sc.kind === 'badges') {
+      // Chips wipe in on the word that names them, like the speed bars of a scoreboard.
+      const items = sc.items ?? [];
+      const chips = items.map((x, k) => `<div class="chip c${k}"><b></b><span>${esc(x)}</span></div>`).join('');
+      open(`<div class="badges">${words('kick', sc.kick)}${words('head', sc.head)}<div class="chips n${items.length}">${chips}</div>${words('sub', sc.sub)}</div>`);
+      textIn();
+      let last = st + 0.5;
+      items.forEach((x, k) => {
+        const at = voAt(p, norm(x.split(/\s+/)[0]), last - 0.01, Math.min(st + d - 1, st + 0.6 + k * Math.min(0.45, (d - 1.6) / items.length)));
+        last = Math.max(last, at);
+        tl(`tl.fromTo("${S} .c${k}",{opacity:0,x:-40,clipPath:"inset(0 100% 0 0)"},{opacity:1,x:0,clipPath:"inset(0 0% 0 0)",duration:.5,ease:"expo.out"},${r3(at)});tl.fromTo("${S} .c${k} b",{scaleY:0},{scaleY:1,duration:.35,ease:"power3.out"},${r3(at + 0.12)});`);
+      });
+      exit(`${S} .badges`);
+    } else if (sc.kind === 'stat') {
+      // Scoreboard digits: each digit is a drum of 0–9 that rolls to its value, so every frame is exact.
+      const stats = sc.stats ?? [];
+      const drum = (v: number, cls: string) => String(v).split('').map((dg, k) => `<span class="dr ${cls}-${k}" data-d="${dg}"><i>${'0123456789'.split('').map((n) => `<em>${n}</em>`).join('')}</i></span>`).join('');
+      open(`<div class="stats">${words('kick', sc.kick)}${words('head', sc.head)}<div class="srow n${stats.length}">${stats.map((x, k) => `<div class="st s${k}"><div class="num">${drum(x.value, `d${k}`)}${x.suffix ? `<span class="sx">${esc(x.suffix)}</span>` : ''}</div><div class="lab">${esc(x.label)}</div></div>`).join('')}</div>${words('sub', sc.sub)}</div>`);
+      textIn();
+      let last = st + 0.5;
+      stats.forEach((x, k) => {
+        const at = voAt(p, norm(x.label.split(/\s+/)[0]), last - 0.01, st + 0.6 + k * 0.5);
+        const start = r3(Math.max(st + 0.4, Math.min(at, st + d - 1.4) - 0.6));
+        last = Math.max(last, at);
+        tl(`tl.fromTo("${S} .s${k}",{opacity:0,y:30},{opacity:1,y:0,duration:.5,ease:"expo.out"},${start});`);
+        String(x.value).split('').forEach((dg, j) => tl(`tl.fromTo("${S} .d${k}-${j} i",{yPercent:0},{yPercent:${-Number(dg) * 10},duration:${r3(0.9 + j * 0.15)},ease:"power3.out"},${start});`));
+      });
+      exit(`${S} .stats`);
     } else if (sc.kind === 'bumper') {
       open(`<div class="bump">${logo ? `<img class="bl" src="${logo}" alt="${esc(spec.brand.name)}">` : ''}${words('head', sc.head ?? spec.brand.name)}${words('sub', sc.sub)}</div>`);
       tl(`tl.fromTo("${S} .bump .head",{opacity:0,yPercent:60},{opacity:1,yPercent:0,duration:.6,ease:"expo.out"},${r3(st + 0.25)});`);
@@ -615,13 +649,15 @@ export async function buildFilm(spec: FilmSpec, dir: string, deps: FilmDeps): Pr
   let music: string | null = null;
   if (spec.music !== null) {
     const mood = (spec.music?.mood ?? 'uplifting') as Mood;
-    const level: Record<FilmKind, number> = { title: 0.5, ui: 0.62, card: 1, cta: 0.85, bumper: 0.9 };
+    const level: Record<FilmKind, number> = { title: 0.5, ui: 0.62, card: 1, cta: 0.85, bumper: 0.9, badges: 0.75, stat: 0.8 };
     const energy = [{ at: 0, level: 0.3 }, ...plan.map((p) => ({ at: p.start, level: level[p.sc.kind] }))];
     const sfx: FilmSfx[] = [];
     for (const p of plan) {
       if (p.start > 0.3) sfx.push({ kind: 'whoosh', at: r3(p.start - 0.14), gain: plan[p.i - 1]?.sc.dive ? 0.3 : 0.13 });
       if (p.sc.kind === 'card') sfx.push({ kind: 'riser', at: r3(Math.max(0, p.start - 1.4)), gain: 0.2 }, { kind: 'impact', at: r3(p.start + 0.05), gain: 0.22 });
       if (p.sc.kind === 'cta') sfx.push({ kind: 'impact', at: r3(p.start + 0.15), gain: 0.16 });
+      if (p.sc.kind === 'stat') sfx.push({ kind: 'riser', at: r3(Math.max(0, p.start - 0.8)), gain: 0.14 }, { kind: 'impact', at: r3(p.start + 1.3), gain: 0.14 });
+      if (p.sc.kind === 'badges') (p.sc.items ?? []).forEach((_, k) => sfx.push({ kind: 'pop', at: r3(p.start + 0.7 + k * 0.4), gain: 0.18 }));
       for (const x of tapsIn(p)) sfx.push({ kind: 'tick', at: x.g, gain: 0.32 });
     }
     music = (await deps.music(mood, r3(total + 0.6), sfx, join(dir, 'assets', 'music.wav'), energy, { bpm: spec.music?.bpm, seed: spec.music?.seed })).file || null;
@@ -675,6 +711,18 @@ html,body{margin:0;background:var(--bg)}
 .co i{display:block;width:26px;height:2px;background:var(--hi)}
 .cod i{width:2px;height:16px}
 .co span{display:inline-block;max-width:${vertical ? 230 : 330}px;padding:10px 18px;border-radius:999px;background:var(--hi);color:var(--bg);font:800 ${vertical ? 26 : 28}px/1.1 var(--fb);box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.badges,.stats{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 ${vertical ? 70 : 160}px}
+.chips{display:grid;gap:${vertical ? 22 : 26}px;margin:${vertical ? 56 : 44}px 0 ${vertical ? 30 : 20}px;grid-template-columns:repeat(${vertical ? 2 : 3},minmax(0,1fr));width:100%;max-width:${vertical ? 940 : 1500}px}
+.chips.n2{grid-template-columns:repeat(2,minmax(0,1fr))}${vertical ? '' : '.chips.n4,.chips.n8{grid-template-columns:repeat(4,minmax(0,1fr))}'}
+.chip{position:relative;display:flex;align-items:center;gap:18px;padding:${vertical ? '26px 30px' : '28px 32px'};background:linear-gradient(100deg,color-mix(in srgb,var(--accent) 22%,transparent),color-mix(in srgb,var(--accent) 6%,transparent));border:2px solid color-mix(in srgb,var(--accent) 45%,transparent);border-radius:14px 34px 14px 34px;text-align:left}
+.chip b{display:block;flex:none;width:12px;height:${vertical ? 54 : 58}px;border-radius:6px;background:var(--hi);transform-origin:50% 100%}
+.chip span{font:400 ${vertical ? 62 : 64}px/1 var(--fd);letter-spacing:.02em;color:var(--ink);text-transform:uppercase}
+.srow{display:flex;gap:${vertical ? 40 : 90}px;margin:${vertical ? 60 : 50}px 0 ${vertical ? 30 : 20}px;flex-wrap:wrap;justify-content:center}
+.st{display:flex;flex-direction:column;align-items:center;min-width:${vertical ? 380 : 300}px}
+.num{display:flex;align-items:flex-start;font:400 ${vertical ? 230 : 210}px/1 var(--fd);color:var(--ink)}
+.dr{display:inline-block;height:1em;overflow:hidden}.dr i{display:block;font-style:normal}.dr em{display:block;height:1em;font-style:normal}
+.sx{color:var(--hi);font-size:.6em;margin-left:6px}
+.lab{margin-top:14px;font:700 ${vertical ? 36 : 34}px/1.1 var(--fb);letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
 .title,.cta,.bump{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 ${vertical ? 80 : 160}px}
 .title .head,.bump .head{font-size:${vertical ? 96 : 104}px}
 .lg,.mark{position:relative;overflow:hidden;margin-bottom:${vertical ? 40 : 30}px}.lg img{display:block;width:${vertical ? 520 : 460}px}.mark img{display:block;width:${vertical ? 300 : 220}px}
