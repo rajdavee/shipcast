@@ -41,6 +41,8 @@ export interface FilmScene {
   kind: FilmKind;
   /** badges: labelled chips that wipe in as the voice says each one (roles, sports, steps). Up to 8. */
   items?: string[];
+  /** title: false leaves the logo out (a hook should open on the idea, not the brand). */
+  mark?: boolean;
   /** stat: big numbers that roll up like a scoreboard, each with a label. Up to 4. */
   stats?: { value: number; label: string; suffix?: string }[];
   vo?: string;
@@ -166,6 +168,7 @@ export function validateFilmSpec(spec: FilmSpec): string[] {
     if (s.min !== undefined && !(isNum(s.min) && s.min >= 0.5 && s.min <= 60)) e('min must be 0.5–60 seconds');
     for (const k of ['kick', 'head', 'sub'] as const) if (s[k] !== undefined && (typeof s[k] !== 'string' || s[k]!.length > (k === 'sub' ? 90 : 60))) e(`${k} must be text under ${k === 'sub' ? 90 : 60} characters`);
     if (s.kind === 'ui' && !s.take) e('take is required for a ui scene');
+    if (s.mark !== undefined && typeof s.mark !== 'boolean') e('mark must be true or false');
     if (s.kind === 'badges' && !(Array.isArray(s.items) && s.items.length >= 2 && s.items.length <= 8 && s.items.every((x) => typeof x === 'string' && x.trim() && x.length <= 28))) e('items must list 2–8 labels of up to 28 characters');
     if (s.kind === 'stat' && !(Array.isArray(s.stats) && s.stats.length >= 1 && s.stats.length <= 4 && s.stats.every((x) => x && Number.isInteger(x.value) && x.value >= 0 && x.value < 1e7 && typeof x.label === 'string' && x.label.length <= 28 && (x.suffix === undefined || (typeof x.suffix === 'string' && x.suffix.length <= 3))))) e('stats must list 1–4 { value: whole number, label, suffix? }');
     if (s.take) {
@@ -244,7 +247,8 @@ function layout(vertical: boolean, phoneAspect: number, deskAspect: number) {
   const SY = vertical ? 470 : Math.round((H - SH) / 2);
   // Desktop: a window right of the text in 16:9; a framed panel in 9:16.
   const DW = vertical ? 1000 : 1060;
-  const DH = Math.min(vertical ? 900 : 800, Math.round(DW * deskAspect));
+  // In 9:16 the panel is taller than the recording and shows a crop of it at about 1.2× its size, so text stays readable.
+  const DH = vertical ? 1120 : Math.min(800, Math.round(DW * deskAspect));
   const CHROME = vertical ? 0 : 44;
   const DX = vertical ? 40 : W - 120 - DW;
   const DY = vertical ? Math.round(SY + (SH - DH) / 2) : Math.round((H - DH - CHROME) / 2);
@@ -252,7 +256,7 @@ function layout(vertical: boolean, phoneAspect: number, deskAspect: number) {
   // Captions: under the device in 9:16 (clear of the right-hand action rail), in the text column in 16:9.
   const capDevice = vertical ? { top: SY + SH + BEZ + 40, left: 70, right: 150, size: 46, align: 'center' } : { top: 800, left: 120, right: W - 740, size: 40, align: 'left' };
   const capWide = vertical ? { top: 1560, left: 70, right: 150, size: 50, align: 'center' } : { top: 950, left: 200, right: 200, size: 46, align: 'center' };
-  return { W, H, SW, SH, BEZ, RAD, SX, SY, DW, DH, DX, DY, CHROME, text, capDevice, capWide };
+  return { W, H, SW, SH, BEZ, RAD, SX, SY, DW, DH, DX, DY, CHROME, text, capDevice, capWide, deskAspect };
 }
 
 type Device = 'phone' | 'desk';
@@ -301,7 +305,7 @@ export async function buildFilm(spec: FilmSpec, dir: string, deps: FilmDeps): Pr
       else warnings.push(`scene "${s.id}": no mark "${s.take.fromMark}" in the take log — starting at ${from.toFixed(1)} s`);
     }
     from = Math.max(0, Math.min(from, Math.max(0, p.duration - 0.5)));
-    if (device === 'desk' && vertical) warnings.push(`scene "${s.id}": a desktop take in a 9:16 film is shown as a framed panel — record a phone take for vertical`);
+    if (device === 'desk' && vertical) warnings.push(`scene "${s.id}": a desktop take in a 9:16 film is shown cropped around its zoom focus — a phone take reads better in vertical`);
     takes[i] = { src: s.take.file, rel: await asset(s.take.file), from: r3(from), span: r3(p.duration - from), device, log, width, height };
   }
 
@@ -387,14 +391,18 @@ export async function buildFilm(spec: FilmSpec, dir: string, deps: FilmDeps): Pr
     }
     return runs;
   };
-  const screenVideos = (ps: Planned[], r: Rect) =>
+  /** `aspect` set: the recording keeps its shape, fills the height and is cropped around the scene's focus (zoom origin). */
+  const screenVideos = (ps: Planned[], r: Rect, aspect?: number) =>
     ps
       .map((p) => {
+        const vw = aspect ? Math.max(r.w, Math.round(r.h / aspect)) : r.w;
+        const fx = p.sc.zoom?.[0]?.[2] ?? 0.5;
+        const ox = aspect ? -Math.round((vw - r.w) * fx) : 0;
         const ripples = tapsIn(p)
           .filter((x) => x.g < p.start + p.duration - 0.3)
-          .map((x, k) => `<div id="tp-${p.sc.id}-${k}" class="clip tap" data-start="${x.g}" data-duration="0.6" data-track-index="${7 + (k % 2)}" style="left:${Math.round(x.x * r.w) - 40}px;top:${Math.round(x.y * r.h) - 40}px"><u></u></div>`)
+          .map((x, k) => `<div id="tp-${p.sc.id}-${k}" class="clip tap" data-start="${x.g}" data-duration="0.6" data-track-index="${7 + (k % 2)}" style="left:${Math.round(x.x * vw) + ox - 40}px;top:${Math.round(x.y * r.h) - 40}px"><u></u></div>`)
           .join('');
-        return `<div class="zoom" id="z-${p.sc.id}" style="width:${r.w}px;height:${r.h}px"><video id="v-${p.sc.id}" src="${p.take!.rel}" muted playsinline data-start="${p.start}" data-duration="${p.duration}" data-media-start="${p.take!.from}" data-track-index="2" data-has-audio="false" data-volume="0" style="position:absolute;left:0;top:0;width:${r.w}px;height:${r.h}px;object-fit:cover"></video>${ripples}</div>`;
+        return `<div class="zoom" id="z-${p.sc.id}" style="width:${r.w}px;height:${r.h}px"><video id="v-${p.sc.id}" src="${p.take!.rel}" muted playsinline data-start="${p.start}" data-duration="${p.duration}" data-media-start="${p.take!.from}" data-track-index="2" data-has-audio="false" data-volume="0" style="position:absolute;left:${ox}px;top:0;width:${vw}px;height:${r.h}px;object-fit:cover"></video>${ripples}</div>`;
       })
       .join('\n');
 
@@ -429,7 +437,7 @@ export async function buildFilm(spec: FilmSpec, dir: string, deps: FilmDeps): Pr
     add(`<div id="pane" style="position:absolute;left:${DX}px;top:${DY}px;width:${DW}px;height:${DH}px">`);
     deskRuns.forEach((r, k) => add(`<div id="pf${k}" class="clip" data-start="${r.start}" data-duration="${r3(r.end - r.start)}" data-track-index="1"><div class="pframe"></div></div>`));
     add(`<div id="pscreen" style="position:absolute;left:0;top:0;width:${DW}px;height:${DH}px;overflow:hidden;border-radius:22px">`);
-    add(screenVideos(deskRuns.flatMap((r) => r.scenes), { x: DX, y: DY, w: DW, h: DH }));
+    add(screenVideos(deskRuns.flatMap((r) => r.scenes), { x: DX, y: DY, w: DW, h: DH }, L.deskAspect));
     add(`</div></div>`);
     tl(`tl.set("#pane",{opacity:0},0);`);
     for (const r of deskRuns) {
@@ -540,10 +548,10 @@ export async function buildFilm(spec: FilmSpec, dir: string, deps: FilmDeps): Pr
         tl(`tl.fromTo("#${id} span",{opacity:0,x:${dx},y:${dy},scale:.85},{opacity:1,x:0,y:0,scale:1,duration:.4,ease:"back.out(2)"},${r3(c.g + 0.25)});tl.fromTo("#${id}",{opacity:1},{opacity:0,duration:.2,immediateRender:false},${r3(c.g + len)});`);
       });
     } else if (sc.kind === 'title') {
-      const mark = logo ? `<div class="lg"><img src="${logo}" alt="${esc(spec.brand.name)}"><div class="glint"><i></i></div></div>` : `<div class="nm">${esc(spec.brand.name)}</div>`;
+      const mark = sc.mark === false ? '' : logo ? `<div class="lg"><img src="${logo}" alt="${esc(spec.brand.name)}"><div class="shine" style="-webkit-mask-image:url(${logo});mask-image:url(${logo})"><div class="glint"><i></i></div></div></div>` : `<div class="nm">${esc(spec.brand.name)}</div>`;
       open(`<div class="title">${mark}${words('kick', sc.kick)}${words('head', sc.head)}${words('sub', sc.sub)}</div>`);
-      if (logo) tl(`tl.fromTo("${S} .lg",{clipPath:"inset(0 100% 0 0)",scale:1.08},{clipPath:"inset(0 0% 0 0)",scale:1,duration:.9,ease:"expo.out"},${r3(st + 0.05)});tl.fromTo("${S} .glint",{xPercent:-150},{xPercent:400,duration:.9,ease:"power2.inOut"},${r3(st + 0.7)});`);
-      else tl(`tl.fromTo("${S} .nm",{opacity:0,scaleX:.8},{opacity:1,scaleX:1,duration:.8,ease:"expo.out"},${r3(st + 0.1)});`);
+      if (sc.mark !== false && logo) tl(`tl.fromTo("${S} .lg",{clipPath:"inset(0 100% 0 0)",scale:1.08},{clipPath:"inset(0 0% 0 0)",scale:1,duration:.9,ease:"expo.out"},${r3(st + 0.05)});tl.fromTo("${S} .glint",{xPercent:-150},{xPercent:400,duration:.9,ease:"power2.inOut"},${r3(st + 0.7)});`);
+      else if (sc.mark !== false) tl(`tl.fromTo("${S} .nm",{opacity:0,scaleX:.8},{opacity:1,scaleX:1,duration:.8,ease:"expo.out"},${r3(st + 0.1)});`);
       textIn();
       exit(`${S} .title`);
     } else if (sc.kind === 'card') {
@@ -570,7 +578,7 @@ export async function buildFilm(spec: FilmSpec, dir: string, deps: FilmDeps): Pr
       // The URL gets its own pill; a sub line that only repeats it is dropped.
       const norm = (u?: string) => (u ?? '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\.|\/$/g, '');
       if (spec.brand.url && norm(sc.sub) === norm(spec.brand.url)) sc = { ...sc, sub: undefined };
-      const mark = logo ? `<div class="mark"><img src="${logo}" alt="${esc(spec.brand.name)}"><div class="glint"><i></i></div></div>` : `<div class="nm">${esc(spec.brand.name)}</div>`;
+      const mark = logo ? `<div class="mark"><img src="${logo}" alt="${esc(spec.brand.name)}"><div class="shine" style="-webkit-mask-image:url(${logo});mask-image:url(${logo})"><div class="glint"><i></i></div></div></div>` : `<div class="nm">${esc(spec.brand.name)}</div>`;
       open(`<div class="cta">${mark}${words('kick', sc.kick)}${words('head', sc.head)}${words('sub', sc.sub)}${spec.brand.url ? `<div class="url">${esc(spec.brand.url)}</div>` : ''}</div>`);
       if (logo) tl(`tl.fromTo("${S} .mark",{clipPath:"inset(0 100% 0 0)",x:-30},{clipPath:"inset(0 0% 0 0)",x:0,duration:.8,ease:"expo.out"},${r3(st + 0.05)});tl.fromTo("${S} .glint",{xPercent:-160},{xPercent:400,duration:.8,ease:"power2.inOut"},${r3(st + 0.55)});`);
       else tl(`tl.fromTo("${S} .nm",{opacity:0,scaleX:.8},{opacity:1,scaleX:1,duration:.8,ease:"expo.out"},${r3(st + 0.05)});`);
@@ -726,7 +734,8 @@ html,body{margin:0;background:var(--bg)}
 .title,.cta,.bump{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 ${vertical ? 80 : 160}px}
 .title .head,.bump .head{font-size:${vertical ? 96 : 104}px}
 .lg,.mark{position:relative;overflow:hidden;margin-bottom:${vertical ? 40 : 30}px}.lg img{display:block;width:${vertical ? 520 : 460}px}.mark img{display:block;width:${vertical ? 300 : 220}px}
-.glint{position:absolute;top:0;left:0;width:25%;height:100%}.glint i{display:block;width:100%;height:100%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.6),transparent);transform:skewX(-16deg);mix-blend-mode:overlay}
+.shine{position:absolute;inset:0;overflow:hidden;-webkit-mask-size:100% 100%;mask-size:100% 100%;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat}
+.glint{position:absolute;top:0;left:0;width:25%;height:100%}.glint i{display:block;width:100%;height:100%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.75),transparent);transform:skewX(-16deg)}
 .nm{font:900 ${vertical ? 120 : 132}px/1 var(--fd);margin-bottom:24px}
 .card{position:absolute;inset:0}
 .cbg{position:absolute;inset:-60px;background-size:cover;background-position:center;filter:blur(36px) brightness(.42)}

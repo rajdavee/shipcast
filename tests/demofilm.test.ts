@@ -315,3 +315,33 @@ test('badges wipe in on the word that names them; stats roll like a scoreboard; 
   assert.ok(validateFilmSpec({ ...spec, scenes: [{ id: 'x', kind: 'badges', items: ['one'] }] }).some((e) => e.includes('items')));
   assert.ok(validateFilmSpec({ ...spec, scenes: [{ id: 'x', kind: 'stat', stats: [{ value: 1.5, label: 'Half' }] }] }).some((e) => e.includes('stats')));
 });
+
+test('9:16 shows a desktop take cropped at readable size around its focus; the logo shine is masked to the logo; a hook can skip the logo', { skip: !hasFfmpeg && 'no ffmpeg' }, async () => {
+  const spec: FilmSpec = {
+    format: 'vertical',
+    brand: brand(boxLogo),
+    voice: null,
+    music: null,
+    scenes: [
+      { id: 'hook', kind: 'title', mark: false, head: 'Six seats. One game.' },
+      { id: 'ops', kind: 'ui', take: { file: desk, log: `${desk}.json`, from: 0 }, head: 'Operations', zoom: [[0, 1, 0, 0.5]] },
+      { id: 'cta', kind: 'cta', head: 'Track the edge.' },
+    ],
+  };
+  const dir = join(home, 'film-crop');
+  const { deps } = stubDeps();
+  await buildFilm(spec, dir, deps);
+  const html = readFileSync(join(dir, 'index.html'), 'utf8');
+  const v = html.match(/<video id="v-ops"[^>]*style="position:absolute;left:(-?\d+)px;top:0;width:(\d+)px;height:(\d+)px/)!;
+  const pane = html.match(/<div id="pane" style="[^"]*width:(\d+)px;height:(\d+)px/)!;
+  // Fills the panel's height, wider than the panel, anchored at the left edge (focus 0).
+  assert.equal(v[3], pane[2]);
+  assert.ok(Number(v[2]) > Number(pane[1]), `${v[2]} > ${pane[1]}`);
+  assert.equal(v[1], '0');
+  // At least 1.15× the size the recording would have at the panel's width.
+  assert.ok(Number(v[2]) / Number(pane[1]) >= 1.15);
+  // The shine sits in a layer masked by the logo itself; the hook has no logo.
+  assert.match(html, /<div class="shine" style="-webkit-mask-image:url\(assets\/[^)]+\);mask-image:url\(/);
+  assert.doesNotMatch(html.match(/<div id="g-hook"[\s\S]*?<\/div><\/div>/)![0], /class="lg"/);
+  assert.ok(validateFilmSpec({ ...spec, scenes: [{ id: 'x', kind: 'title', mark: 'no' as any }] }).some((e) => e.includes('mark')));
+});
