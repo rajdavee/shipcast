@@ -48,7 +48,7 @@ on the phone (390 × 844) for people on the move and on the desktop (1440 × 900
 for operator screens. Put a `mark` before each beat the script talks about. The
 film cuts on marks, and callouts and tap ticks come from the tap log.
 
-- Use demo or fictional data only. Never real people's names, photos or messages.
+- Use demo or fictional data only. Never real people's names, photos or messages. When a screen lists anyone who isn't clearly demo data, start the take with a `redact` step naming them.
 - When the product needs a login, ask the user to sign in once in the visible
   window (`scripts/takes.mjs signin <url>`). Shipcast keeps that session private
   to the workspace. Never ask for or type a password yourself.

@@ -23,6 +23,8 @@ const PAGE = `<!doctype html><html><head><meta name="viewport" content="width=de
 <button id="copy">Copy link</button><div role="status" id="st"></div>
 <label for="plan">Plan</label><select id="plan"><option value="free">Free</option><option value="pro">Pro</option><option value="team">Team</option></select>
 <button id="del">Delete account</button>
+<label for="csv">Data file</label><input type="file" id="csv" style="display:none">
+<p id="who">Owner: jane.doe@private.test</p>
 <div class="tall"></div>
 <h2 id="pricing">Pricing</h2><p>Pro is $9 a month.</p><div style="height:600px"></div>
 <div role="dialog" aria-label="Details" id="dlg" hidden><p>Details: plans start at $9 a month.</p><button id="close">Close</button></div>
@@ -35,6 +37,10 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape') dlg.hidden
 $('copy').onclick = () => { st.textContent = 'Link copied'; };
 plan.onchange = () => hit('plan=' + plan.value);
 $('del').onclick = () => hit('delete');
+$('csv').onchange = () => hit('file=' + [...$('csv').files].map((f) => f.name + ':' + f.size).join(','));
+// Rows that arrive later must be covered too.
+setTimeout(() => { const p = document.createElement('p'); p.id = 'late'; p.textContent = 'Late row: jane.doe@private.test'; document.body.appendChild(p); }, 900);
+if (location.search.includes('probe')) setTimeout(() => hit('blur=' + getComputedStyle($('who')).filter + '|' + getComputedStyle($('late')).filter + '|' + getComputedStyle(document.querySelector('h1')).filter), 1600);
 </script></body></html>`;
 
 const hits: string[] = [];
@@ -138,4 +144,17 @@ test('session profiles are private to the workspace and can be forgotten', async
   assert.deepEqual(await runAs({ workspace: 'wtakes0002' }, listSessions), []);
   assert.equal(await runAs({ workspace: 'wtakes0001' }, () => forgetSession('app.example.com:8443')), true);
   assert.ok(!existsSync(dir));
+});
+
+test('upload attaches a local file to a hidden input; redact blurs matching text, including rows that load later', { skip }, async () => {
+  const csv = join(out, 'stats.csv');
+  (await import('node:fs')).writeFileSync(csv, 'name,speed\nSam,31.2\n');
+  hits.length = 0;
+  await recordTake({ url: base, viewport: 'desktop', out: join(out, 'redact.mp4'), steps: [{ redact: ['jane.doe@private.test'] }, { goto: base + '?probe' }, { upload: { label: 'Data file' }, files: [csv] }, { wait: 2200 }], pauseMs: 100, holdMs: 200 });
+  assert.ok(hits.includes('file=stats.csv:20'), hits.join(' '));
+  const blur = hits.find((h) => h.startsWith('blur='))!;
+  const [who, late, h1] = blur.slice(5).split('|');
+  assert.match(who, /blur/);
+  assert.match(late, /blur/);
+  assert.equal(h1, 'none');
 });

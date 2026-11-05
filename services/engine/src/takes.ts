@@ -1,6 +1,7 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { basename, dirname, join } from 'node:path';
+import { existsSync } from 'node:fs';
+import { basename, dirname, join, resolve } from 'node:path';
 import { launchChrome, type Chrome } from './chrome.ts';
 import { run } from './exec.ts';
 import { fullChrome } from './capture-session.ts';
@@ -33,7 +34,11 @@ export type TakeStep =
   | { scrollTo: TakeTarget; offset?: number; ms?: number }
   | { wait: number }
   | { mark: string }
-  | { clear: 'storage' };
+  | { clear: 'storage' }
+  /** Attach local files to a file input (the input itself may be hidden). */
+  | { upload: TakeTarget; files: string[] }
+  /** Blur every element whose text contains one of these strings, for the rest of the take (names, emails). */
+  | { redact: string[] };
 
 export interface TakeOptions {
   url: string;
@@ -268,6 +273,31 @@ async function inView(tab: Tab, t: TakeTarget): Promise<Box> {
   return boxOf(tab, t);
 }
 
+/**
+ * Blur text that must not appear on camera. Installed once per document and
+ * kept up to date by a MutationObserver, so rows that load later are covered too.
+ */
+const redactJs = (terms: string[]) => `(() => {
+  const terms = ${JSON.stringify(terms.map((t) => t.toLowerCase()))};
+  const hide = (root) => {
+    const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    for (let n = w.nextNode(); n; n = w.nextNode()) {
+      const t = (n.nodeValue || '').toLowerCase();
+      if (t.trim() && terms.some((x) => t.includes(x)) && n.parentElement) n.parentElement.style.filter = 'blur(9px)';
+    }
+    for (const el of root.querySelectorAll ? root.querySelectorAll('input,textarea') : []) if (terms.some((x) => String(el.value || '').toLowerCase().includes(x))) el.style.filter = 'blur(9px)';
+  };
+  const start = () => {
+    hide(document.body);
+    if (window.__scRedact) window.__scRedact.disconnect();
+    // Observer callbacks run before the next paint, so new text is blurred before it's ever drawn.
+    window.__scRedact = new MutationObserver(() => hide(document.body));
+    window.__scRedact.observe(document.body, { subtree: true, childList: true, characterData: true });
+  };
+  if (document.body) start();
+  else new MutationObserver((_, o) => { if (document.body) { o.disconnect(); start(); } }).observe(document.documentElement, { childList: true });
+})()`;
+
 /** A discreet tap ring: a 44 px cyan circle that grows and fades over 0.6 s. */
 const ringJs = (x: number, y: number) => `(() => {
   const d = document.createElement('div');
@@ -377,15 +407,40 @@ async function recordOnce(opts: TakeOptions, headful: boolean): Promise<TakeLog>
       taps.push({ label: t.name ?? t.text ?? t.label ?? (b.name || t.css || 'tap'), at: at(), x: Math.round((x / vp.width) * 1e4) / 1e4, y: Math.round((y / vp.height) * 1e4) / 1e4 });
       await act(b);
     };
+    // Redactions apply from the moment they're set, including on pages opened later.
+    let redact: string[] = [];
+    const applyRedact = () => (redact.length ? tab.eval(redactJs(redact)).catch(() => {}) : Promise.resolve());
     await sleep(hold);
     for (const step of opts.steps) {
       if ('goto' in step) {
         await tab.goto(new URL(step.goto, await tab.eval<string>('location.href')).href);
         await guard();
+        await applyRedact();
+      } else if ('redact' in step) {
+        redact = [...new Set([...redact, ...step.redact.filter((t) => typeof t === 'string' && t.trim().length >= 2)])];
+        await tab.send('Page.addScriptToEvaluateOnNewDocument', { source: redactJs(redact) });
+        await applyRedact();
+        continue;
+      } else if ('upload' in step) {
+        const files = step.files.map((f) => resolve(f));
+        for (const f of files) if (!existsSync(f)) throw new Error(`upload: ${f} doesn't exist`);
+        const { result } = await tab.send('Runtime.evaluate', { expression: `(() => { ${FINDER_JS}; const t = ${JSON.stringify(step.upload)}; const isFile = (e) => e && e.tagName === 'INPUT' && e.type === 'file';
+          const near = (el) => (isFile(el) ? el : el.querySelector('input[type=file]') || el.closest('form,label,div')?.querySelector('input[type=file]'));
+          const hit = __scFind(t); if (hit) { const f = near(hit.el); if (f) return f; }
+          // File inputs are usually hidden, which the finder skips: try labels, then CSS, then the page's only file input.
+          const norm = (s) => String(s || '').replace(/\\s+/g, ' ').trim().toLowerCase();
+          const want = norm(t.label || t.name || t.text);
+          if (want) for (const l of document.querySelectorAll('label')) if (norm(l.innerText).includes(want) && isFile(l.control)) return l.control;
+          if (t.css) { const c = document.querySelector(t.css); if (c) return near(c) || null; }
+          const all = document.querySelectorAll('input[type=file]'); return all.length === 1 ? all[0] : null; })()` });
+        if (!result?.objectId) throw new Error(`Couldn't find a file input at ${describeTarget(step.upload)}`);
+        await tab.send('DOM.setFileInputFiles', { files, objectId: result.objectId });
+        await tab.settle();
       } else if ('tap' in step) {
         await tap(step.tap, (b) => press(tab, b.x + b.w / 2, b.y + b.h / 2));
         await sleep(250);
         await tab.settle();
+        await applyRedact();
       } else if ('select' in step) {
         const value = step.value;
         await tap(step.select, async () => {

@@ -21,6 +21,9 @@
 //   "out": "out/takes"
 // }
 // Targets: { role, name } | { text } | { label } | { css }, plus "nth". A name like "/^save/i" is a pattern.
+// Also: { "upload": { "label": "Data file" }, "files": ["work/stats.csv"] } attaches a file (hidden inputs too),
+// and { "redact": ["jane@real-domain.com", "Real Person"] } blurs that text for the rest of the take: put it first
+// whenever a screen lists real people's names or emails.
 // Writes <name>.mp4 and <name>.json ({ marks, taps }) per take; prints one JSON line each.
 import { mkdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
