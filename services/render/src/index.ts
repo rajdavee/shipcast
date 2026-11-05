@@ -8,9 +8,10 @@ import { CAPTION_STYLES } from './captions.ts';
 import { compileStoryboard, echoesVoice, validateStoryboard, type Storyboard, type VoiceShape } from './compile.ts';
 import { compileCaptionVideo } from './captionVideo.ts';
 import { compileInfographic, validateInfographic } from './infographic.ts';
+import { buildFilm, validateFilmSpec, type FilmDeps, type FilmSpec } from './demofilm.ts';
 
-export { SCENES, CAPTION_STYLES, compileStoryboard, validateStoryboard, validateInfographic, echoesVoice };
-export type { Storyboard };
+export { SCENES, CAPTION_STYLES, compileStoryboard, validateStoryboard, validateInfographic, echoesVoice, buildFilm, validateFilmSpec };
+export type { Storyboard, FilmSpec };
 
 /** Voice lines are cached by (text, voice, speed, shape): editing visuals never re-synthesizes speech. */
 async function cachedVoice(text: string, voice: string, speed: number, out: string, shape: VoiceShape = {}) {
@@ -38,6 +39,13 @@ const deps = {
   music: (mood: string, seconds: number, sfx: unknown[], out: string, energy?: { at: number; level: number }[]) => callService('media', 'music', { mood, seconds, sfx, out, energy }),
   mix: (voice: string | null, music: string | null, out: string, seconds: number, gainDb?: number) => callService('media', 'mix', { voice, music, out, seconds, ...(gainDb !== undefined ? { musicGainDb: gainDb } : {}) }),
   transcribe: (file: string) => callService('media', 'transcribe', { file }),
+};
+
+/** Film deps: the same cached voice, plus the score's tempo and seed. */
+const filmDeps: FilmDeps = {
+  voice: cachedVoice,
+  music: (mood, seconds, sfx, out, energy, opts) => callService('media', 'music', { mood, seconds, sfx, out, energy, ...(opts?.bpm ? { bpm: opts.bpm } : {}), ...(opts?.seed !== undefined ? { seed: opts.seed } : {}) }),
+  mix: (voice, music, out, seconds, gainDb) => deps.mix(voice, music, out, seconds, gainDb),
 };
 
 /** Render with HyperFrames; when parallel capture times out under load, retry once with a single worker. */
@@ -297,6 +305,47 @@ export function createRenderService() {
       },
 
       validateInfographic: async ({ spec }) => ({ errors: validateInfographic(spec) }),
+
+      validateFilm: async ({ spec }) => ({ errors: validateFilmSpec(spec) }),
+
+      /**
+       * Demo film from real takes: build the project next to `out`, render it,
+       * mux the mastered mix and write the captions beside the film.
+       */
+      demoFilm: async ({ spec, out, quality = 'final' }: { spec: FilmSpec; out: string; quality?: string }, ctx) => {
+        const errs = validateFilmSpec(spec);
+        if (errs.length) throw new Error(`film spec is invalid:\n- ${errs.join('\n- ')}`);
+        const file = assertInHome(out, 'out');
+        if (!file.endsWith('.mp4')) throw new Error('out must be an .mp4 path');
+        if (spec.brand.logo) assertInHome(spec.brand.logo, 'brand.logo');
+        spec.scenes.forEach((s, i) => {
+          if (s.take?.file) assertInHome(s.take.file, `scenes[${i}].take.file`);
+          if (s.take?.log) assertInHome(s.take.log, `scenes[${i}].take.log`);
+          if (s.image) assertInHome(s.image, `scenes[${i}].image`);
+        });
+        // The project lives beside the film (inside the caller's home), so voice and mix can write into it.
+        const project = file.replace(/\.mp4$/, '.film');
+        await run('rm', ['-rf', project]);
+        ctx.progress(0.05, 'voice, score and layout');
+        const built = await buildFilm(spec, project, filmDeps);
+        ctx.progress(0.4, 'rendering frames');
+        const raw = join(project, 'render.raw.mp4');
+        const r = await hfRender(['render', '.', '-o', raw, '--quality', quality === 'draft' ? 'draft' : 'delivery', '--fps', '30', '--quiet'], project);
+        if (r.code !== 0) throw new Error(`render failed: ${(r.stderr || r.stdout).slice(-900)}`);
+        ctx.progress(0.9, 'muxing sound');
+        const args = built.audio
+          ? ['-y', '-v', 'error', '-i', raw, '-i', built.audio, '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-t', String(built.total), '-movflags', '+faststart', file]
+          : ['-y', '-v', 'error', '-i', raw, '-map', '0:v', '-c:v', 'copy', '-t', String(built.total), '-movflags', '+faststart', file];
+        const m = await run('ffmpeg', args, { timeoutMs: 600_000 });
+        if (m.code !== 0) throw new Error(`muxing failed: ${m.stderr.slice(-300)}`);
+        await run('rm', ['-f', raw]);
+        let srt: string | null = null;
+        if (built.srt) {
+          srt = file.replace(/\.mp4$/, '.srt');
+          await copyFile(built.srt, srt);
+        }
+        return { file, srt, project, total: built.total, scenes: built.scenes, warnings: built.warnings };
+      },
 
       /** Animated framework infographic → looping MP4, GIF for LinkedIn, PNG still. */
       infographic: async ({ spec, outDir, brandDir, name = 'infographic' }, ctx) => {
